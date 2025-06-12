@@ -71,6 +71,7 @@
 		"svelte"
 	],
 	"dependencies": {
+		"lucide-svelte": "^0.513.0",
 		"tailwindcss-animate": "^1.0.7"
 	}
 }

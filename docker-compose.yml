@@ -8,9 +8,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 한국어 지원을 위한 로케일 설정
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # 초기화 스크립트 자동 실행
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # 설정 파일 마운트
+      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     ports:
       - "${POSTGRES_PORT}:5432"
     restart: unless-stopped
@@ -19,17 +25,20 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    # 성능 최적화를 위한 명령어 추가
+    # command: >
+    #   postgres  -c max_connections=200 -c shared_buffers=256MB -c effective_cache_size=1GB -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=200 -c max_wal_size=1GB -c min_wal_size=80MB -c autovacuum_vacuum_scale_factor=0.2 -c autovacuum_analyze_scale_factor=0.1 -c autovacuum_freeze_max_age=150000000 -c autovacuum_freeze_min_age=5000000
 
   api:
     build:
-      context: ./backendsapi
+      context: ./backends/api
       dockerfile: Dockerfile
     container_name: ${APP_NAME}_api
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       API_PORT: ${API_PORT}
       RUST_LOG: ${RUST_LOG_LEVEL}
