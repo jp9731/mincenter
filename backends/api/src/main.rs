@@ -49,7 +49,8 @@ async fn main() {
         .route("/api/auth/login", post(handlers::auth::login))
         .route("/api/auth/refresh", post(handlers::auth::refresh))
         .route("/api/auth/logout", post(handlers::auth::logout))
-        .route("/api/auth/me", get(handlers::auth::me))
+        // Admin auth routes
+        .route("/api/admin/auth/login", post(handlers::admin::admin_login))
         // Community routes (public)
         .route("/api/community/boards", get(handlers::community::get_boards))
         .route("/api/community/boards/:board_id/categories", get(handlers::community::get_categories))
@@ -59,6 +60,7 @@ async fn main() {
 
     // 인증이 필요한 라우터
     let protected_routes = Router::new()
+        .route("/api/auth/me", get(handlers::auth::me))
         .route("/api/community/posts", post(handlers::community::create_post))
         .route("/api/community/posts/:post_id", put(handlers::community::update_post))
         .route("/api/community/posts/:post_id", delete(handlers::community::delete_post))
@@ -67,11 +69,25 @@ async fn main() {
         .route("/api/community/comments/:comment_id", delete(handlers::community::delete_comment))
         .layer(from_fn_with_state(state.clone(), middleware::auth_middleware));
 
+    // 관리자 라우터 (관리자 권한 필요) - 실제로 구현된 함수들만 포함
+    let admin_routes = Router::new()
+        // 대시보드
+        .route("/api/admin/dashboard/stats", get(handlers::admin::get_dashboard_stats))
+        // 사용자 관리
+        .route("/api/admin/users", get(handlers::admin::get_users))
+        // 게시글 관리
+        .route("/api/admin/posts", get(handlers::admin::get_posts))
+        // 게시판 관리
+        .route("/api/admin/boards", get(handlers::admin::get_boards))
+        // 댓글 관리
+        .route("/api/admin/comments", get(handlers::admin::get_comments))
+        .layer(from_fn_with_state(state.clone(), middleware::admin_middleware));
+
     // 라우터 결합
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
-        .layer(Extension(config.clone()))
+        .merge(admin_routes)
         .layer(CorsLayer::permissive())
         .with_state(state);
 

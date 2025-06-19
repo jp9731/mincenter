@@ -202,4 +202,5 @@ pub struct PostSummary {
     pub user_name: Option<String>,
     pub board_name: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
+    pub comment_count: Option<i64>,
 } 

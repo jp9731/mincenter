@@ -80,7 +80,11 @@ export async function login(email: string, password: string) {
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({
+        email,
+        password,
+        service_type: 'site'
+      })
     });
 
     const apiResponse = await response.json();
@@ -116,7 +120,10 @@ export async function logout() {
       await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken })
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+          service_type: 'site'
+        })
       });
     }
   } catch (e) {
@@ -147,7 +154,10 @@ export async function register(userData: {
     const response = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
+      body: JSON.stringify({
+        ...userData,
+        service_type: 'site'
+      })
     });
 
     const apiResponse = await response.json();

@@ -1,0 +1,240 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+
+	// 목 데이터로 대시보드 통계 설정
+	const dashboardStats = {
+		total_users: 1250,
+		total_posts: 3420,
+		total_comments: 15680,
+		active_volunteers: 89,
+		total_donations: 12500000,
+		monthly_visitors: 15420
+	};
+
+	// 통계 카드 데이터
+	$: statsCards = [
+		{
+			title: '총 사용자',
+			value: dashboardStats.total_users,
+			description: '전체 등록된 사용자',
+			icon: '👥',
+			color: 'bg-blue-500'
+		},
+		{
+			title: '총 게시글',
+			value: dashboardStats.total_posts,
+			description: '전체 게시글 수',
+			icon: '📝',
+			color: 'bg-green-500'
+		},
+		{
+			title: '총 댓글',
+			value: dashboardStats.total_comments,
+			description: '전체 댓글 수',
+			icon: '💬',
+			color: 'bg-yellow-500'
+		},
+		{
+			title: '활성 봉사자',
+			value: dashboardStats.active_volunteers,
+			description: '현재 활동 중인 봉사자',
+			icon: '🤝',
+			color: 'bg-purple-500'
+		},
+		{
+			title: '총 후원금',
+			value: dashboardStats.total_donations.toLocaleString(),
+			description: '총 후원 금액',
+			icon: '💰',
+			color: 'bg-red-500'
+		},
+		{
+			title: '월간 방문자',
+			value: dashboardStats.monthly_visitors,
+			description: '이번 달 방문자 수',
+			icon: '📊',
+			color: 'bg-indigo-500'
+		}
+	];
+
+	// 최근 활동 데이터 (임시)
+	const recentActivities = [
+		{
+			action: '새 사용자 가입',
+			user: '김철수',
+			time: '5분 전',
+			type: 'user'
+		},
+		{
+			action: '새 게시글 작성',
+			user: '이영희',
+			time: '10분 전',
+			type: 'post'
+		},
+		{
+			action: '봉사 활동 신청',
+			user: '박민수',
+			time: '15분 전',
+			type: 'volunteer'
+		},
+		{
+			action: '후원 완료',
+			user: '정수진',
+			time: '30분 전',
+			type: 'donation'
+		}
+	];
+
+	function getActivityIcon(type: string) {
+		switch (type) {
+			case 'user':
+				return '👤';
+			case 'post':
+				return '📝';
+			case 'volunteer':
+				return '🤝';
+			case 'donation':
+				return '💰';
+			default:
+				return '📋';
+		}
+	}
+</script>
+
+<div class="space-y-8">
+	<!-- 페이지 헤더 -->
+	<div>
+		<h1 class="text-3xl font-bold text-gray-900">대시보드</h1>
+		<p class="mt-2 text-gray-600">시스템 현황과 최근 활동을 확인하세요.</p>
+	</div>
+
+	<!-- 통계 카드 그리드 -->
+	<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+		{#each statsCards as card}
+			<Card>
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+					<CardTitle class="text-sm font-medium text-gray-600">
+						{card.title}
+					</CardTitle>
+					<div
+						class="h-8 w-8 rounded-full {card.color} flex items-center justify-center text-lg text-white"
+					>
+						{card.icon}
+					</div>
+				</CardHeader>
+				<CardContent>
+					<div class="text-2xl font-bold text-gray-900">{card.value}</div>
+					<p class="mt-1 text-xs text-gray-500">{card.description}</p>
+				</CardContent>
+			</Card>
+		{/each}
+	</div>
+
+	<!-- 최근 활동 및 빠른 액션 -->
+	<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+		<!-- 최근 활동 -->
+		<Card>
+			<CardHeader>
+				<CardTitle>최근 활동</CardTitle>
+				<CardDescription>시스템에서 발생한 최근 활동들입니다.</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<div class="space-y-4">
+					{#each recentActivities as activity}
+						<div class="flex items-center space-x-3">
+							<div class="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+								<span class="text-sm">{getActivityIcon(activity.type)}</span>
+							</div>
+							<div class="flex-1">
+								<p class="text-sm font-medium text-gray-900">{activity.action}</p>
+								<p class="text-xs text-gray-500">{activity.user} • {activity.time}</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</CardContent>
+		</Card>
+
+		<!-- 빠른 액션 -->
+		<Card>
+			<CardHeader>
+				<CardTitle>빠른 액션</CardTitle>
+				<CardDescription>자주 사용하는 관리 기능들입니다.</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<div class="grid grid-cols-2 gap-4">
+					<Button
+						variant="outline"
+						class="flex h-20 flex-col items-center justify-center space-y-2"
+					>
+						<span class="text-2xl">👥</span>
+						<span class="text-sm">사용자 관리</span>
+					</Button>
+					<Button
+						variant="outline"
+						class="flex h-20 flex-col items-center justify-center space-y-2"
+					>
+						<span class="text-2xl">📝</span>
+						<span class="text-sm">게시글 관리</span>
+					</Button>
+					<Button
+						variant="outline"
+						class="flex h-20 flex-col items-center justify-center space-y-2"
+					>
+						<span class="text-2xl">🤝</span>
+						<span class="text-sm">봉사 활동</span>
+					</Button>
+					<Button
+						variant="outline"
+						class="flex h-20 flex-col items-center justify-center space-y-2"
+					>
+						<span class="text-2xl">🔔</span>
+						<span class="text-sm">알림 발송</span>
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
+	</div>
+
+	<!-- 시스템 상태 -->
+	<Card>
+		<CardHeader>
+			<CardTitle>시스템 상태</CardTitle>
+			<CardDescription>현재 시스템의 상태 정보입니다.</CardDescription>
+		</CardHeader>
+		<CardContent>
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+				<div class="flex items-center space-x-3">
+					<div class="h-3 w-3 rounded-full bg-green-500"></div>
+					<div>
+						<p class="text-sm font-medium text-gray-900">데이터베이스</p>
+						<p class="text-xs text-gray-500">정상 작동 중</p>
+					</div>
+				</div>
+				<div class="flex items-center space-x-3">
+					<div class="h-3 w-3 rounded-full bg-green-500"></div>
+					<div>
+						<p class="text-sm font-medium text-gray-900">API 서버</p>
+						<p class="text-xs text-gray-500">정상 작동 중</p>
+					</div>
+				</div>
+				<div class="flex items-center space-x-3">
+					<div class="h-3 w-3 rounded-full bg-green-500"></div>
+					<div>
+						<p class="text-sm font-medium text-gray-900">파일 저장소</p>
+						<p class="text-xs text-gray-500">정상 작동 중</p>
+					</div>
+				</div>
+			</div>
+		</CardContent>
+	</Card>
+</div>

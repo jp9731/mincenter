@@ -15,11 +15,13 @@
 	import {
 		posts,
 		categories,
+		boards,
 		tags,
 		postFilter,
 		isLoading,
 		error,
 		fetchPosts,
+		fetchBoards,
 		fetchCategories,
 		fetchTags
 	} from '$lib/stores/community';
@@ -42,6 +44,7 @@
 				limit: 10
 			}),
 			fetchCategories(),
+			fetchBoards(),
 			fetchTags()
 		]);
 	});

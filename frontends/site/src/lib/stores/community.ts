@@ -244,6 +244,18 @@ export async function loadBoards() {
   }
 }
 
+// 게시판 목록 조회 (직접 반환)
+export async function fetchBoards(): Promise<Board[]> {
+  try {
+    const data = await api.fetchBoards();
+    boards.set(data);
+    return data;
+  } catch (e: any) {
+    error.set(e.message || '게시판 목록을 불러오는데 실패했습니다.');
+    throw e;
+  }
+}
+
 // 카테고리 목록 조회
 export async function loadCategories(boardId: string) {
   try {

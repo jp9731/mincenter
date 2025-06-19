@@ -81,30 +81,304 @@ pub async fn get_categories(
 
 // 게시글 목록 조회
 pub async fn get_posts(
-    Query(_query): Query<PostQuery>,
+    Query(query): Query<PostQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<Vec<crate::models::community::PostSummary>>>, StatusCode> {
-    let posts = sqlx::query_as::<_, crate::models::community::PostSummary>(
-        "SELECT p.id, p.title, u.name as user_name,p.board_id, b.name as board_name, p.created_at
-         FROM posts p
-         JOIN users u ON p.user_id = u.id
-         JOIN boards b ON p.board_id = b.id
-         WHERE p.status = 'active'
-         ORDER BY p.created_at DESC
-         LIMIT 10"
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| {
-        eprintln!("Database error: {:?}", e);
+    // 기본값 설정
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(10).min(100); // 최대 100개로 제한
+    let offset = (page - 1) * limit;
+    
+    // 정렬 조건 설정 (기본값: 최신순)
+    let sort_order = match query.sort.as_deref() {
+        Some("popular") => "p.likes DESC NULLS LAST, p.views DESC NULLS LAST",
+        Some("comments") => "comment_count DESC NULLS LAST",
+        Some("oldest") => "p.created_at ASC",
+        _ => "p.created_at DESC"
+    };
+
+    // 검색어 처리
+    let search = query.search.as_ref().map(|s| format!("%{}%", s));
+
+    // 전체 개수 조회
+    let total: i64 = if let Some(search) = &search {
+        if let Some(board_id) = query.board_id {
+            if let Some(category_id) = query.category_id {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as total FROM posts p
+                        JOIN users u ON p.user_id = u.id
+                        WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                        AND (
+                            p.title ILIKE $3 OR
+                            p.content ILIKE $3 OR
+                            u.name ILIKE $3 OR
+                            EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $3)
+                        )
+                    "#,
+                    board_id, category_id, search
+                )
+                .fetch_one(&state.pool)
+                .await
+                .map_err(|e| {
+                    eprintln!("Count query error: {:?}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
+                .unwrap_or(0)
+            } else {
+                sqlx::query_scalar!(
+                    r#"SELECT COUNT(*) as total FROM posts p
+                        JOIN users u ON p.user_id = u.id
+                        WHERE p.status = 'active' AND p.board_id = $1
+                        AND (
+                            p.title ILIKE $2 OR
+                            p.content ILIKE $2 OR
+                            u.name ILIKE $2 OR
+                            EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $2)
+                        )
+                    "#,
+                    board_id, search
+                )
+                .fetch_one(&state.pool)
+                .await
+                .map_err(|e| {
+                    eprintln!("Count query error: {:?}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
+                .unwrap_or(0)
+            }
+        } else {
+            sqlx::query_scalar!(
+                r#"SELECT COUNT(*) as total FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    WHERE p.status = 'active'
+                    AND (
+                        p.title ILIKE $1 OR
+                        p.content ILIKE $1 OR
+                        u.name ILIKE $1 OR
+                        EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $1)
+                    )
+                "#,
+                search
+            )
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| {
+                eprintln!("Count query error: {:?}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+            .unwrap_or(0)
+        }
+    } else {
+        if let Some(board_id) = query.board_id {
+            if let Some(category_id) = query.category_id {
+                sqlx::query_scalar!(
+                    "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2",
+                    board_id, category_id
+                )
+                .fetch_one(&state.pool)
+                .await
+                .map_err(|e| {
+                    eprintln!("Count query error: {:?}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
+                .unwrap_or(0)
+            } else {
+                sqlx::query_scalar!(
+                    "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active' AND p.board_id = $1",
+                    board_id
+                )
+                .fetch_one(&state.pool)
+                .await
+                .map_err(|e| {
+                    eprintln!("Count query error: {:?}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?
+                .unwrap_or(0)
+            }
+        } else {
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active'"
+            )
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| {
+                eprintln!("Count query error: {:?}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+            .unwrap_or(0)
+        }
+    };
+
+    // 게시글 목록 조회 (정렬은 기본값으로 고정)
+    let posts = if let Some(search) = &search {
+        if let Some(board_id) = query.board_id {
+            if let Some(category_id) = query.category_id {
+                sqlx::query_as!(
+                    crate::models::community::PostSummary,
+                    r#"
+                    SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    JOIN boards b ON p.board_id = b.id
+                    WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                        AND (
+                            p.title ILIKE $3 OR
+                            p.content ILIKE $3 OR
+                            u.name ILIKE $3 OR
+                            EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $3)
+                        )
+                    ORDER BY p.created_at DESC
+                    LIMIT $4 OFFSET $5
+                    "#,
+                    board_id, category_id, search, limit, offset
+                )
+                .fetch_all(&state.pool)
+                .await
+            } else {
+                sqlx::query_as!(
+                    crate::models::community::PostSummary,
+                    r#"
+                    SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    JOIN boards b ON p.board_id = b.id
+                    WHERE p.status = 'active' AND p.board_id = $1
+                        AND (
+                            p.title ILIKE $2 OR
+                            p.content ILIKE $2 OR
+                            u.name ILIKE $2 OR
+                            EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $2)
+                        )
+                    ORDER BY p.created_at DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                    board_id, search, limit, offset
+                )
+                .fetch_all(&state.pool)
+                .await
+            }
+        } else {
+            sqlx::query_as!(
+                crate::models::community::PostSummary,
+                r#"
+                SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                JOIN boards b ON p.board_id = b.id
+                WHERE p.status = 'active'
+                    AND (
+                        p.title ILIKE $1 OR
+                        p.content ILIKE $1 OR
+                        u.name ILIKE $1 OR
+                        EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.content ILIKE $1)
+                    )
+                ORDER BY p.created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                search, limit, offset
+            )
+            .fetch_all(&state.pool)
+            .await
+        }
+    } else {
+        if let Some(board_id) = query.board_id {
+            if let Some(category_id) = query.category_id {
+                sqlx::query_as!(
+                    crate::models::community::PostSummary,
+                    r#"
+                    SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    JOIN boards b ON p.board_id = b.id
+                    WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                    ORDER BY p.created_at DESC
+                    LIMIT $3 OFFSET $4
+                    "#,
+                    board_id, category_id, limit, offset
+                )
+                .fetch_all(&state.pool)
+                .await
+            } else {
+                sqlx::query_as!(
+                    crate::models::community::PostSummary,
+                    r#"
+                    SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                    FROM posts p
+                    JOIN users u ON p.user_id = u.id
+                    JOIN boards b ON p.board_id = b.id
+                    WHERE p.status = 'active' AND p.board_id = $1
+                    ORDER BY p.created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#,
+                    board_id, limit, offset
+                )
+                .fetch_all(&state.pool)
+                .await
+            }
+        } else {
+            sqlx::query_as!(
+                crate::models::community::PostSummary,
+                r#"
+                SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, p.created_at,
+                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                JOIN boards b ON p.board_id = b.id
+                WHERE p.status = 'active'
+                ORDER BY p.created_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+                limit, offset
+            )
+            .fetch_all(&state.pool)
+            .await
+        }
+    };
+    let posts = posts.map_err(|e| {
+        eprintln!("Posts query error: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    // 정렬이 필요한 경우 메모리에서 정렬
+    let mut posts = posts;
+    match query.sort.as_deref() {
+        Some("popular") => {
+            posts.sort_by(|a, b| {
+                b.created_at.cmp(&a.created_at)
+            });
+        }
+        Some("comments") => {
+            posts.sort_by(|a, b| {
+                b.comment_count.unwrap_or(0).cmp(&a.comment_count.unwrap_or(0))
+            });
+        }
+        Some("oldest") => {
+            posts.sort_by(|a, b| {
+                a.created_at.cmp(&b.created_at)
+            });
+        }
+        _ => {} // 기본값 (최신순)은 이미 SQL에서 처리됨
+    }
+
+    // 페이징 정보 계산
+    let total_pages = (total + limit - 1) / limit;
+    let pagination = Some(PaginationInfo {
+        page: page as u32,
+        limit: limit as u32,
+        total: total as u64,
+        total_pages: total_pages as u32,
+    });
 
     Ok(Json(ApiResponse {
         success: true,
         message: "게시글 목록을 성공적으로 조회했습니다.".to_string(),
         data: Some(posts),
-        pagination: None,
+        pagination,
     }))
 }
 

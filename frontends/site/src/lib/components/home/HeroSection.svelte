@@ -6,7 +6,7 @@
 	<div class="absolute inset-0 overflow-hidden">
 		<div class="absolute inset-0 bg-black/30"></div>
 		<img
-			src="/images/hero-bg.jpg"
+			src="/images/hero_bg.jpeg"
 			alt="장애인 자립생활 지원 활동"
 			class="h-full w-full object-cover"
 		/>

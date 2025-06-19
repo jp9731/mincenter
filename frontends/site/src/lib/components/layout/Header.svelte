@@ -8,11 +8,14 @@
 	let mobileMenuOpen = false;
 
 	const navigation = [
-		{ name: '센터소개', href: '/about' },
-		{ name: '사업안내', href: '/services' },
-		{ name: '커뮤니티', href: '/community' },
-		{ name: '갤러리', href: '/gallery' },
-		{ name: '참여하기', href: '/participate' }
+		{ name: '민들레는요', href: '/about' },
+		{ name: '공지사항', href: '/community/4c9cee50-1cf9-4b57-b320-959bb28d5b5a' },
+
+		{ name: '사업소개', href: '/services' },
+		{ name: '정보마당', href: '/community' },
+		// { name: '갤러리', href: '/gallery' },
+		// { name: '참여하기', href: '/participate' },
+		{ name: '후원하기', href: '/donation' }
 	];
 
 	// 로그아웃 처리
@@ -27,7 +30,13 @@
 		<div class="flex h-16 justify-between">
 			<!-- 로고 -->
 			<div class="flex flex-shrink-0 items-center">
-				<a href="/" class="text-primary-600 text-xl font-bold"> 민들레장애인자립생활센터 </a>
+				<a href="/" class="text-primary-600 text-xl font-bold">
+					<img
+						src="/images/mincenter_logo.png"
+						alt="민들레장애인자립생활센터"
+						class="mb-2 h-12 w-auto"
+					/>
+				</a>
 			</div>
 
 			<!-- 데스크톱 메뉴 -->

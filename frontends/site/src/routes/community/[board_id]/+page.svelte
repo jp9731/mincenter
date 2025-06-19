@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
@@ -16,10 +16,12 @@
 	import {
 		posts,
 		categories,
+		boards,
 		tags,
 		isLoading,
 		error,
 		fetchPosts,
+		fetchBoards,
 		fetchCategories,
 		fetchTags
 	} from '$lib/stores/community';
@@ -29,31 +31,36 @@
 
 	let searchQuery = '';
 	let selectedTags: string[] = [];
-	let boardName = '';
 	let currentSort = 'latest';
 
+	// 게시판 이름을 반응형으로 계산
+	$: boardName = $boards.find((board: any) => board.id === page.params.board_id)?.name || '게시판';
+
 	onMount(async () => {
-		const boardId = $page.params.board_id;
+		console.log('aaaaa');
+		console.log(page);
+		console.log('aaaaa');
+		const boardId = page.params.board_id;
 		await Promise.all([
 			fetchPosts({
 				search: '',
-				category: boardId,
+				board_id: boardId,
 				tags: [],
 				sort: 'latest',
 				page: 1,
 				limit: 10
 			}),
+			fetchBoards(),
 			fetchCategories(),
 			fetchTags()
 		]);
 
-		// 게시판 이름 설정
-		const category = $categories.find((c: any) => c.id === boardId);
-		boardName = category?.name || '게시판';
+		console.log('aaaaa');
+		console.log($boards);
 	});
 
 	function handleSearch() {
-		const boardId = $page.params.board_id;
+		const boardId = page.params.board_id;
 		fetchPosts({
 			search: searchQuery,
 			category: boardId,
@@ -66,7 +73,7 @@
 
 	function handleSortChange(value: string) {
 		currentSort = value;
-		const boardId = $page.params.board_id;
+		const boardId = page.params.board_id;
 		fetchPosts({
 			search: searchQuery,
 			category: boardId,
@@ -108,7 +115,7 @@
 		</div>
 		{#if $isAuthenticated && canCreatePost()}
 			<Button asChild>
-				<a href="/community/write?board={$page.params.board_id}">글쓰기</a>
+				<a href="/community/write?board={page.params.board_id}">글쓰기</a>
 			</Button>
 		{:else if !$isAuthenticated}
 			<Button variant="outline" asChild>

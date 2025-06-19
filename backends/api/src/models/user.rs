@@ -14,10 +14,28 @@ pub struct User {
     pub updated_at: Option<DateTime<Utc>>,  // Option으로 변경
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AdminUser {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub role: String,
+    pub permissions: Vec<String>,
+    pub last_login: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
+    pub service_type: Option<String>, // "site", "admin", "mobile" 등
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminLoginRequest {
+    pub email: String,
+    pub password: String,
+    pub service_type: Option<String>, // "site", "admin", "mobile" 등
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,11 +43,13 @@ pub struct RegisterRequest {
     pub email: String,
     pub password: String,
     pub name: String,
+    pub service_type: Option<String>, // "site", "admin", "mobile" 등
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RefreshRequest {
     pub refresh_token: String,
+    pub service_type: Option<String>, // "site", "admin", "mobile" 등
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +58,12 @@ pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_in: i64,  // seconds
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdminAuthResponse {
+    pub user: AdminUser,
+    pub token: String,
 }
 
 #[derive(Debug, Serialize)]
