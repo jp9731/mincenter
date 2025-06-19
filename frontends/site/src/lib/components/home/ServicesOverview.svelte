@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { Card } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { Users, Heart, Car, Shield } from 'lucide-svelte';
+	import { Icon, UserGroup, Heart, Truck, ShieldCheck } from 'svelte-hero-icons';
 
 	const services = [
 		{
 			title: '자립생활지원',
 			description: '장애인의 자립생활을 위한 맞춤형 지원 서비스를 제공합니다.',
-			icon: Users,
+			icon: UserGroup,
 			href: '/services/support'
 		},
 		{
@@ -19,13 +19,13 @@
 		{
 			title: '이동지원서비스',
 			description: '장애인의 이동권 보장을 위한 이동지원 서비스를 제공합니다.',
-			icon: Car,
+			icon: Truck,
 			href: '/services/mobility'
 		},
 		{
 			title: '권익옹호활동',
 			description: '장애인의 권리와 이익을 보호하고 옹호하는 활동을 합니다.',
-			icon: Shield,
+			icon: ShieldCheck,
 			href: '/services/advocacy'
 		}
 	];
@@ -47,7 +47,7 @@
 						<div
 							class="bg-primary-100 mb-4 flex h-12 w-12 items-center justify-center rounded-full"
 						>
-							<svelte:component this={service.icon} class="text-primary-600 h-6 w-6" />
+							<Icon src={service.icon} class="text-primary-600 h-6 w-6" />
 						</div>
 						<h3 class="mb-2 text-xl font-semibold text-gray-900">
 							{service.title}

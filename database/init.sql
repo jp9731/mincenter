@@ -74,11 +74,24 @@ CREATE TABLE boards (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 카테고리 테이블 (게시판 내부 구분용)
+CREATE TABLE categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 임시저장 테이블
 CREATE TABLE drafts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     title VARCHAR(200),
     content TEXT,
     auto_save_count INTEGER DEFAULT 0,
@@ -91,6 +104,7 @@ CREATE TABLE drafts (
 CREATE TABLE posts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,
@@ -267,10 +281,21 @@ CREATE TABLE token_blacklist (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- refresh_tokens 테이블 추가
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_revoked BOOLEAN DEFAULT FALSE
+);
+
 -- 인덱스 생성
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_status ON users(status);
 CREATE INDEX idx_posts_board_id ON posts(board_id);
+CREATE INDEX idx_posts_category_id ON posts(category_id);
 CREATE INDEX idx_posts_user_id ON posts(user_id);
 CREATE INDEX idx_posts_status ON posts(status);
 CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
@@ -287,6 +312,8 @@ CREATE INDEX idx_likes_entity ON likes(entity_type, entity_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(is_read);
 CREATE INDEX idx_point_transactions_user_id ON point_transactions(user_id);
+CREATE INDEX idx_categories_board_id ON categories(board_id);
+CREATE INDEX idx_categories_is_active ON categories(is_active);
 
 -- 전문 검색을 위한 인덱스
 CREATE INDEX idx_posts_title_gin ON posts USING gin(to_tsvector('korean', title));
@@ -304,6 +331,7 @@ $$ language 'plpgsql';
 -- 트리거 적용
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_posts_updated_at BEFORE UPDATE ON posts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_galleries_updated_at BEFORE UPDATE ON galleries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

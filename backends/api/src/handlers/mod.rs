@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod community;
 
 use axum::{
     http::StatusCode,

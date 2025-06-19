@@ -1,5 +1,28 @@
-// API 설정
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// 환경 설정
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+// 앱 설정
+export const APP_CONFIG = {
+  name: '민중의집',
+  description: '장애인 자립생활 지원 센터',
+  version: '1.0.0'
+};
+
+// API 엔드포인트
+export const API_ENDPOINTS = {
+  auth: {
+    register: '/api/auth/register',
+    login: '/api/auth/login',
+    refresh: '/api/auth/refresh',
+    logout: '/api/auth/logout',
+    me: '/api/auth/me'
+  },
+  community: {
+    posts: '/api/posts',
+    categories: '/api/categories',
+    tags: '/api/tags'
+  }
+};
 
 // 인증 설정
 export const AUTH_TOKEN_KEY = 'auth_token';

@@ -30,7 +30,7 @@
 		</div>
 
 		<form class="mt-8 space-y-6" on:submit|preventDefault={handleSubmit}>
-			<div class="space-y-4 rounded-md shadow-sm">
+			<div class="space-y-4">
 				<div>
 					<label for="email" class="sr-only">이메일</label>
 					<Input

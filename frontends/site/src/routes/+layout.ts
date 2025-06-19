@@ -1,6 +1,10 @@
 import type { LayoutLoad } from './$types';
+import { initializeAuth } from '$lib/stores/auth';
 
-export const load: LayoutLoad = ({ url }) => {
+export const load: LayoutLoad = async ({ url }) => {
+  // 인증 상태 초기화
+  await initializeAuth();
+
   return {
     meta: {
       title: '민들레장애인자립생활센터',

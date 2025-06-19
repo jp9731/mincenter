@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
@@ -16,7 +17,6 @@
 		posts,
 		categories,
 		tags,
-		postFilter,
 		isLoading,
 		error,
 		fetchPosts,
@@ -28,14 +28,16 @@
 	import type { Post, PostFilter } from '$lib/types/community';
 
 	let searchQuery = '';
-	let selectedCategory = '';
 	let selectedTags: string[] = [];
+	let boardName = '';
+	let currentSort = 'latest';
 
 	onMount(async () => {
+		const boardId = $page.params.board_id;
 		await Promise.all([
 			fetchPosts({
 				search: '',
-				category: '',
+				category: boardId,
 				tags: [],
 				sort: 'latest',
 				page: 1,
@@ -44,29 +46,35 @@
 			fetchCategories(),
 			fetchTags()
 		]);
+
+		// 게시판 이름 설정
+		const category = $categories.find((c: any) => c.id === boardId);
+		boardName = category?.name || '게시판';
 	});
 
 	function handleSearch() {
-		postFilter.update((filter: PostFilter) => ({
-			...filter,
+		const boardId = $page.params.board_id;
+		fetchPosts({
 			search: searchQuery,
-			category: selectedCategory,
-			tags: selectedTags
-		}));
-		fetchPosts($postFilter);
+			category: boardId,
+			tags: selectedTags,
+			sort: currentSort,
+			page: 1,
+			limit: 10
+		});
 	}
 
 	function handleSortChange(value: string) {
-		postFilter.update((filter: PostFilter) => ({
-			...filter,
-			sort: value as 'latest' | 'popular' | 'comments'
-		}));
-		fetchPosts($postFilter);
-	}
-
-	function handleCategoryChange(value: string) {
-		selectedCategory = value;
-		handleSearch();
+		currentSort = value;
+		const boardId = $page.params.board_id;
+		fetchPosts({
+			search: searchQuery,
+			category: boardId,
+			tags: selectedTags,
+			sort: value as 'latest' | 'popular' | 'comments',
+			page: 1,
+			limit: 10
+		});
 	}
 
 	function handleTagClick(tagId: string) {
@@ -90,20 +98,17 @@
 				return '정렬 기준';
 		}
 	}
-
-	function getCategoryLabel(categoryId: string) {
-		if (!categoryId) return '전체';
-		const category = $categories.find((c) => c.id === categoryId);
-		return category ? category.name : '카테고리';
-	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<div class="mb-8 flex items-center justify-between">
-		<h1 class="text-3xl font-bold">커뮤니티</h1>
+		<div>
+			<h1 class="text-3xl font-bold">{boardName}</h1>
+			<p class="mt-2 text-gray-600">게시글 {posts.length}개</p>
+		</div>
 		{#if $isAuthenticated && canCreatePost()}
 			<Button asChild>
-				<a href="/community/write">글쓰기</a>
+				<a href="/community/write?board={$page.params.board_id}">글쓰기</a>
 			</Button>
 		{:else if !$isAuthenticated}
 			<Button variant="outline" asChild>
@@ -126,26 +131,14 @@
 		</div>
 
 		<div class="flex items-center gap-4">
-			<Select value={$postFilter.sort} onValueChange={handleSortChange}>
+			<Select value={currentSort} onValueChange={handleSortChange}>
 				<SelectTrigger class="w-[180px]">
-					{getSortLabel($postFilter.sort)}
+					{getSortLabel(currentSort)}
 				</SelectTrigger>
 				<SelectContent>
 					<SelectItem value="latest">최신순</SelectItem>
 					<SelectItem value="popular">인기순</SelectItem>
 					<SelectItem value="comments">댓글순</SelectItem>
-				</SelectContent>
-			</Select>
-
-			<Select value={selectedCategory} onValueChange={handleCategoryChange}>
-				<SelectTrigger class="w-[180px]">
-					{getCategoryLabel(selectedCategory)}
-				</SelectTrigger>
-				<SelectContent>
-					<SelectItem value="">전체</SelectItem>
-					{#each $categories as category}
-						<SelectItem value={category.id}>{category.name}</SelectItem>
-					{/each}
 				</SelectContent>
 			</Select>
 		</div>
@@ -183,10 +176,7 @@
 									</a>
 								</CardTitle>
 								<CardDescription>
-									<a href="/community/{post.board_id}" class="text-blue-600 hover:underline">
-										{post.board_name}
-									</a>
-									· {new Date(post.created_at).toLocaleDateString()}
+									{new Date(post.created_at).toLocaleDateString()}
 								</CardDescription>
 							</div>
 							<div class="flex items-center gap-4 text-sm text-gray-500">

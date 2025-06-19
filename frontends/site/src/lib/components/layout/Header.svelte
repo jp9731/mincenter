@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { Button } from '$lib/components/ui/button';
-	import { Menu, X } from 'lucide-svelte';
+	import { Icon, Bars3, XMark, User, ArrowRightOnRectangle } from 'svelte-hero-icons';
+	import { user, isAuthenticated, logout } from '$lib/stores/auth';
+	import { goto } from '$app/navigation';
 
 	let mobileMenuOpen = false;
 
@@ -12,6 +14,12 @@
 		{ name: '갤러리', href: '/gallery' },
 		{ name: '참여하기', href: '/participate' }
 	];
+
+	// 로그아웃 처리
+	async function handleLogout() {
+		await logout();
+		goto('/');
+	}
 </script>
 
 <header class="sticky top-0 z-50 border-b bg-white shadow-sm">
@@ -36,8 +44,24 @@
 				{/each}
 
 				<div class="flex items-center space-x-4">
-					<Button variant="ghost" href="/auth/login">로그인</Button>
-					<Button href="/auth/register">회원가입</Button>
+					{#if $isAuthenticated && $user}
+						<!-- 로그인된 상태 -->
+						<div class="flex items-center space-x-2">
+							<span class="text-sm text-gray-700">안녕하세요, {$user.name}님</span>
+							<Button variant="ghost" href="/my" class="flex items-center space-x-1">
+								<Icon src={User} class="h-4 w-4" />
+								<span>마이페이지</span>
+							</Button>
+							<Button variant="outline" on:click={handleLogout} class="flex items-center space-x-1">
+								<Icon src={ArrowRightOnRectangle} class="h-4 w-4" />
+								<span>로그아웃</span>
+							</Button>
+						</div>
+					{:else}
+						<!-- 로그인되지 않은 상태 -->
+						<Button variant="ghost" href="/auth/login">로그인</Button>
+						<Button href="/auth/register">회원가입</Button>
+					{/if}
 				</div>
 			</div>
 
@@ -52,9 +76,9 @@
 				>
 					<span class="sr-only">메뉴 열기</span>
 					{#if mobileMenuOpen}
-						<X class="block h-6 w-6" aria-hidden="true" />
+						<Icon src={XMark} class="block h-6 w-6" aria-hidden="true" />
 					{:else}
-						<Menu class="block h-6 w-6" aria-hidden="true" />
+						<Icon src={Bars3} class="block h-6 w-6" aria-hidden="true" />
 					{/if}
 				</button>
 			</div>
@@ -76,14 +100,32 @@
 					{/each}
 				</div>
 				<div class="border-t border-gray-200 pb-3 pt-4">
-					<div class="flex items-center px-5">
-						<div class="flex-shrink-0">
-							<Button variant="ghost" href="/auth/login" class="w-full">로그인</Button>
+					{#if $isAuthenticated && $user}
+						<!-- 로그인된 상태 (모바일) -->
+						<div class="px-5 py-3">
+							<div class="mb-3 text-sm text-gray-700">안녕하세요, {$user.name}님</div>
+							<div class="space-y-2">
+								<Button variant="ghost" href="/my" class="w-full justify-start">
+									<Icon src={User} class="mr-2 h-4 w-4" />
+									마이페이지
+								</Button>
+								<Button variant="outline" on:click={handleLogout} class="w-full justify-start">
+									<Icon src={ArrowRightOnRectangle} class="mr-2 h-4 w-4" />
+									로그아웃
+								</Button>
+							</div>
 						</div>
-						<div class="ml-3">
-							<Button href="/auth/register" class="w-full">회원가입</Button>
+					{:else}
+						<!-- 로그인되지 않은 상태 (모바일) -->
+						<div class="flex items-center px-5">
+							<div class="flex-shrink-0">
+								<Button variant="ghost" href="/auth/login" class="w-full">로그인</Button>
+							</div>
+							<div class="ml-3">
+								<Button href="/auth/register" class="w-full">회원가입</Button>
+							</div>
 						</div>
-					</div>
+					{/if}
 				</div>
 			</div>
 		{/if}

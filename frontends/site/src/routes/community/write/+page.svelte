@@ -1,48 +1,83 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import {
-		Select,
-		SelectContent,
-		SelectItem,
-		SelectTrigger,
-		SelectValue
-	} from '$lib/components/ui/select';
-	import { createPost, categories, tags, isLoading, error } from '$lib/stores/community';
+		createPost,
+		categories,
+		boards,
+		loadCategories,
+		loadBoards,
+		isLoading,
+		error
+	} from '$lib/stores/community';
 
 	let title = '';
 	let content = '';
-	let category = '';
-	let selectedTags: string[] = [];
-	let tagInput = '';
+	let selectedCategory = '';
+	let selectedBoard = '';
+	let boardName = '';
+
+	onMount(async () => {
+		// URL에서 board_id 가져오기
+		const boardId = $page.url.searchParams.get('board');
+		if (boardId) {
+			selectedBoard = boardId;
+			await loadCategories(boardId);
+		}
+
+		// 게시판 목록 로드
+		await loadBoards();
+
+		// 게시판 이름 설정
+		if (boardId) {
+			const board = $boards.find((b) => b.id === boardId);
+			boardName = board?.name || '게시판';
+		}
+	});
 
 	async function handleSubmit() {
+		if (!selectedBoard) {
+			alert('게시판을 선택해주세요.');
+			return;
+		}
+
 		const post = await createPost({
+			board_id: selectedBoard,
+			category_id: selectedCategory || undefined,
 			title,
-			content,
-			category,
-			tags: selectedTags
+			content
 		});
 
 		if (post) {
-			goto(`/community/${post.id}`);
+			goto(`/community/${post.board_id}/${post.id}`);
 		}
 	}
 
-	function handleTagInput(e: KeyboardEvent) {
-		if (e.key === 'Enter' && tagInput.trim()) {
-			e.preventDefault();
-			if (!selectedTags.includes(tagInput.trim())) {
-				selectedTags = [...selectedTags, tagInput.trim()];
-			}
-			tagInput = '';
-		}
+	function handleBoardChange(value: string) {
+		selectedBoard = value;
+		selectedCategory = ''; // 게시판 변경 시 카테고리 초기화
+		loadCategories(value);
+
+		// 게시판 이름 설정
+		const board = $boards.find((b) => b.id === value);
+		boardName = board?.name || '게시판';
 	}
 
-	function removeTag(tag: string) {
-		selectedTags = selectedTags.filter((t) => t !== tag);
+	function getBoardLabel(boardId: string) {
+		if (!boardId) return '게시판을 선택하세요';
+		const board = $boards.find((b) => b.id === boardId);
+		return board ? board.name : '게시판을 선택하세요';
+	}
+
+	function getCategoryLabel(categoryId: string) {
+		if (!categoryId) return '카테고리를 선택하세요 (선택사항)';
+		const category = $categories.find((c) => c.id === categoryId);
+		return category ? category.name : '카테고리를 선택하세요 (선택사항)';
 	}
 </script>
 
@@ -52,24 +87,41 @@
 
 		<form on:submit|preventDefault={handleSubmit} class="space-y-6">
 			<div>
-				<label for="title" class="mb-1 block text-sm font-medium text-gray-700"> 제목 </label>
-				<Input id="title" bind:value={title} required placeholder="제목을 입력하세요" />
-			</div>
-
-			<div>
-				<label for="category" class="mb-1 block text-sm font-medium text-gray-700">
-					카테고리
-				</label>
-				<Select value={category} onValueChange={(value) => (category = value)}>
+				<label for="board" class="mb-1 block text-sm font-medium text-gray-700"> 게시판 </label>
+				<Select value={selectedBoard} onValueChange={handleBoardChange}>
 					<SelectTrigger>
-						<SelectValue placeholder="카테고리를 선택하세요" />
+						{getBoardLabel(selectedBoard)}
 					</SelectTrigger>
 					<SelectContent>
-						{#each $categories as cat}
-							<SelectItem value={cat.id}>{cat.name}</SelectItem>
+						{#each $boards as board}
+							<SelectItem value={board.id}>{board.name}</SelectItem>
 						{/each}
 					</SelectContent>
 				</Select>
+			</div>
+
+			{#if selectedBoard && $categories.length > 0}
+				<div>
+					<label for="category" class="mb-1 block text-sm font-medium text-gray-700">
+						카테고리
+					</label>
+					<Select value={selectedCategory} onValueChange={(value) => (selectedCategory = value)}>
+						<SelectTrigger>
+							{getCategoryLabel(selectedCategory)}
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="">카테고리 없음</SelectItem>
+							{#each $categories as category}
+								<SelectItem value={category.id}>{category.name}</SelectItem>
+							{/each}
+						</SelectContent>
+					</Select>
+				</div>
+			{/if}
+
+			<div>
+				<label for="title" class="mb-1 block text-sm font-medium text-gray-700"> 제목 </label>
+				<Input id="title" bind:value={title} required placeholder="제목을 입력하세요" />
 			</div>
 
 			<div>
@@ -81,34 +133,6 @@
 					placeholder="내용을 입력하세요"
 					class="min-h-[300px]"
 				/>
-			</div>
-
-			<div>
-				<label for="tags" class="mb-1 block text-sm font-medium text-gray-700"> 태그 </label>
-				<div class="space-y-2">
-					<Input
-						id="tags"
-						bind:value={tagInput}
-						on:keydown={handleTagInput}
-						placeholder="태그를 입력하고 Enter를 누르세요"
-					/>
-					<div class="flex flex-wrap gap-2">
-						{#each selectedTags as tag}
-							<div
-								class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-sm"
-							>
-								{tag}
-								<button
-									type="button"
-									class="text-gray-500 hover:text-gray-700"
-									on:click={() => removeTag(tag)}
-								>
-									×
-								</button>
-							</div>
-						{/each}
-					</div>
-				</div>
 			</div>
 
 			{#if $error}

@@ -46,7 +46,7 @@
 		</div>
 
 		<form class="mt-8 space-y-6" on:submit|preventDefault={handleSubmit}>
-			<div class="space-y-4 rounded-md shadow-sm">
+			<div class="space-y-4">
 				<div>
 					<label for="name" class="sr-only">이름</label>
 					<Input
@@ -104,7 +104,7 @@
 			{/if}
 
 			{#if $error}
-				<div class="text-center text-sm text-red-500">
+				<div class="text-center text-sm text-blue-500">
 					{$error}
 				</div>
 			{/if}

@@ -1,34 +1,88 @@
+-- UUID 확장 활성화
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- 샘플 데이터 삽입 스크립트
 -- 개발 및 테스트용 데이터
+
+-- 게시판 생성
+INSERT INTO boards (name, description, category, display_order, is_public, allow_anonymous) VALUES
+    ('공지사항', '중요한 공지사항을 확인하세요', 'notice', 1, true, false),
+    ('봉사활동 후기', '봉사활동 경험을 공유해보세요', 'review', 2, true, false),
+    ('자유게시판', '자유롭게 이야기를 나누세요', 'free', 3, true, false),
+    ('질문과 답변', '궁금한 점을 물어보세요', 'qna', 4, true, false)
+ON CONFLICT (name) DO NOTHING;
+
+-- 카테고리 생성 (게시판별)
+DO $$
+DECLARE
+    board_notice_id uuid;
+    board_review_id uuid;
+    board_free_id uuid;
+    board_qna_id uuid;
+BEGIN
+    -- 게시판 ID 가져오기
+    SELECT id INTO board_notice_id FROM boards WHERE name = '공지사항';
+    SELECT id INTO board_review_id FROM boards WHERE name = '봉사활동 후기';
+    SELECT id INTO board_free_id FROM boards WHERE name = '자유게시판';
+    SELECT id INTO board_qna_id FROM boards WHERE name = '질문과 답변';
+    
+    -- 공지사항 카테고리
+    INSERT INTO categories (board_id, name, description, display_order) VALUES
+        (board_notice_id, '일반공지', '일반적인 공지사항', 1),
+        (board_notice_id, '긴급공지', '긴급한 공지사항', 2),
+        (board_notice_id, '행사안내', '다가오는 행사 안내', 3);
+    
+    -- 봉사활동 후기 카테고리
+    INSERT INTO categories (board_id, name, description, display_order) VALUES
+        (board_review_id, '복지관봉사', '복지관 관련 봉사활동 후기', 1),
+        (board_review_id, '교육봉사', '교육 관련 봉사활동 후기', 2),
+        (board_review_id, '행사봉사', '행사 지원 봉사활동 후기', 3),
+        (board_review_id, '기타봉사', '기타 봉사활동 후기', 4);
+    
+    -- 자유게시판 카테고리
+    INSERT INTO categories (board_id, name, description, display_order) VALUES
+        (board_free_id, '일반', '일반적인 이야기', 1),
+        (board_free_id, '정보공유', '유용한 정보 공유', 2),
+        (board_free_id, '모임후기', '봉사자 모임 후기', 3);
+    
+    -- 질문과 답변 카테고리
+    INSERT INTO categories (board_id, name, description, display_order) VALUES
+        (board_qna_id, '봉사활동', '봉사활동 관련 질문', 1),
+        (board_qna_id, '시설이용', '시설 이용 관련 질문', 2),
+        (board_qna_id, '기타', '기타 질문', 3);
+END $$;
 
 -- 추가 사용자 생성 (테스트용)
 INSERT INTO users (email, password_hash, name, role, status, email_verified, points) VALUES
     ('user1@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '김봉사', 'user', 'active', true, 150),
     ('user2@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '이도움', 'user', 'active', true, 230),
-    ('user3@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '박나눔', 'user', 'active', true, 80);
+    ('user3@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '박나눔', 'user', 'active', true, 80)
+ON CONFLICT (email) DO NOTHING;
 
 -- 히어로 섹션 데이터
 INSERT INTO hero_sections (title, subtitle, description, button_text, button_link, is_active, display_order) VALUES
     ('함께하는 따뜻한 마음', '장애인과 함께하는 봉사활동', '우리의 작은 관심과 참여가 더 나은 세상을 만듭니다. 지금 봉사활동에 참여해보세요.', '봉사활동 참여하기', '/volunteer', true, 1),
-    ('나눔의 기쁨을 경험하세요', '매월 다양한 봉사활동 프로그램', '정기적인 봉사활동을 통해 의미있는 시간을 보내고 소중한 경험을 쌓아보세요.', '프로그램 보기', '/programs', false, 2);
+    ('나눔의 기쁨을 경험하세요', '매월 다양한 봉사활동 프로그램', '정기적인 봉사활동을 통해 의미있는 시간을 보내고 소중한 경험을 쌓아보세요.', '프로그램 보기', '/programs', false, 2)
+ON CONFLICT DO NOTHING;
 
 -- 갤러리 데이터
 INSERT INTO galleries (title, description, category) VALUES
     ('2024년 하반기 봉사활동', '지난 6개월간의 봉사활동 모습들을 모았습니다.', 'activity'),
     ('장애인의 날 행사', '매년 4월 20일 장애인의 날 기념행사 사진들', 'event'),
-    ('여름 캠프 활동', '장애인 청소년들과 함께한 여름 캠프', 'camp');
+    ('여름 캠프 활동', '장애인 청소년들과 함께한 여름 캠프', 'camp')
+ON CONFLICT DO NOTHING;
 
 -- 샘플 게시글 생성
 DO $$
 DECLARE
-    board_notice_id UUID;
-    board_review_id UUID;
-    board_free_id UUID;
-    board_qna_id UUID;
-    user1_id UUID;
-    user2_id UUID;
-    user3_id UUID;
-    admin_id UUID;
+    board_notice_id uuid;
+    board_review_id uuid;
+    board_free_id uuid;
+    board_qna_id uuid;
+    user1_id uuid;
+    user2_id uuid;
+    user3_id uuid;
+    admin_id uuid;
 BEGIN
     -- 게시판 ID 가져오기
     SELECT id INTO board_notice_id FROM boards WHERE name = '공지사항';
@@ -130,16 +184,16 @@ BEGIN
 
 혹시 기부도 가능한가요?', 19);
 
-END $;
+END $$;
 
 -- 댓글 추가
-DO $
+DO $$
 DECLARE
-    post_id_1 UUID;
-    post_id_2 UUID;
-    user1_id UUID;
-    user2_id UUID;
-    admin_id UUID;
+    post_id_1 uuid;
+    post_id_2 uuid;
+    user1_id uuid;
+    user2_id uuid;
+    admin_id uuid;
 BEGIN
     -- 필요한 ID들 가져오기
     SELECT id INTO admin_id FROM users WHERE email = 'admin@example.com';
@@ -157,7 +211,7 @@ BEGIN
         (post_id_2, admin_id, '편한 복장과 개인 물병 정도면 충분합니다. 자세한 내용은 활동 전 안내해드릴게요!', 2),
         (post_id_2, user1_id, '저도 처음에 많이 궁금했는데, 생각보다 특별한 준비물은 없어요. 마음의 준비만 하시면 됩니다! ^^', 4);
 
-END $;
+END $$;
 
 -- 포인트 거래 내역 추가
 INSERT INTO point_transactions (user_id, type, amount, reason, reference_type, reference_id) 
@@ -170,7 +224,8 @@ SELECT
     p.id
 FROM users u
 JOIN posts p ON u.id = p.user_id
-WHERE u.email != 'admin@example.com';
+WHERE u.email != 'admin@example.com'
+ON CONFLICT DO NOTHING;
 
 INSERT INTO point_transactions (user_id, type, amount, reason, reference_type, reference_id) 
 SELECT 
@@ -182,16 +237,17 @@ SELECT
     c.id
 FROM users u
 JOIN comments c ON u.id = c.user_id
-WHERE u.email != 'admin@example.com';
+WHERE u.email != 'admin@example.com'
+ON CONFLICT DO NOTHING;
 
 -- 좋아요 데이터 추가
-DO $
+DO $$
 DECLARE
-    user_ids UUID[];
-    post_ids UUID[];
-    comment_ids UUID[];
-    i INTEGER;
-    j INTEGER;
+    user_ids uuid[];
+    post_ids uuid[];
+    comment_ids uuid[];
+    i integer;
+    j integer;
 BEGIN
     -- 사용자 ID 배열 생성
     SELECT ARRAY_AGG(id) INTO user_ids FROM users WHERE email != 'admin@example.com';
@@ -199,26 +255,30 @@ BEGIN
     SELECT ARRAY_AGG(id) INTO comment_ids FROM comments;
 
     -- 랜덤하게 좋아요 추가 (게시글)
-    FOR i IN 1..array_length(user_ids, 1) LOOP
-        FOR j IN 1..array_length(post_ids, 1) LOOP
-            IF random() < 0.3 THEN -- 30% 확률로 좋아요
-                INSERT INTO likes (user_id, entity_type, entity_id) 
-                VALUES (user_ids[i], 'post', post_ids[j])
-                ON CONFLICT DO NOTHING;
-            END IF;
+    IF user_ids IS NOT NULL AND post_ids IS NOT NULL THEN
+        FOR i IN 1..array_length(user_ids, 1) LOOP
+            FOR j IN 1..array_length(post_ids, 1) LOOP
+                IF random() < 0.3 THEN -- 30% 확률로 좋아요
+                    INSERT INTO likes (user_id, entity_type, entity_id) 
+                    VALUES (user_ids[i], 'post', post_ids[j])
+                    ON CONFLICT DO NOTHING;
+                END IF;
+            END LOOP;
         END LOOP;
-    END LOOP;
+    END IF;
 
     -- 랜덤하게 좋아요 추가 (댓글)
-    FOR i IN 1..array_length(user_ids, 1) LOOP
-        FOR j IN 1..array_length(comment_ids, 1) LOOP
-            IF random() < 0.2 THEN -- 20% 확률로 좋아요
-                INSERT INTO likes (user_id, entity_type, entity_id) 
-                VALUES (user_ids[i], 'comment', comment_ids[j])
-                ON CONFLICT DO NOTHING;
-            END IF;
+    IF user_ids IS NOT NULL AND comment_ids IS NOT NULL THEN
+        FOR i IN 1..array_length(user_ids, 1) LOOP
+            FOR j IN 1..array_length(comment_ids, 1) LOOP
+                IF random() < 0.2 THEN -- 20% 확률로 좋아요
+                    INSERT INTO likes (user_id, entity_type, entity_id) 
+                    VALUES (user_ids[i], 'comment', comment_ids[j])
+                    ON CONFLICT DO NOTHING;
+                END IF;
+            END LOOP;
         END LOOP;
-    END LOOP;
+    END IF;
 
     -- 게시글 좋아요 수 업데이트
     UPDATE posts SET likes = (
@@ -232,7 +292,7 @@ BEGIN
         WHERE entity_type = 'comment' AND entity_id = comments.id
     );
 
-END $;
+END $$;
 
 -- 알림 샘플 데이터
 INSERT INTO notifications (user_id, type, title, message, entity_type, entity_id) 
@@ -245,23 +305,27 @@ SELECT
     p.id
 FROM posts p
 JOIN comments c ON p.id = c.post_id
-WHERE p.user_id != c.user_id;
+WHERE p.user_id != c.user_id
+ON CONFLICT DO NOTHING;
 
 -- 임시저장 샘플 데이터
-DO $
+DO $$
 DECLARE
-    board_free_id UUID;
-    user1_id UUID;
+    board_free_id uuid;
+    user1_id uuid;
 BEGIN
     SELECT id INTO board_free_id FROM boards WHERE name = '자유게시판';
     SELECT id INTO user1_id FROM users WHERE email = 'user1@example.com';
     
-    INSERT INTO drafts (user_id, board_id, title, content, auto_save_count) VALUES
-        (user1_id, board_free_id, '작성 중인 글 제목', '이것은 임시저장된 글 내용입니다...', 3);
-END $;
+    IF board_free_id IS NOT NULL AND user1_id IS NOT NULL THEN
+        INSERT INTO drafts (user_id, board_id, title, content, auto_save_count) VALUES
+            (user1_id, board_free_id, '작성 중인 글 제목', '이것은 임시저장된 글 내용입니다...', 3)
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;
 
 -- 뷰 생성: 인기 게시글
-CREATE VIEW popular_posts AS
+CREATE OR REPLACE VIEW popular_posts AS
 SELECT 
     p.id,
     p.title,
@@ -279,7 +343,7 @@ WHERE p.status = 'active'
 ORDER BY popularity_score DESC;
 
 -- 뷰 생성: 사용자 활동 통계
-CREATE VIEW user_activity_stats AS
+CREATE OR REPLACE VIEW user_activity_stats AS
 SELECT 
     u.id,
     u.name,
@@ -315,10 +379,10 @@ UPDATE users SET points = (
 );
 
 -- 완료 메시지
-DO $
+DO $$
 BEGIN
     RAISE NOTICE '=== 데이터베이스 초기화 완료 ===';
     RAISE NOTICE '관리자 계정: admin@example.com / admin123';
     RAISE NOTICE '테스트 계정: user1@example.com / admin123';
     RAISE NOTICE '샘플 데이터가 성공적으로 생성되었습니다.';
-END $;
+END $$;
