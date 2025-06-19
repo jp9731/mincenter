@@ -1,24 +1,76 @@
-node_modules
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Output
-.output
-.vercel
-.netlify
-.wrangler
-/.svelte-kit
-/build
-/dist
+# SvelteKit
+.svelte-kit/
+build/
+dist/
+.output/
+.vercel/
+.netlify/
+.wrangler/
 
-# OS
-.DS_Store
-Thumbs.db
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
-# Env
+# Rust
+target/
+Cargo.lock
+*.pdb
+*.exe
+
+# SQLx
+.sqlx/
+
+# Environment variables
 .env
 .env.*
 !.env.example
 !.env.test
 
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Logs
+*.log
+logs/
+server.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+
+# Package manager lock files (keep package-lock.json for consistency)
+# yarn.lock
+# pnpm-lock.yaml
