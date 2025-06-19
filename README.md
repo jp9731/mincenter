@@ -14,6 +14,6 @@ api 서버
 database
 데이터베이스
 
-## 기술사항
+### 기술사항
 frontend : sveltekit
 backend : rust axum
