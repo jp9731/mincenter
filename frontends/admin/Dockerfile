@@ -6,8 +6,8 @@ WORKDIR /app
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 # 패키지 파일 복사 및 의존성 설치
-COPY package*.json ./
-RUN npm ci --only=production=false --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --no-audit --no-fund
 
 # 소스 코드 복사
 COPY . .
