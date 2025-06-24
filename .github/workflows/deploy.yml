@@ -61,15 +61,27 @@ jobs:
           Port 22000
           StrictHostKeyChecking no
           UserKnownHostsFile /dev/null
+          IdentityFile ~/.ssh/id_rsa
+          IdentitiesOnly yes
+          PreferredAuthentications publickey
+          PubkeyAuthentication yes
+          PasswordAuthentication no
         EOF
+        
+        chmod 600 ~/.ssh/config
         
     - name: Add server to known hosts
       run: |
         ssh-keyscan -H -p 22000 ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
         
+    - name: Test SSH Connection
+      run: |
+        echo "SSH 연결을 테스트합니다..."
+        ssh -v -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo 'SSH 연결 성공!'"
+        
     - name: Deploy to server
       run: |
-        ssh ${{ secrets.DEPLOY_HOST }} << 'EOF'
+        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
           cd ${{ secrets.DEPLOY_PATH }}
           git pull origin main
           ./scripts/deploy.sh

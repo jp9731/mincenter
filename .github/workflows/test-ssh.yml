@@ -60,7 +60,14 @@ jobs:
           Port 22000
           StrictHostKeyChecking no
           UserKnownHostsFile /dev/null
+          IdentityFile ~/.ssh/id_rsa
+          IdentitiesOnly yes
+          PreferredAuthentications publickey
+          PubkeyAuthentication yes
+          PasswordAuthentication no
         EOF
+        
+        chmod 600 ~/.ssh/config
         
     - name: Add server to known hosts
       run: |
@@ -69,19 +76,19 @@ jobs:
     - name: Test SSH Connection
       run: |
         echo "SSH 연결을 테스트합니다..."
-        ssh ${{ secrets.DEPLOY_HOST }} "echo '✅ SSH 연결 성공!'; whoami; pwd; date"
+        ssh -v -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo '✅ SSH 연결 성공!'; whoami; pwd; date"
         
     - name: Test Project Path
       run: |
         echo "프로젝트 경로를 테스트합니다..."
-        ssh ${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && echo '✅ 프로젝트 경로 접근 성공!'; pwd; ls -la"
+        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && echo '✅ 프로젝트 경로 접근 성공!'; pwd; ls -la"
         
     - name: Test Docker
       run: |
         echo "Docker 상태를 확인합니다..."
-        ssh ${{ secrets.DEPLOY_HOST }} "docker --version; docker-compose --version; docker ps"
+        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "docker --version; docker-compose --version; docker ps"
         
     - name: Test System Info
       run: |
         echo "시스템 정보를 확인합니다..."
-        ssh ${{ secrets.DEPLOY_HOST }} "uname -a; cat /etc/redhat-release; free -h; df -h" 
+        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "uname -a; cat /etc/redhat-release; free -h; df -h" 
