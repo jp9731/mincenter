@@ -274,4 +274,216 @@ git add .
 git commit -m "새로운 기능 추가"
 git push origin main
 # 🎉 자동으로 배포됨!
-``` 
+```
+
+## 🚀 GitHub Actions를 통한 자동 배포
+
+### **1. GitHub Secrets 설정**
+
+GitHub 저장소의 Settings > Secrets and variables > Actions에서 다음 시크릿을 설정하세요:
+
+```bash
+# 서버 정보
+SERVER_HOST=your-server-ip-or-domain
+SERVER_USER=your-username
+SSH_PRIVATE_KEY=-----BEGIN OPENSSH PRIVATE KEY-----
+your-private-key-content
+-----END OPENSSH PRIVATE KEY-----
+
+# 프로젝트 경로
+PROJECT_PATH=/path/to/your/project
+
+# 서비스 URL (헬스체크용)
+SITE_URL=http://your-domain:3000
+ADMIN_URL=http://your-domain:3001
+API_URL=http://your-domain:8000
+```
+
+### **2. SSH 키 생성 및 설정**
+
+#### **로컬에서 SSH 키 생성**
+```bash
+# SSH 키 생성
+ssh-keygen -t rsa -b 4096 -C "github-actions@example.com" -f ~/.ssh/github_actions
+
+# 공개키를 서버에 등록
+ssh-copy-id -i ~/.ssh/github_actions.pub -p 22000 your-username@your-server-ip
+
+# 또는 수동으로 등록
+cat ~/.ssh/github_actions.pub | ssh -p 22000 your-username@your-server-ip "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+```
+
+#### **서버에서 SSH 설정 확인**
+```bash
+# SSH 설정 파일 확인
+sudo vim /etc/ssh/sshd_config
+
+# 포트 설정 확인
+Port 22000
+
+# SSH 서비스 재시작
+sudo systemctl restart sshd
+```
+
+### **3. GitHub Actions 워크플로우**
+
+`.github/workflows/deploy.yml` 파일이 자동으로 생성됩니다:
+
+```yaml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Configure SSH for CentOS 7
+      run: |
+        mkdir -p ~/.ssh
+        cat >> ~/.ssh/config << EOF
+        Host ${{ secrets.SERVER_HOST }}
+          HostName ${{ secrets.SERVER_HOST }}
+          User ${{ secrets.SERVER_USER }}
+          Port 22000
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+        EOF
+        
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H -p 22000 ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy to server
+      run: |
+        ssh ${{ secrets.SERVER_HOST }} << 'EOF'
+          cd ${{ secrets.PROJECT_PATH }}
+          git pull origin main
+          ./scripts/deploy.sh
+        EOF
+        
+    - name: Health check
+      run: |
+        sleep 60
+        curl -f ${{ secrets.SITE_URL }}/health || echo "사이트 헬스체크 실패"
+        curl -f ${{ secrets.ADMIN_URL }}/health || echo "관리자 페이지 헬스체크 실패"
+        curl -f ${{ secrets.API_URL }}/health || echo "API 헬스체크 실패"
+```
+
+### **4. 배포 프로세스**
+
+1. **코드 푸시**: `main` 브랜치에 푸시하면 자동 배포 시작
+2. **SSH 연결**: 포트 22000을 통해 서버에 연결
+3. **코드 업데이트**: 최신 코드를 가져옴
+4. **배포 실행**: `deploy.sh` 스크립트 실행
+5. **헬스체크**: 모든 서비스 정상 동작 확인
+
+### **5. 수동 배포**
+
+GitHub Actions 페이지에서 "Run workflow" 버튼을 클릭하여 수동으로 배포할 수 있습니다.
+
+### **6. 배포 로그 확인**
+
+#### **GitHub Actions 로그**
+- GitHub 저장소 > Actions 탭에서 실시간 로그 확인
+- 각 단계별 성공/실패 상태 확인
+
+#### **서버 로그**
+```bash
+# 배포 스크립트 로그
+tail -f deploy.log
+
+# Docker 컨테이너 로그
+docker-compose -f docker-compose.prod.yml logs -f
+
+# 특정 서비스 로그
+docker-compose -f docker-compose.prod.yml logs -f api
+docker-compose -f docker-compose.prod.yml logs -f site
+docker-compose -f docker-compose.prod.yml logs -f admin
+```
+
+### **7. 문제 해결**
+
+#### **SSH 연결 실패**
+```bash
+# SSH 연결 테스트
+ssh -p 22000 -i ~/.ssh/github_actions your-username@your-server-ip
+
+# SSH 설정 확인
+ssh -p 22000 -v your-username@your-server-ip
+```
+
+#### **권한 문제**
+```bash
+# 서버에서 권한 확인
+ls -la ~/.ssh/
+chmod 600 ~/.ssh/authorized_keys
+chmod 700 ~/.ssh/
+```
+
+#### **포트 문제**
+```bash
+# 방화벽 설정 확인
+sudo firewall-cmd --list-all
+sudo firewall-cmd --add-port=22000/tcp --permanent
+sudo firewall-cmd --reload
+
+# SELinux 설정 확인
+sudo semanage port -l | grep ssh
+sudo semanage port -a -t ssh_port_t -p tcp 22000
+```
+
+### **8. 보안 고려사항**
+
+1. **SSH 키 보안**: 프라이빗 키는 절대 공개하지 마세요
+2. **포트 변경**: 기본 SSH 포트(22) 대신 22000 사용
+3. **방화벽 설정**: 필요한 포트만 열어두기
+4. **정기 업데이트**: 서버 및 애플리케이션 정기 업데이트
+
+### **9. 모니터링**
+
+#### **배포 상태 모니터링**
+```bash
+# 서비스 상태 확인
+docker-compose -f docker-compose.prod.yml ps
+
+# 리소스 사용량 확인
+docker stats
+
+# 로그 모니터링
+docker-compose -f docker-compose.prod.yml logs -f --tail=100
+```
+
+#### **알림 설정**
+- GitHub Actions 실패 시 이메일 알림
+- 서버 모니터링 도구 설정 (예: Prometheus, Grafana)
+
+### **10. 롤백 전략**
+
+#### **자동 롤백**
+```bash
+# 이전 버전으로 롤백
+git checkout HEAD~1
+./scripts/deploy.sh
+```
+
+#### **수동 롤백**
+```bash
+# 특정 커밋으로 롤백
+git checkout <commit-hash>
+./scripts/deploy.sh
+```
+
+이제 GitHub Actions를 통해 CentOS 7 서버(포트 22000)로 자동 배포가 가능합니다! 🚀 
