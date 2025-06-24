@@ -51,6 +51,32 @@ export async function fetchPosts(filter?: PostFilter) {
   }
 }
 
+// slug 기반 게시글 목록 조회
+export async function fetchPostsBySlug(slug: string, filter?: PostFilter) {
+  isLoading.set(true);
+  error.set(null);
+
+  try {
+    const currentFilter = filter || get(postFilter);
+    const params = {
+      search: currentFilter.search,
+      board_id: currentFilter.board_id,
+      category_id: currentFilter.category_id,
+      tags: currentFilter.tags.join(','),
+      sort: currentFilter.sort,
+      page: currentFilter.page,
+      limit: currentFilter.limit
+    };
+
+    const data = await api.fetchPostsBySlug(slug, params);
+    posts.set(data);
+  } catch (e: any) {
+    error.set(e.message || '게시글을 불러오는데 실패했습니다.');
+  } finally {
+    isLoading.set(false);
+  }
+}
+
 // 게시글 상세 조회
 export async function fetchPost(id: string) {
   isLoading.set(true);

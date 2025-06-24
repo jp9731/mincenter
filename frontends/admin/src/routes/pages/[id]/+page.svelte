@@ -167,9 +167,9 @@
 							</code>
 						</div>
 
+						{@const statusBadge = getStatusBadge(pageData.status, pageData.is_published)}
 						<div>
 							<label class="mb-1 block text-sm font-medium text-gray-700">상태</label>
-							{@const statusBadge = getStatusBadge(pageData.status, pageData.is_published)}
 							<Badge variant={statusBadge.variant}>
 								{statusBadge.text}
 							</Badge>

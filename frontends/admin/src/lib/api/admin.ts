@@ -173,6 +173,15 @@ export async function toggleCommentVisibility(id: string, hidden: boolean): Prom
   return json.data;
 }
 
+// 댓글 삭제
+export async function deleteComment(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/comments/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
+}
+
 // 사용자 상태 변경
 export async function updateUserStatus(id: string, status: string): Promise<any> {
   const res = await authenticatedAdminFetch(`/api/admin/users/${id}/status`, {
@@ -300,4 +309,30 @@ export async function deletePage(id: string): Promise<void> {
   });
   const json: ApiResponse<null> = await res.json();
   if (!json.success) throw new Error(json.message);
+}
+
+// 알림 생성
+export async function createNotification(data: {
+  title: string;
+  message: string;
+  type: string;
+  target: string;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/notifications', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 알림 발송
+export async function sendNotification(id: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/notifications/${id}/send`, {
+    method: 'POST'
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 } 

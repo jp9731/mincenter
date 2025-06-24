@@ -38,6 +38,30 @@ export const postsPagination = writable({
   totalPages: 0
 });
 
+export const comments = writable<any[]>([]);
+export const commentsPagination = writable({
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0
+});
+
+export const notifications = writable<any[]>([]);
+export const notificationsPagination = writable({
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0
+});
+
+export const volunteerActivities = writable<any[]>([]);
+export const volunteerPagination = writable({
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0
+});
+
 // 관리자 로그인 상태 초기화
 export async function initializeAdminAuth(fetchFn?: typeof fetch) {
   if (!browser) return;
@@ -272,15 +296,160 @@ export async function hidePost(postId: string, reason: string) {
 
 export async function showPost(postId: string) {
   try {
-    await togglePostVisibility(postId, false);
-    // 게시글 목록 새로고침
-    const currentPagination = get(postsPagination);
-    await loadPosts({
-      page: currentPagination.page,
-      limit: currentPagination.limit
+    const response = await authenticatedAdminFetch(`/api/admin/posts/${postId}/show`, {
+      method: 'PUT'
     });
-  } catch (error) {
-    console.error('Failed to show post:', error);
-    throw error;
+
+    if (response.ok) {
+      // 게시글 목록 새로고침
+      const currentParams = get(postsPagination);
+      await loadPosts(currentParams);
+      return true;
+    } else {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '게시글 표시에 실패했습니다.');
+    }
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '게시글 표시에 실패했습니다.');
+    return false;
   }
-} 
+}
+
+// 댓글 목록 조회
+export async function loadComments(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  post_id?: string;
+  status?: string;
+}) {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.post_id) queryParams.append('post_id', params.post_id);
+    if (params.status) queryParams.append('status', params.status);
+
+    const response = await authenticatedAdminFetch(`/api/admin/comments?${queryParams}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      comments.set(data.comments || []);
+      commentsPagination.set({
+        page: data.pagination?.page || 1,
+        limit: data.pagination?.limit || 20,
+        total: data.pagination?.total || 0,
+        totalPages: data.pagination?.total_pages || 0
+      });
+    } else {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '댓글 목록을 불러오는데 실패했습니다.');
+    }
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '댓글 목록을 불러오는데 실패했습니다.');
+  }
+}
+
+// 댓글 숨기기
+export async function hideComment(commentId: string, reason?: string) {
+  try {
+    const response = await authenticatedAdminFetch(`/api/admin/comments/${commentId}/hide`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+
+    if (response.ok) {
+      // 댓글 목록 새로고침
+      const currentParams = get(commentsPagination);
+      await loadComments(currentParams);
+      return true;
+    } else {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '댓글 숨기기에 실패했습니다.');
+    }
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '댓글 숨기기에 실패했습니다.');
+    return false;
+  }
+}
+
+// 알림 목록 로드
+export async function loadNotifications(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  target?: string;
+}) {
+  try {
+    isLoading.set(true);
+    error.set(null);
+
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.set('search', params.search);
+    if (params.type) searchParams.set('type', params.type);
+    if (params.target) searchParams.set('target', params.target);
+    if (params.page) searchParams.set('page', params.page.toString());
+    if (params.limit) searchParams.set('limit', params.limit.toString());
+
+    const response = await authenticatedAdminFetch(`/api/admin/notifications?${searchParams}`);
+    const apiResponse = await response.json();
+
+    if (response.ok && apiResponse.success) {
+      notifications.set(apiResponse.data.notifications || []);
+      notificationsPagination.set({
+        page: apiResponse.data.pagination?.page || 1,
+        limit: apiResponse.data.pagination?.limit || 20,
+        total: apiResponse.data.pagination?.total || 0,
+        totalPages: apiResponse.data.pagination?.total_pages || 0
+      });
+    } else {
+      throw new Error(apiResponse.message || '알림 목록을 불러오는데 실패했습니다.');
+    }
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '알림 목록을 불러오는데 실패했습니다.');
+  } finally {
+    isLoading.set(false);
+  }
+}
+
+// 봉사활동 목록 로드
+export async function loadVolunteerActivities(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}) {
+  try {
+    isLoading.set(true);
+    error.set(null);
+
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.set('search', params.search);
+    if (params.status) searchParams.set('status', params.status);
+    if (params.page) searchParams.set('page', params.page.toString());
+    if (params.limit) searchParams.set('limit', params.limit.toString());
+
+    const response = await authenticatedAdminFetch(`/api/admin/volunteer?${searchParams}`);
+    const apiResponse = await response.json();
+
+    if (response.ok && apiResponse.success) {
+      volunteerActivities.set(apiResponse.data.activities || []);
+      volunteerPagination.set({
+        page: apiResponse.data.pagination?.page || 1,
+        limit: apiResponse.data.pagination?.limit || 20,
+        total: apiResponse.data.pagination?.total || 0,
+        totalPages: apiResponse.data.pagination?.total_pages || 0
+      });
+    } else {
+      throw new Error(apiResponse.message || '봉사활동 목록을 불러오는데 실패했습니다.');
+    }
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '봉사활동 목록을 불러오는데 실패했습니다.');
+  } finally {
+    isLoading.set(false);
+  }
+}
