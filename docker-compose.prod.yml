@@ -66,7 +66,7 @@ services:
       PUBLIC_API_URL: ${PUBLIC_API_URL}
       SESSION_SECRET: ${SESSION_SECRET}
     ports:
-      - "127.0.0.1:${SITE_PORT}:3000"
+      - "127.0.0.1:${SITE_PORT}:${SITE_PORT}"
     restart: unless-stopped
     deploy:
       resources:
@@ -95,7 +95,7 @@ services:
       SESSION_SECRET: ${ADMIN_SESSION_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
-      - "127.0.0.1:${ADMIN_PORT}:3000"
+      - "127.0.0.1:${ADMIN_PORT}:${ADMIN_PORT}"
     restart: unless-stopped
     deploy:
       resources:
