@@ -85,7 +85,7 @@
 						</svg>
 					</a>
 					<button
-						on:click={downloadApplication}
+						onclick={downloadApplication}
 						class="inline-flex items-center justify-center rounded-lg border border-green-600 px-8 py-3 font-semibold text-green-600 transition-colors hover:bg-green-50"
 					>
 						<span>신청서 다운로드</span>

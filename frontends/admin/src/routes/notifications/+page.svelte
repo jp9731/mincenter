@@ -221,8 +221,8 @@
 					</div>
 				</div>
 				<DialogFooter>
-					<Button variant="outline" on:click={closeCreateDialog}>취소</Button>
-					<Button on:click={handleCreateNotification}>생성</Button>
+					<Button variant="outline" onclick={closeCreateDialog}>취소</Button>
+					<Button onclick={handleCreateNotification}>생성</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
@@ -247,7 +247,7 @@
 					<option value="warning">경고</option>
 					<option value="error">오류</option>
 				</select>
-				<Button on:click={handleSearch}>검색</Button>
+				<Button onclick={handleSearch}>검색</Button>
 			</div>
 		</CardContent>
 	</Card>

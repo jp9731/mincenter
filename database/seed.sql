@@ -5,11 +5,23 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 개발 및 테스트용 데이터
 
 -- 게시판 생성
-INSERT INTO boards (name, description, category, display_order, is_public, allow_anonymous) VALUES
-    ('공지사항', '중요한 공지사항을 확인하세요', 'notice', 1, true, false),
-    ('봉사활동 후기', '봉사활동 경험을 공유해보세요', 'review', 2, true, false),
-    ('자유게시판', '자유롭게 이야기를 나누세요', 'free', 3, true, false),
-    ('질문과 답변', '궁금한 점을 물어보세요', 'qna', 4, true, false)
+INSERT INTO boards (
+    name, description, category, display_order, is_public, allow_anonymous,
+    allow_file_upload, max_files, max_file_size, allowed_file_types,
+    allow_rich_text, require_category, allow_comments, allow_likes
+) VALUES
+    ('공지사항', '중요한 공지사항을 확인하세요', 'notice', 1, true, false,
+     true, 3, 5242880, ARRAY['image/*', 'application/pdf'],
+     true, true, true, false),
+    ('봉사활동 후기', '봉사활동 경험을 공유해보세요', 'review', 2, true, false,
+     true, 5, 10485760, ARRAY['image/*', 'video/*'],
+     true, true, true, true),
+    ('자유게시판', '자유롭게 이야기를 나누세요', 'free', 3, true, false,
+     true, 5, 10485760, ARRAY['image/*'],
+     true, false, true, true),
+    ('질문과 답변', '궁금한 점을 물어보세요', 'qna', 4, true, false,
+     false, 0, 0, ARRAY[]::text[],
+     true, true, true, false)
 ON CONFLICT (name) DO NOTHING;
 
 -- 카테고리 생성 (게시판별)
@@ -54,9 +66,9 @@ END $$;
 
 -- 추가 사용자 생성 (테스트용)
 INSERT INTO users (email, password_hash, name, role, status, email_verified, points) VALUES
-    ('user1@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '김봉사', 'user', 'active', true, 150),
-    ('user2@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '이도움', 'user', 'active', true, 230),
-    ('user3@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewmWQOmGM0aZOJ8e', '박나눔', 'user', 'active', true, 80)
+    ('user1@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '김봉사', 'user', 'active', true, 150),
+    ('user2@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '이도움', 'user', 'active', true, 230),
+    ('user3@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '박나눔', 'user', 'active', true, 80)
 ON CONFLICT (email) DO NOTHING;
 
 -- 히어로 섹션 데이터

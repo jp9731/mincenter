@@ -7,12 +7,24 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Board {
     pub id: Uuid,
+    pub slug: String,
     pub name: String,
     pub description: Option<String>,
     pub category: Option<String>,
     pub display_order: Option<i32>,
     pub is_public: Option<bool>,
     pub allow_anonymous: Option<bool>,
+    // 파일 업로드 설정
+    pub allow_file_upload: Option<bool>,
+    pub max_files: Option<i32>,
+    pub max_file_size: Option<i64>,
+    pub allowed_file_types: Option<Vec<String>>,
+    // 리치 텍스트 에디터 설정
+    pub allow_rich_text: Option<bool>,
+    // 기타 설정
+    pub require_category: Option<bool>,
+    pub allow_comments: Option<bool>,
+    pub allow_likes: Option<bool>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -100,7 +112,7 @@ pub struct CommentDetail {
 // 게시글 생성 요청
 #[derive(Debug, Deserialize)]
 pub struct CreatePostRequest {
-    pub board_id: Uuid,
+    pub board_id: Option<Uuid>,
     pub category_id: Option<Uuid>,
     pub title: String,
     pub content: String,
@@ -203,4 +215,44 @@ pub struct PostSummary {
     pub board_name: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub comment_count: Option<i64>,
+} 
+
+// 게시판 생성 요청
+#[derive(Debug, Deserialize)]
+pub struct CreateBoardRequest {
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub display_order: Option<i32>,
+    pub is_public: Option<bool>,
+    pub allow_anonymous: Option<bool>,
+    pub allow_file_upload: Option<bool>,
+    pub max_files: Option<i32>,
+    pub max_file_size: Option<i64>,
+    pub allowed_file_types: Option<Vec<String>>,
+    pub allow_rich_text: Option<bool>,
+    pub require_category: Option<bool>,
+    pub allow_comments: Option<bool>,
+    pub allow_likes: Option<bool>,
+}
+
+// 게시판 수정 요청
+#[derive(Debug, Deserialize)]
+pub struct UpdateBoardRequest {
+    pub name: Option<String>,
+    pub slug: Option<String>,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub display_order: Option<i32>,
+    pub is_public: Option<bool>,
+    pub allow_anonymous: Option<bool>,
+    pub allow_file_upload: Option<bool>,
+    pub max_files: Option<i32>,
+    pub max_file_size: Option<i64>,
+    pub allowed_file_types: Option<Vec<String>>,
+    pub allow_rich_text: Option<bool>,
+    pub require_category: Option<bool>,
+    pub allow_comments: Option<bool>,
+    pub allow_likes: Option<bool>,
 } 

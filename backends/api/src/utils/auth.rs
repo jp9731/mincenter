@@ -15,6 +15,7 @@ use crate::{
     models::user::User,
     AppState,
 };
+use tracing::{info, debug};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {

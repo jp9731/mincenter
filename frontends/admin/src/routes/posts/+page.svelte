@@ -100,9 +100,10 @@
 					type="text"
 					placeholder="제목, 내용, 작성자로 검색"
 					bind:value={searchQuery}
-					on:keydown={(e: any) => e.key === 'Enter' && handleSearch()}
+					onkeydown={(e: any) => e.key === 'Enter' && handleSearch()}
 				/>
 				<Select
+					type="single"
 					value={boardFilter}
 					onValueChange={(value: any) => {
 						boardFilter = value;
@@ -120,6 +121,7 @@
 					</SelectContent>
 				</Select>
 				<Select
+					type="single"
 					value={statusFilter}
 					onValueChange={(value: any) => {
 						statusFilter = value;
@@ -136,7 +138,7 @@
 						<SelectItem value="draft">임시저장</SelectItem>
 					</SelectContent>
 				</Select>
-				<Button on:click={handleSearch}>검색</Button>
+				<Button onclick={handleSearch}>검색</Button>
 			</div>
 		</CardContent>
 	</Card>
@@ -200,7 +202,7 @@
 							<TableCell>
 								<div class="flex space-x-2">
 									{#if post.status === 'published'}
-										<Button variant="outline" size="sm" on:click={() => handleHidePost(post.id)}>
+										<Button variant="outline" size="sm" onclick={() => handleHidePost(post.id)}>
 											숨기기
 										</Button>
 									{:else if post.status === 'hidden'}
@@ -220,11 +222,7 @@
 				<div class="mt-6 flex justify-center">
 					<div class="flex space-x-2">
 						{#if currentPage > 1}
-							<Button
-								variant="outline"
-								size="sm"
-								on:click={() => handlePageChange(currentPage - 1)}
-							>
+							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage - 1)}>
 								이전
 							</Button>
 						{/if}
@@ -233,18 +231,14 @@
 							<Button
 								variant={currentPage === pageNum ? 'default' : 'outline'}
 								size="sm"
-								on:click={() => handlePageChange(pageNum)}
+								onclick={() => handlePageChange(pageNum)}
 							>
 								{pageNum}
 							</Button>
 						{/each}
 
 						{#if currentPage < $postsPagination.total_pages}
-							<Button
-								variant="outline"
-								size="sm"
-								on:click={() => handlePageChange(currentPage + 1)}
-							>
+							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage + 1)}>
 								다음
 							</Button>
 						{/if}

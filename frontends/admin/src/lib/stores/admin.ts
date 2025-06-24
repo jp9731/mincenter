@@ -1,326 +1,286 @@
-import { writable, derived } from 'svelte/store';
-import * as adminApi from '$lib/api/admin.js';
-import type {
-  AdminUser,
-  DashboardStats,
-  User,
-  Post,
-  Board,
-  Comment,
-  VolunteerActivity,
-  Donation,
-  Notification,
-  SystemLog,
-  PaginationParams,
-  FilterParams
-} from '$lib/types/admin.js';
+import { writable, get } from 'svelte/store';
+import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
+import type { AdminUser } from '$lib/types/admin';
+import {
+  setAdminToken,
+  getAdminToken,
+  getAdminRefreshToken,
+  removeAdminTokens,
+  isTokenExpired,
+  decodeToken,
+  getAdminAuthHeaders,
+  refreshAdminToken
+} from '$lib/utils/auth';
+import { getUsers, getPosts, togglePostVisibility, updateUserStatus } from '$lib/api/admin';
 
-// 관리자 인증 상태
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export const adminUser = writable<AdminUser | null>(null);
-export const isAuthenticated = derived(adminUser, ($adminUser) => !!$adminUser);
-
-// 로딩 상태
+export const isAdminAuthenticated = writable(false);
 export const isLoading = writable(false);
 export const error = writable<string | null>(null);
 
-// 대시보드 통계
-export const dashboardStats = writable<DashboardStats | null>(null);
-
-// 사용자 관리
-export const users = writable<User[]>([]);
-export const usersPagination = writable<PaginationParams>({
+// 데이터 스토어
+export const users = writable<any[]>([]);
+export const usersPagination = writable({
   page: 1,
   limit: 20,
   total: 0,
-  total_pages: 0
+  totalPages: 0
 });
 
-// 게시글 관리
-export const posts = writable<Post[]>([]);
-export const postsPagination = writable<PaginationParams>({
+export const posts = writable<any[]>([]);
+export const postsPagination = writable({
   page: 1,
   limit: 20,
   total: 0,
-  total_pages: 0
+  totalPages: 0
 });
 
-// 게시판 관리
-export const boards = writable<Board[]>([]);
+// 관리자 로그인 상태 초기화
+export async function initializeAdminAuth(fetchFn?: typeof fetch) {
+  if (!browser) return;
 
-// 댓글 관리
-export const comments = writable<Comment[]>([]);
-export const commentsPagination = writable<PaginationParams>({
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0
-});
+  try {
+    const token = getAdminToken();
+    if (!token) {
+      isAdminAuthenticated.set(false);
+      adminUser.set(null);
+      return;
+    }
 
-// 봉사 활동 관리
-export const volunteerActivities = writable<VolunteerActivity[]>([]);
-export const volunteerPagination = writable<PaginationParams>({
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0
-});
+    if (isTokenExpired(token)) {
+      // 토큰이 만료되었으면 리프레시 시도
+      const refreshed = await refreshAdminToken();
+      if (!refreshed) {
+        isAdminAuthenticated.set(false);
+        adminUser.set(null);
+        return;
+      }
+    }
 
-// 후원 관리
-export const donations = writable<Donation[]>([]);
-export const donationsPagination = writable<PaginationParams>({
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0
-});
+    // 서버에서 관리자 정보 가져오기
+    await fetchAdminProfile(fetchFn);
+  } catch (e) {
+    console.error('Failed to initialize admin auth:', e);
+    isAdminAuthenticated.set(false);
+    adminUser.set(null);
+  }
+}
 
-// 알림 관리
-export const notifications = writable<Notification[]>([]);
-export const notificationsPagination = writable<PaginationParams>({
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0
-});
+// 관리자 프로필 가져오기
+async function fetchAdminProfile(fetchFn?: typeof fetch) {
+  try {
+    const fetcher = fetchFn || fetch;
+    const response = await fetcher(`${API_URL}/api/admin/me`, {
+      headers: getAdminAuthHeaders()
+    });
 
-// 시스템 로그
-export const systemLogs = writable<SystemLog[]>([]);
-export const logsPagination = writable<PaginationParams>({
-  page: 1,
-  limit: 50,
-  total: 0,
-  total_pages: 0
-});
+    if (response.ok) {
+      const userData = await response.json();
+      adminUser.set(userData);
+      isAdminAuthenticated.set(true);
+    } else {
+      throw new Error('Failed to fetch admin profile');
+    }
+  } catch (e) {
+    console.error('Failed to fetch admin profile:', e);
+    await adminLogout();
+  }
+}
 
-// 대시보드 통계 로드
-export async function loadDashboardStats() {
+// 관리자 로그인
+export async function adminLogin(email: string, password: string) {
   isLoading.set(true);
   error.set(null);
 
   try {
-    const stats = await adminApi.getDashboardStats();
-    dashboardStats.set(stats);
-  } catch (e: any) {
-    error.set(e.message || '대시보드 통계를 불러오는데 실패했습니다.');
+    const response = await fetch(`${API_URL}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        service_type: 'admin'
+      })
+    });
+
+    const apiResponse = await response.json();
+
+    if (!response.ok || !apiResponse.success) {
+      throw new Error(apiResponse.message || '관리자 로그인에 실패했습니다.');
+    }
+
+    const authData = apiResponse.data;
+
+    // JWT 토큰 저장
+    setAdminToken(authData.access_token, authData.refresh_token);
+
+    // 관리자 정보 설정
+    adminUser.set(authData.user);
+    isAdminAuthenticated.set(true);
+
+    return true;
+  } catch (e) {
+    error.set(e instanceof Error ? e.message : '관리자 로그인에 실패했습니다.');
+    return false;
   } finally {
     isLoading.set(false);
   }
 }
 
-// 사용자 목록 로드
-export async function loadUsers(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
-
+// 관리자 로그아웃
+export async function adminLogout() {
   try {
-    const result = await adminApi.getUsers(params);
-    users.set(result.users);
-    usersPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '사용자 목록을 불러오는데 실패했습니다.');
+    // 서버에 관리자 로그아웃 요청
+    await fetch(`${API_URL}/api/admin/logout`, {
+      method: 'POST',
+      headers: getAdminAuthHeaders()
+    });
+  } catch (e) {
+    console.error('Admin logout request failed:', e);
   } finally {
-    isLoading.set(false);
+    // 클라이언트 상태 정리
+    removeAdminTokens();
+    adminUser.set(null);
+    isAdminAuthenticated.set(false);
+
+    // 로그인 페이지로 리다이렉트
+    if (browser) {
+      goto('/login');
+    }
   }
 }
 
-// 게시글 목록 로드
-export async function loadPosts(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
+// 관리자 인증된 API 요청
+export async function authenticatedAdminFetch(url: string, options: RequestInit = {}, fetchFn?: typeof fetch) {
+  const token = getAdminToken();
 
+  if (!token) {
+    throw new Error('No admin token available');
+  }
+
+  if (isTokenExpired(token)) {
+    const refreshed = await refreshAdminToken();
+    if (!refreshed) {
+      await adminLogout();
+      throw new Error('Token refresh failed');
+    }
+  }
+
+  // URL이 상대 경로인 경우 API_URL과 결합
+  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+
+  const fetcher = fetchFn || fetch;
+  const response = await fetcher(fullUrl, {
+    ...options,
+    headers: {
+      ...getAdminAuthHeaders(),
+      ...options.headers
+    }
+  });
+
+  if (response.status === 401) {
+    await adminLogout();
+    throw new Error('Unauthorized');
+  }
+
+  return response;
+}
+
+// 사용자 관리 함수들
+export async function loadUsers(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+}) {
   try {
-    const result = await adminApi.getPosts(params);
-    posts.set(result.posts);
-    postsPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '게시글 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    const data = await getUsers(params);
+    users.set(data.users);
+    usersPagination.set(data.pagination);
+  } catch (error) {
+    console.error('Failed to load users:', error);
+    throw error;
   }
 }
 
-// 게시판 목록 로드
-export async function loadBoards() {
-  isLoading.set(true);
-  error.set(null);
-
+export async function suspendUser(userId: string, reason: string) {
   try {
-    const boardsData = await adminApi.getBoards();
-    boards.set(boardsData);
-  } catch (e: any) {
-    error.set(e.message || '게시판 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    await updateUserStatus(userId, 'suspended');
+    // 사용자 목록 새로고침
+    const currentPagination = get(usersPagination);
+    await loadUsers({
+      page: currentPagination.page,
+      limit: currentPagination.limit
+    });
+  } catch (error) {
+    console.error('Failed to suspend user:', error);
+    throw error;
   }
 }
 
-// 댓글 목록 로드
-export async function loadComments(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
-
+export async function activateUser(userId: string) {
   try {
-    const result = await adminApi.getComments(params);
-    comments.set(result.comments);
-    commentsPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '댓글 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    await updateUserStatus(userId, 'active');
+    // 사용자 목록 새로고침
+    const currentPagination = get(usersPagination);
+    await loadUsers({
+      page: currentPagination.page,
+      limit: currentPagination.limit
+    });
+  } catch (error) {
+    console.error('Failed to activate user:', error);
+    throw error;
   }
 }
 
-// 봉사 활동 목록 로드
-export async function loadVolunteerActivities(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
-
+// 게시글 관리 함수들
+export async function loadPosts(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  board_id?: string;
+  status?: string;
+}) {
   try {
-    const result = await adminApi.getVolunteerActivities(params);
-    volunteerActivities.set(result.activities);
-    volunteerPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '봉사 활동 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    const data = await getPosts(params);
+    posts.set(data.posts);
+    postsPagination.set(data.pagination);
+  } catch (error) {
+    console.error('Failed to load posts:', error);
+    throw error;
   }
 }
 
-// 후원 목록 로드
-export async function loadDonations(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
-
+export async function hidePost(postId: string, reason: string) {
   try {
-    const result = await adminApi.getDonations(params);
-    donations.set(result.donations);
-    donationsPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '후원 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    await togglePostVisibility(postId, true);
+    // 게시글 목록 새로고침
+    const currentPagination = get(postsPagination);
+    await loadPosts({
+      page: currentPagination.page,
+      limit: currentPagination.limit
+    });
+  } catch (error) {
+    console.error('Failed to hide post:', error);
+    throw error;
   }
 }
 
-// 알림 목록 로드
-export async function loadNotifications(params?: PaginationParams) {
-  isLoading.set(true);
-  error.set(null);
-
+export async function showPost(postId: string) {
   try {
-    const result = await adminApi.getNotifications(params);
-    notifications.set(result.notifications);
-    notificationsPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '알림 목록을 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-// 시스템 로그 로드
-export async function loadSystemLogs(params?: PaginationParams & FilterParams) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    const result = await adminApi.getSystemLogs(params);
-    systemLogs.set(result.logs);
-    logsPagination.set(result.pagination);
-  } catch (e: any) {
-    error.set(e.message || '시스템 로그를 불러오는데 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-// 사용자 관리 액션
-export async function updateUser(id: string, data: Partial<User>) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    const updatedUser = await adminApi.updateUser(id, data);
-    users.update(userList =>
-      userList.map(user => user.id === id ? updatedUser : user)
-    );
-  } catch (e: any) {
-    error.set(e.message || '사용자 정보 수정에 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-export async function suspendUser(id: string, reason: string) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    await adminApi.suspendUser(id, reason);
-    users.update(userList =>
-      userList.map(user =>
-        user.id === id ? { ...user, status: 'suspended' as const } : user
-      )
-    );
-  } catch (e: any) {
-    error.set(e.message || '사용자 정지에 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-export async function activateUser(id: string) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    await adminApi.activateUser(id);
-    users.update(userList =>
-      userList.map(user =>
-        user.id === id ? { ...user, status: 'active' as const } : user
-      )
-    );
-  } catch (e: any) {
-    error.set(e.message || '사용자 활성화에 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-// 게시글 관리 액션
-export async function hidePost(id: string, reason: string) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    await adminApi.hidePost(id, reason);
-    posts.update(postList =>
-      postList.map(post =>
-        post.id === id ? { ...post, status: 'hidden' as const } : post
-      )
-    );
-  } catch (e: any) {
-    error.set(e.message || '게시글 숨김에 실패했습니다.');
-  } finally {
-    isLoading.set(false);
-  }
-}
-
-// 댓글 관리 액션
-export async function hideComment(id: string, reason: string) {
-  isLoading.set(true);
-  error.set(null);
-
-  try {
-    await adminApi.hideComment(id, reason);
-    comments.update(commentList =>
-      commentList.map(comment =>
-        comment.id === id ? { ...comment, status: 'hidden' as const } : comment
-      )
-    );
-  } catch (e: any) {
-    error.set(e.message || '댓글 숨김에 실패했습니다.');
-  } finally {
-    isLoading.set(false);
+    await togglePostVisibility(postId, false);
+    // 게시글 목록 새로고침
+    const currentPagination = get(postsPagination);
+    await loadPosts({
+      page: currentPagination.page,
+      limit: currentPagination.limit
+    });
+  } catch (error) {
+    console.error('Failed to show post:', error);
+    throw error;
   }
 } 

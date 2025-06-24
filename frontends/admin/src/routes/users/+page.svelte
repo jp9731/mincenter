@@ -114,9 +114,10 @@
 					type="text"
 					placeholder="이름, 이메일, 사용자명으로 검색"
 					bind:value={searchQuery}
-					on:keydown={(e) => e.key === 'Enter' && handleSearch()}
+					onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 				/>
 				<Select
+					type="single"
 					value={statusFilter}
 					onValueChange={(value) => {
 						statusFilter = value;
@@ -134,6 +135,7 @@
 					</SelectContent>
 				</Select>
 				<Select
+					type="single"
 					value={roleFilter}
 					onValueChange={(value) => {
 						roleFilter = value;
@@ -150,7 +152,7 @@
 						<SelectItem value="admin">관리자</SelectItem>
 					</SelectContent>
 				</Select>
-				<Button on:click={handleSearch}>검색</Button>
+				<Button onclick={handleSearch}>검색</Button>
 			</div>
 		</CardContent>
 	</Card>
@@ -208,15 +210,11 @@
 							<TableCell>
 								<div class="flex space-x-2">
 									{#if user.status === 'active'}
-										<Button variant="outline" size="sm" on:click={() => handleSuspendUser(user.id)}>
+										<Button variant="outline" size="sm" onclick={() => handleSuspendUser(user.id)}>
 											정지
 										</Button>
 									{:else if user.status === 'suspended'}
-										<Button
-											variant="outline"
-											size="sm"
-											on:click={() => handleActivateUser(user.id)}
-										>
+										<Button variant="outline" size="sm" onclick={() => handleActivateUser(user.id)}>
 											활성화
 										</Button>
 									{/if}
@@ -233,11 +231,7 @@
 				<div class="mt-6 flex justify-center">
 					<div class="flex space-x-2">
 						{#if currentPage > 1}
-							<Button
-								variant="outline"
-								size="sm"
-								on:click={() => handlePageChange(currentPage - 1)}
-							>
+							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage - 1)}>
 								이전
 							</Button>
 						{/if}
@@ -246,18 +240,14 @@
 							<Button
 								variant={currentPage === pageNum ? 'default' : 'outline'}
 								size="sm"
-								on:click={() => handlePageChange(pageNum)}
+								onclick={() => handlePageChange(pageNum)}
 							>
 								{pageNum}
 							</Button>
 						{/each}
 
 						{#if currentPage < $usersPagination.total_pages}
-							<Button
-								variant="outline"
-								size="sm"
-								on:click={() => handlePageChange(currentPage + 1)}
-							>
+							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage + 1)}>
 								다음
 							</Button>
 						{/if}

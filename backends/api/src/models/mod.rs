@@ -1,10 +1,11 @@
-pub mod response;
 pub mod user;
+pub mod response;
 pub mod community;
+pub mod menu;
+pub mod page;
 
-use sqlx::PgPool;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub db: PgPool,
-}
+pub use user::*;
+pub use response::*;
+pub use community::*;
+pub use menu::*;
+pub use page::*;

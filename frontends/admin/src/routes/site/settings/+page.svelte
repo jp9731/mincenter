@@ -1,8 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Textarea } from '$lib/components/ui/textarea';
 	import {
 		Card,
 		CardContent,
@@ -10,21 +7,41 @@
 		CardHeader,
 		CardTitle
 	} from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Separator } from '$lib/components/ui/separator';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import {
-		PlusIcon,
-		TrashIcon,
-		SaveIcon,
 		GlobeIcon,
 		MapPinIcon,
 		PhoneIcon,
 		MailIcon,
-		ShareIcon
+		Share2Icon,
+		PlusIcon,
+		TrashIcon,
+		ChevronUpIcon,
+		ChevronDownIcon
 	} from 'lucide-svelte';
+	import { getSiteSettings, saveSiteSettings } from '$lib/api/admin';
 
-	// 사이트 기본 정보
-	let siteInfo = {
+	interface SiteInfo {
+		siteName: string;
+		catchphrase: string;
+		address: string;
+		phone: string;
+		email: string;
+	}
+
+	interface SnsLink {
+		id: string;
+		name: string;
+		url: string;
+		icon: string;
+		iconType: 'svg' | 'emoji';
+		order: number;
+	}
+
+	let siteInfo: SiteInfo = {
 		siteName: '',
 		catchphrase: '',
 		address: '',
@@ -32,28 +49,18 @@
 		email: ''
 	};
 
-	// SNS 링크 목록
-	let snsLinks: Array<{
-		id: string;
-		name: string;
-		url: string;
-		icon: string;
-		iconType: 'image' | 'svg';
-		order: number;
-	}> = [];
-
-	let loading = false;
+	let snsLinks: SnsLink[] = [];
+	let loading = true;
 	let saving = false;
+	let errorMessage: string | null = null;
 
-	// SNS 아이콘 옵션
 	const snsIconOptions = [
 		{ value: 'facebook', label: 'Facebook', icon: '📘' },
-		{ value: 'twitter', label: 'Twitter', icon: '🐦' },
 		{ value: 'instagram', label: 'Instagram', icon: '📷' },
+		{ value: 'twitter', label: 'Twitter', icon: '🐦' },
 		{ value: 'youtube', label: 'YouTube', icon: '📺' },
-		{ value: 'linkedin', label: 'LinkedIn', icon: '💼' },
 		{ value: 'blog', label: 'Blog', icon: '📝' },
-		{ value: 'kakao', label: 'KakaoTalk', icon: '💛' },
+		{ value: 'kakao', label: 'KakaoTalk', icon: '💬' },
 		{ value: 'naver', label: 'Naver', icon: '🟢' },
 		{ value: 'custom', label: 'Custom', icon: '🔗' }
 	];
@@ -65,11 +72,21 @@
 	async function loadSiteSettings() {
 		loading = true;
 		try {
-			// TODO: API 호출로 실제 데이터 로드
-			// const response = await fetch('/api/admin/site/settings');
-			// const data = await response.json();
+			errorMessage = null;
+			const data = await getSiteSettings();
 
-			// 임시 목 데이터
+			// API 응답 구조에 따라 데이터 설정
+			if (data.siteInfo) {
+				siteInfo = data.siteInfo;
+			}
+			if (data.snsLinks) {
+				snsLinks = data.snsLinks;
+			}
+		} catch (error) {
+			console.error('설정 로드 실패:', error);
+			errorMessage = error instanceof Error ? error.message : '설정을 불러오는데 실패했습니다.';
+
+			// 에러 시 기본값 설정
 			siteInfo = {
 				siteName: '민센터 봉사단체',
 				catchphrase: '함께 만들어가는 따뜻한 세상',
@@ -77,58 +94,28 @@
 				phone: '02-1234-5678',
 				email: 'info@mincenter.org'
 			};
-
-			snsLinks = [
-				{
-					id: '1',
-					name: 'Facebook',
-					url: 'https://facebook.com/mincenter',
-					icon: 'facebook',
-					iconType: 'svg',
-					order: 1
-				},
-				{
-					id: '2',
-					name: 'Instagram',
-					url: 'https://instagram.com/mincenter',
-					icon: 'instagram',
-					iconType: 'svg',
-					order: 2
-				},
-				{
-					id: '3',
-					name: 'Blog',
-					url: 'https://blog.naver.com/mincenter',
-					icon: 'blog',
-					iconType: 'svg',
-					order: 3
-				}
-			];
-		} catch (error) {
-			console.error('설정 로드 실패:', error);
+			snsLinks = [];
 		} finally {
 			loading = false;
 		}
 	}
 
-	async function saveSiteSettings(event: Event) {
+	async function handleSaveSettings(event: Event) {
 		event.preventDefault();
 		saving = true;
 		try {
-			// TODO: API 호출로 실제 데이터 저장
-			// const response = await fetch('/api/admin/site/settings', {
-			// 	method: 'PUT',
-			// 	headers: { 'Content-Type': 'application/json' },
-			// 	body: JSON.stringify({ siteInfo, snsLinks })
-			// });
-
-			console.log('저장할 데이터:', { siteInfo, snsLinks });
+			errorMessage = null;
+			const settingsData = {
+				siteInfo,
+				snsLinks
+			};
+			await saveSiteSettings(settingsData);
 
 			// 성공 메시지 표시
 			alert('설정이 저장되었습니다.');
 		} catch (error) {
 			console.error('설정 저장 실패:', error);
-			alert('설정 저장에 실패했습니다.');
+			errorMessage = error instanceof Error ? error.message : '설정 저장에 실패했습니다.';
 		} finally {
 			saving = false;
 		}
@@ -186,12 +173,19 @@
 		<p class="text-gray-600">사이트의 기본 정보와 SNS 링크를 관리하세요</p>
 	</div>
 
+	<!-- 에러 메시지 -->
+	{#if errorMessage}
+		<div class="rounded-lg border border-red-200 bg-red-50 p-4">
+			<p class="text-red-600">{errorMessage}</p>
+		</div>
+	{/if}
+
 	{#if loading}
 		<div class="flex items-center justify-center py-12">
 			<div class="border-primary-600 h-8 w-8 animate-spin rounded-full border-b-2"></div>
 		</div>
 	{:else}
-		<form onsubmit={saveSiteSettings} class="space-y-6">
+		<form onsubmit={handleSaveSettings} class="space-y-6">
 			<!-- 기본 정보 -->
 			<Card>
 				<CardHeader>
@@ -262,125 +256,123 @@
 				</CardContent>
 			</Card>
 
-			<!-- SNS 링크 관리 -->
+			<!-- SNS 링크 -->
 			<Card>
 				<CardHeader>
 					<CardTitle class="flex items-center gap-2">
-						<ShareIcon class="h-5 w-5" />
-						SNS 링크 관리
+						<Share2Icon class="h-5 w-5" />
+						SNS 링크
 					</CardTitle>
-					<CardDescription>SNS 계정 링크를 추가하고 관리합니다</CardDescription>
+					<CardDescription>소셜 미디어 링크를 추가하고 관리하세요</CardDescription>
 				</CardHeader>
-				<CardContent>
-					<div class="space-y-4">
-						<!-- SNS 링크 목록 -->
-						{#if snsLinks.length === 0}
-							<div class="py-8 text-center text-gray-500">
-								<ShareIcon class="mx-auto mb-2 h-12 w-12 text-gray-300" />
-								<p>등록된 SNS 링크가 없습니다.</p>
-								<p class="text-sm">아래 버튼을 클릭하여 SNS 링크를 추가하세요.</p>
-							</div>
-						{:else}
-							<div class="space-y-3">
-								{#each snsLinks as link, index}
-									<div class="rounded-lg border bg-gray-50 p-4">
-										<div class="flex items-center gap-4">
-											<!-- 순서 표시 -->
-											<div class="flex flex-col gap-1">
-												<button
-													type="button"
-													class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
-													disabled={index === 0}
-													onclick={() => moveSnsLink(link.id, 'up')}
-												>
-													↑
-												</button>
-												<Badge variant="secondary" class="text-xs">
-													{link.order}
-												</Badge>
-												<button
-													type="button"
-													class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
-													disabled={index === snsLinks.length - 1}
-													onclick={() => moveSnsLink(link.id, 'down')}
-												>
-													↓
-												</button>
-											</div>
-
-											<!-- 아이콘 -->
-											<div
-												class="flex h-10 w-10 items-center justify-center rounded-lg border bg-white"
-											>
-												<span class="text-lg">{getIconDisplay(link.icon, link.iconType)}</span>
-											</div>
-
-											<!-- 입력 필드들 -->
-											<div class="grid flex-1 grid-cols-1 gap-3 md:grid-cols-3">
-												<div>
-													<label class="mb-1 block text-xs font-medium text-gray-600">
-														SNS명
-													</label>
-													<Input bind:value={link.name} placeholder="SNS명" class="text-sm" />
-												</div>
-												<div>
-													<label class="mb-1 block text-xs font-medium text-gray-600"> URL </label>
-													<Input bind:value={link.url} placeholder="https://" class="text-sm" />
-												</div>
-												<div>
-													<label class="mb-1 block text-xs font-medium text-gray-600">
-														아이콘
-													</label>
-													<select
-														bind:value={link.icon}
-														class="focus:ring-primary-500 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2"
-													>
-														{#each snsIconOptions as option}
-															<option value={option.value}>
-																{option.icon}
-																{option.label}
-															</option>
-														{/each}
-													</select>
-												</div>
-											</div>
-
-											<!-- 삭제 버튼 -->
-											<button
-												type="button"
-												class="rounded-lg p-2 text-red-500 hover:bg-red-50"
-												onclick={() => removeSnsLink(link.id)}
-											>
-												<TrashIcon class="h-4 w-4" />
-											</button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{/if}
-
-						<Separator />
-
-						<!-- SNS 링크 추가 버튼 -->
-						<Button type="button" variant="outline" onclick={addSnsLink} class="w-full">
+				<CardContent class="space-y-4">
+					<div class="flex items-center justify-between">
+						<h3 class="text-lg font-medium">등록된 SNS 링크</h3>
+						<Button type="button" variant="outline" onclick={addSnsLink}>
 							<PlusIcon class="mr-2 h-4 w-4" />
 							SNS 링크 추가
 						</Button>
 					</div>
+
+					{#if snsLinks.length === 0}
+						<div class="py-8 text-center text-gray-500">
+							<p>등록된 SNS 링크가 없습니다.</p>
+							<p class="text-sm">위의 "SNS 링크 추가" 버튼을 클릭하여 추가하세요.</p>
+						</div>
+					{:else}
+						<div class="space-y-3">
+							{#each snsLinks as link, index}
+								<div class="space-y-3 rounded-lg border p-4">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<span class="text-lg">{getIconDisplay(link.icon, link.iconType)}</span>
+											<span class="font-medium">SNS 링크 #{index + 1}</span>
+										</div>
+										<div class="flex items-center gap-2">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onclick={() => moveSnsLink(link.id, 'up')}
+												disabled={index === 0}
+											>
+												<ChevronUpIcon class="h-4 w-4" />
+											</Button>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onclick={() => moveSnsLink(link.id, 'down')}
+												disabled={index === snsLinks.length - 1}
+											>
+												<ChevronDownIcon class="h-4 w-4" />
+											</Button>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												class="text-red-600"
+												onclick={() => removeSnsLink(link.id)}
+											>
+												<TrashIcon class="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+										<div>
+											<Label for="sns-name-{link.id}">SNS 이름</Label>
+											<Input
+												id="sns-name-{link.id}"
+												bind:value={link.name}
+												placeholder="예: Facebook, Instagram"
+											/>
+										</div>
+										<div>
+											<Label for="sns-icon-{link.id}">아이콘</Label>
+											<Select type="single" bind:value={link.icon}>
+												<SelectTrigger>
+													<span class="flex items-center gap-2">
+														<span>{getIconDisplay(link.icon, link.iconType)}</span>
+														<span>
+															{snsIconOptions.find((opt) => opt.value === link.icon)?.label ||
+																'Custom'}
+														</span>
+													</span>
+												</SelectTrigger>
+												<SelectContent>
+													{#each snsIconOptions as option}
+														<SelectItem value={option.value}>
+															<span class="flex items-center gap-2">
+																<span>{option.icon}</span>
+																<span>{option.label}</span>
+															</span>
+														</SelectItem>
+													{/each}
+												</SelectContent>
+											</Select>
+										</div>
+										<div>
+											<Label for="sns-url-{link.id}">URL</Label>
+											<Input
+												id="sns-url-{link.id}"
+												bind:value={link.url}
+												placeholder="https://example.com"
+												type="url"
+											/>
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 
 			<!-- 저장 버튼 -->
-			<div class="flex justify-end gap-3">
-				<Button type="button" variant="outline" onclick={loadSiteSettings}>취소</Button>
+			<div class="flex justify-end">
 				<Button type="submit" disabled={saving}>
-					{#if saving}
-						<div class="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-						저장 중...
-					{:else}
-						<SaveIcon class="mr-2 h-4 w-4" />
-						저장
-					{/if}
+					{saving ? '저장 중...' : '설정 저장'}
 				</Button>
 			</div>
 		</form>

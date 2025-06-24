@@ -83,21 +83,25 @@ pub async fn login(
   State(state): State<AppState>,
   Json(data): Json<LoginRequest>,
 ) -> Result<AxumJson<ApiResponse<AuthResponse>>, StatusCode> {
-  let user = sqlx::query_as::<_, User>(
-      "SELECT id, email, name, role::text, password_hash, created_at, updated_at FROM users WHERE email = $1"
+  let user = match sqlx::query_as::<_, User>(
+      "SELECT id, email, name, role, password_hash, created_at, updated_at FROM users WHERE email = $1"
   )
   .bind(&data.email)
   .fetch_optional(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-  .ok_or_else(|| StatusCode::UNAUTHORIZED)?;
+  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+      Some(user) => user,
+      None => {
+          return Ok(AxumJson(ApiResponse::<AuthResponse>::error("이메일 또는 비밀번호가 올바르지 않습니다.")));
+      }
+  };
 
   let password_hash = user.password_hash
       .as_ref()
       .ok_or_else(|| StatusCode::INTERNAL_SERVER_ERROR)?;
 
   if !crate::utils::auth::verify_password(&data.password, password_hash) {
-      return Err(StatusCode::UNAUTHORIZED);
+      return Ok(AxumJson(ApiResponse::<AuthResponse>::error("이메일 또는 비밀번호가 올바르지 않습니다.")));
   }
 
   let (access_token, refresh_token) = generate_tokens(&state.config, user.id)
@@ -233,7 +237,7 @@ pub async fn me(
   Extension(claims): Extension<crate::utils::auth::Claims>,
 ) -> Result<AxumJson<ApiResponse<User>>, StatusCode> {
   let user = sqlx::query_as::<_, User>(
-    "SELECT id, email, name, role::text, password_hash, created_at, updated_at FROM users WHERE id = $1"
+    "SELECT id, email, name, role, password_hash, created_at, updated_at FROM users WHERE id = $1"
   )
   .bind(claims.sub)
   .fetch_optional(&state.pool)

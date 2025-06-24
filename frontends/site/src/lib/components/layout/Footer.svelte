@@ -56,7 +56,7 @@
 		<!-- 전화 버튼 -->
 		<li>
 			<button
-				on:click={makeCall}
+				onclick={makeCall}
 				class="flex h-14 w-14 items-center justify-center rounded-full bg-green-600 p-4 text-white shadow-lg transition-all duration-200 hover:scale-110 hover:bg-green-700"
 				aria-label="전화하기"
 			>
@@ -103,7 +103,7 @@
 		<!-- 맨위로 버튼 -->
 		<li>
 			<button
-				on:click={scrollToTop}
+				onclick={scrollToTop}
 				class="flex h-14 w-14 items-center justify-center rounded-full bg-white p-4 text-gray-500 shadow-lg transition-all duration-200 hover:scale-110 hover:bg-gray-200"
 				aria-label="맨위로"
 			>

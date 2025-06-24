@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
@@ -26,21 +25,22 @@
 	import { user, isAuthenticated } from '$lib/stores/auth';
 	import { canEditPost, canDeletePost } from '$lib/utils/permissions';
 
+	export let data;
 	let newComment = '';
 	let isEditing = false;
 	let editTitle = '';
 	let editContent = '';
 
 	onMount(async () => {
-		const { board_id, post_id } = $page.params;
-		await Promise.all([fetchPost(post_id), loadComments(post_id)]);
+		const { slug, postId } = data;
+		await Promise.all([fetchPost(postId), loadComments(postId)]);
 	});
 
 	function handleCommentSubmit() {
 		if (!newComment.trim()) return;
 
 		createComment({
-			post_id: $page.params.post_id,
+			post_id: data.postId,
 			content: newComment
 		});
 		newComment = '';
@@ -72,7 +72,7 @@
 
 		await deletePost($currentPost.id);
 		// 목록으로 돌아가기
-		window.location.href = `/community/${$currentPost.board_id}`;
+		window.location.href = `/community/${data.slug}`;
 	}
 
 	function formatDate(dateString: string) {
@@ -90,17 +90,17 @@
 		<div class="mb-6">
 			<div class="mb-4 flex items-center justify-between">
 				<div>
-					<a href="/community/{$currentPost.board_id}" class="text-blue-600 hover:underline">
+					<a href="/community/{$currentPost.board_slug}" class="text-blue-600 hover:underline">
 						← {$currentPost.board_name}
 					</a>
 				</div>
 				{#if $isAuthenticated && (canEditPost($currentPost) || canDeletePost($currentPost))}
 					<div class="flex gap-2">
 						{#if canEditPost($currentPost)}
-							<Button variant="outline" size="sm" on:click={startEdit}>수정</Button>
+							<Button variant="outline" size="sm" onclick={startEdit}>수정</Button>
 						{/if}
 						{#if canDeletePost($currentPost)}
-							<Button variant="outline" size="sm" on:click={handleDelete}>삭제</Button>
+							<Button variant="outline" size="sm" onclick={handleDelete}>삭제</Button>
 						{/if}
 					</div>
 				{/if}
@@ -120,8 +120,8 @@
 						placeholder="내용을 입력하세요"
 					></textarea>
 					<div class="flex gap-2">
-						<Button on:click={handleEdit}>저장</Button>
-						<Button variant="outline" on:click={() => (isEditing = false)}>취소</Button>
+						<Button onclick={handleEdit}>저장</Button>
+						<Button variant="outline" onclick={() => (isEditing = false)}>취소</Button>
 					</div>
 				</div>
 			{:else}
@@ -177,7 +177,7 @@
 							class="h-24 w-full rounded-lg border border-gray-300 p-3"
 							placeholder="댓글을 입력하세요"
 						></textarea>
-						<Button on:click={handleCommentSubmit}>댓글 작성</Button>
+						<Button onclick={handleCommentSubmit}>댓글 작성</Button>
 					</div>
 				{:else}
 					<div class="py-4 text-center">

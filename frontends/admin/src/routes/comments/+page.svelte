@@ -160,7 +160,7 @@
 					<option value="published">공개</option>
 					<option value="hidden">숨김</option>
 				</select>
-				<Button on:click={handleSearch}>검색</Button>
+				<Button onclick={handleSearch}>검색</Button>
 			</div>
 		</CardContent>
 	</Card>
@@ -214,7 +214,7 @@
 								<TableCell>
 									<div class="max-w-xs">
 										<p class="text-sm text-gray-900">{truncateText(comment.content)}</p>
-										<Button variant="link" size="sm" on:click={() => openDetailDialog(comment)}>
+										<Button variant="link" size="sm" onclick={() => openDetailDialog(comment)}>
 											전체 보기
 										</Button>
 									</div>
@@ -236,18 +236,18 @@
 											<Button
 												variant="outline"
 												size="sm"
-												on:click={() => handleHideComment(comment.id)}
+												onclick={() => handleHideComment(comment.id)}
 											>
 												숨기기
 											</Button>
 										{/if}
-										<Button variant="outline" size="sm" on:click={() => openDetailDialog(comment)}>
+										<Button variant="outline" size="sm" onclick={() => openDetailDialog(comment)}>
 											상세
 										</Button>
 										<Button
 											variant="outline"
 											size="sm"
-											on:click={() => handleDeleteComment(comment.id)}
+											onclick={() => handleDeleteComment(comment.id)}
 										>
 											삭제
 										</Button>
@@ -269,7 +269,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									on:click={() => handlePageChange($commentsPagination.page - 1)}
+									onclick={() => handlePageChange($commentsPagination.page - 1)}
 								>
 									이전
 								</Button>
@@ -278,7 +278,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									on:click={() => handlePageChange($commentsPagination.page + 1)}
+									onclick={() => handlePageChange($commentsPagination.page + 1)}
 								>
 									다음
 								</Button>
@@ -345,11 +345,11 @@
 			</div>
 		{/if}
 		<DialogFooter>
-			<Button variant="outline" on:click={closeDetailDialog}>닫기</Button>
+			<Button variant="outline" onclick={closeDetailDialog}>닫기</Button>
 			{#if selectedComment && selectedComment.status === 'published'}
 				<Button
 					variant="outline"
-					on:click={() => {
+					onclick={() => {
 						handleHideComment(selectedComment.id);
 						closeDetailDialog();
 					}}

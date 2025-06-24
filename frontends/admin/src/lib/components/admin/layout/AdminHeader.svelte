@@ -1,80 +1,111 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-	import { adminUser } from '$lib/stores/admin';
+	import { adminUser, adminLogout } from '$lib/stores/admin';
 	import { Button } from '$lib/components/ui/button';
-	import { BellIcon, UserIcon, LogOutIcon, MenuIcon } from 'lucide-svelte';
-	import { goto } from '$app/navigation';
+	import {
+		BellIcon,
+		UserIcon,
+		LogOutIcon,
+		MenuIcon,
+		ChevronLeftIcon,
+		ChevronRightIcon
+	} from 'lucide-svelte';
+	import { createEventDispatcher } from 'svelte';
+
+	export let sidebarCollapsed: boolean;
+	export let handleToggleSidebar: () => void;
+	export let handleToggleCollapse: () => void;
 
 	let showUserMenu = false;
 	const dispatch = createEventDispatcher();
 
-	function handleLogout() {
-		localStorage.removeItem('admin_token');
-		localStorage.removeItem('admin_user');
-		adminUser.set(null);
-		goto('/login');
+	async function handleLogout() {
+		try {
+			await adminLogout();
+			alert('로그아웃 되었습니다.');
+		} catch (error) {
+			console.error('로그아웃 실패:', error);
+			alert('로그아웃 중 오류가 발생했습니다.');
+		}
 	}
-	function handleSidebarToggle() {
-		dispatch('toggleSidebar');
+
+	function handleLogoutClick(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		showUserMenu = false;
+		handleLogout();
 	}
 </script>
 
-<header class="border-b border-gray-200 bg-white shadow-sm">
-	<div class="flex h-16 items-center justify-between px-6">
-		<!-- 햄버거 + 로고/타이틀 -->
-		<div class="flex items-center gap-4">
+<header
+	class="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-white px-6 shadow-sm"
+>
+	<div class="flex items-center gap-4">
+		<!-- 모바일/태블릿용 사이드바 토글 버튼 -->
+		<button
+			type="button"
+			class="-ml-2 rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+			onclick={handleToggleSidebar}
+			aria-label="메뉴 열기"
+		>
+			<MenuIcon class="h-6 w-6" />
+		</button>
+
+		<!-- PC용 사이드바 토글 버튼 -->
+		<button
+			type="button"
+			class="hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:block"
+			onclick={handleToggleCollapse}
+			aria-label="사이드바 토글"
+		>
+			{#if sidebarCollapsed}
+				<ChevronRightIcon class="h-6 w-6" />
+			{:else}
+				<ChevronLeftIcon class="h-6 w-6" />
+			{/if}
+		</button>
+	</div>
+
+	<div class="flex items-center gap-4">
+		<button type="button" class="rounded-lg p-2 text-gray-600 hover:bg-gray-100" aria-label="알림">
+			<BellIcon class="h-6 w-6" />
+		</button>
+
+		<div class="relative">
 			<button
 				type="button"
-				class="-ml-2 rounded-lg p-2 text-gray-600 hover:bg-gray-100 md:hidden"
-				on:click={handleSidebarToggle}
-				aria-label="메뉴 열기"
+				class="flex items-center gap-2 rounded-lg p-2 text-gray-600 hover:bg-gray-100"
+				onclick={(e) => {
+					showUserMenu = !showUserMenu;
+				}}
+				aria-label="사용자 메뉴"
 			>
-				<MenuIcon class="h-6 w-6" />
-			</button>
-		</div>
-
-		<!-- 우측 메뉴 -->
-		<div class="flex items-center gap-4">
-			<button
-				type="button"
-				class="rounded-lg p-2 text-gray-600 hover:bg-gray-100"
-				aria-label="알림"
-			>
-				<BellIcon class="h-6 w-6" />
+				<UserIcon class="h-6 w-6" />
+				<span class="hidden md:inline">{$adminUser?.name || '관리자'}</span>
 			</button>
 
-			<!-- 사용자 메뉴 -->
-			<div class="relative">
-				<button
-					type="button"
-					class="flex items-center gap-2 rounded-lg p-2 text-gray-600 hover:bg-gray-100"
-					on:click={() => (showUserMenu = !showUserMenu)}
-					aria-label="사용자 메뉴"
+			{#if showUserMenu}
+				<div
+					class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-lg"
+					style="z-index: 9999;"
 				>
-					<UserIcon class="h-6 w-6" />
-					<span class="hidden md:inline">{$adminUser?.name || '관리자'}</span>
-				</button>
-
-				{#if showUserMenu}
-					<div
-						class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-lg"
-						on:click={() => (showUserMenu = false)}
+					<button
+						class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							showUserMenu = false;
+							handleLogout();
+						}}
 					>
-						<button
-							class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-							on:click={handleLogout}
-						>
-							<LogOutIcon class="h-4 w-4" />
-							로그아웃
-						</button>
-					</div>
-				{/if}
-			</div>
+						<LogOutIcon class="h-4 w-4" />
+						로그아웃
+					</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 </header>
 
-<!-- 배경 클릭시 메뉴 닫기 -->
 {#if showUserMenu}
-	<div class="fixed inset-0 z-40" on:click={() => (showUserMenu = false)}></div>
+	<div class="fixed inset-0 z-10" style="z-index: 10;" onclick={() => (showUserMenu = false)} />
 {/if}

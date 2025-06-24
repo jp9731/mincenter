@@ -4,49 +4,88 @@
 	import AdminHeader from '$lib/components/admin/layout/AdminHeader.svelte';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+	import { isAdminAuthenticated, initializeAdminAuth } from '$lib/stores/admin';
+	import { page } from '$app/stores';
 
-	let isLoggedIn = false;
-	let isLoginPage = false;
 	let sidebarOpen = false;
 	let sidebarCollapsed = false;
+	let isMobile = false;
+	let isTablet = false;
 
-	onMount(() => {
+	onMount(async () => {
 		if (browser) {
-			const token = localStorage.getItem('admin_token');
-			isLoggedIn = !!token;
-			isLoginPage = window.location.pathname === '/login';
-			// 저장된 사이드바 상태 복원
-			sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+			await initializeAdminAuth();
+
+			const mediaQueryMobile = window.matchMedia('(max-width: 767px)');
+			const mediaQueryTablet = window.matchMedia('(min-width: 768px) and (max-width: 1023px)');
+
+			isMobile = mediaQueryMobile.matches;
+			isTablet = mediaQueryTablet.matches;
+
+			// 태블릿에서는 기본적으로 축소된 상태로 시작
+			if (isTablet) {
+				sidebarCollapsed = true;
+			} else {
+				sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+			}
+
+			// 화면 크기 변경 감지
+			mediaQueryMobile.addEventListener('change', (e) => {
+				isMobile = e.matches;
+				if (e.matches) {
+					sidebarCollapsed = false;
+					sidebarOpen = false;
+				}
+			});
+
+			mediaQueryTablet.addEventListener('change', (e) => {
+				isTablet = e.matches;
+				if (e.matches) {
+					sidebarCollapsed = true;
+					sidebarOpen = false;
+				} else {
+					// 데스크톱으로 변경 시 저장된 설정 사용
+					sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+				}
+			});
 		}
 	});
 
 	function handleToggleSidebar() {
 		sidebarOpen = !sidebarOpen;
 	}
+
 	function handleCloseSidebar() {
 		sidebarOpen = false;
 	}
+
+	function handleToggleCollapse() {
+		sidebarCollapsed = !sidebarCollapsed;
+		if (!isTablet) {
+			localStorage.setItem('sidebarCollapsed', sidebarCollapsed.toString());
+		}
+	}
+
+	$: isLoginPage = $page.url.pathname === '/login';
+
+	$: mainMargin = (() => {
+		if (isMobile) return '0';
+		if (sidebarCollapsed) return '4rem';
+		return '16rem';
+	})();
 </script>
 
-{#if isLoggedIn && !isLoginPage}
-	<div class="flex min-h-screen bg-gray-50">
-		<!-- 사이드바 -->
-		<AdminSidebar {sidebarOpen} {sidebarCollapsed} on:closeSidebar={handleCloseSidebar} />
+{#if $isAdminAuthenticated && !isLoginPage}
+	<div class="min-h-screen bg-gray-50">
+		<AdminSidebar {sidebarOpen} {sidebarCollapsed} {handleCloseSidebar} />
 
-		<!-- 메인 콘텐츠 -->
-		<div
-			class="flex flex-1 flex-col transition-all duration-200 ease-in-out
-			{sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}
-			md:ml-20"
-		>
-			<AdminHeader on:toggleSidebar={handleToggleSidebar} />
-
-			<main class="flex-1 p-6">
+		<div class="transition-all duration-300 ease-in-out" style="margin-left: {mainMargin};">
+			<AdminHeader {sidebarCollapsed} {handleToggleSidebar} {handleToggleCollapse} />
+			<main class="p-6">
 				<slot />
 			</main>
 		</div>
 	</div>
 {:else}
-	<!-- 로그인 페이지 또는 로딩 상태 -->
 	<slot />
 {/if}

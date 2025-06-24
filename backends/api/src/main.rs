@@ -8,20 +8,26 @@ mod services;
 mod utils;
 
 use axum::{
-    routing::{post, get, put, delete},
-    Router,
-    middleware::from_fn_with_state,
-    extract::Extension,
+    extract::{Path, Query, State, Extension},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post, put, delete},
+    Json, Router,
 };
+use std::collections::HashMap;
 use tower_http::cors::CorsLayer;
-use sqlx::PgPool;
+use tower_http::services::fs::ServeDir;
+use tracing::{info, error, warn};
 use crate::config::Config;
+use redis::Client as RedisClient;
+use sqlx::PgPool;
 
 // 애플리케이션 상태 구조체
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub config: Config,
+    pub redis: RedisClient,
 }
 
 #[tokio::main]
@@ -29,48 +35,77 @@ async fn main() {
     // 환경 변수 로드
     dotenv::dotenv().ok();
     
-    // 설정 로드
-    let config = Config::from_env();
-    let port = config.api_port; // 포트 번호를 미리 저장
+    // 로깅 초기화
+    tracing_subscriber::fmt::init();
+    
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let port: u16 = port.parse().expect("PORT must be a number");
     
     // 데이터베이스 연결
-    let pool = PgPool::connect(&config.database_url)
-        .await
-        .expect("Failed to connect to Postgres");
+    let pool = crate::database::get_database().await.expect("Failed to connect to database");
+    
+    // Redis 연결
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis = RedisClient::open(redis_url).expect("Failed to connect to Redis");
+    
+    // 설정 로드
+    let config = Config::from_env();
+    
+    let state = AppState {
+        pool,
+        config,
+        redis,
+    };
 
-    // 애플리케이션 상태 생성
-    let state = AppState { pool, config: config.clone() };
-
-    // 공개 라우터
+    // 공개 라우터 (인증 불필요)
     let public_routes = Router::new()
-        .route("/health", get(|| async { "OK" }))
-        // Auth routes
-        .route("/api/auth/register", post(handlers::auth::register))
+        // 인증
         .route("/api/auth/login", post(handlers::auth::login))
+        .route("/api/auth/register", post(handlers::auth::register))
         .route("/api/auth/refresh", post(handlers::auth::refresh))
-        .route("/api/auth/logout", post(handlers::auth::logout))
-        // Admin auth routes
-        .route("/api/admin/auth/login", post(handlers::admin::admin_login))
-        // Community routes (public)
+        // Community
         .route("/api/community/boards", get(handlers::community::get_boards))
-        .route("/api/community/boards/:board_id/categories", get(handlers::community::get_categories))
         .route("/api/community/posts", get(handlers::community::get_posts))
-        .route("/api/community/posts/:post_id", get(handlers::community::get_post))
-        .route("/api/community/posts/:post_id/comments", get(handlers::community::get_comments));
+        //.route("/api/community/boards/:id/posts", get(handlers::community::get_posts))
+        .route("/api/community/posts/:id", get(handlers::community::get_post))
+        .route("/api/community/posts/:id/comments", get(handlers::community::get_comments))
+        .route("/api/community/boards/:slug", get(handlers::community::get_board_by_slug))
+        .route("/api/community/boards/:slug/posts", get(handlers::community::get_posts_by_slug))
+        .route("/api/community/boards/:slug/categories", get(handlers::community::get_categories_by_slug))
+        // Pages (공개)
+        .route("/api/pages", get(handlers::page::get_published_pages))
+        .route("/api/pages/:slug", get(handlers::page::get_page_by_slug))
+        // 사이트 메뉴 (공개)
+        .route("/api/site/menus", get(handlers::menu::get_site_menus))
+        // 파일 업로드
+        .route("/api/upload/posts", post(handlers::upload::upload_post_file))
+        .route("/api/upload/profiles", post(handlers::upload::upload_profile_file))
+        .route("/api/upload/site", post(handlers::upload::upload_site_file));
 
-    // 인증이 필요한 라우터
+    // 보호된 라우터 (인증 필요)
     let protected_routes = Router::new()
         .route("/api/auth/me", get(handlers::auth::me))
+        // Community (인증된 사용자)
         .route("/api/community/posts", post(handlers::community::create_post))
-        .route("/api/community/posts/:post_id", put(handlers::community::update_post))
-        .route("/api/community/posts/:post_id", delete(handlers::community::delete_post))
+        .route("/api/community/posts/:id", put(handlers::community::update_post))
+        .route("/api/community/posts/:id", delete(handlers::community::delete_post))
         .route("/api/community/comments", post(handlers::community::create_comment))
-        .route("/api/community/comments/:comment_id", put(handlers::community::update_comment))
-        .route("/api/community/comments/:comment_id", delete(handlers::community::delete_comment))
-        .layer(from_fn_with_state(state.clone(), middleware::auth_middleware));
+        .route("/api/community/comments/:id", put(handlers::community::update_comment))
+        .route("/api/community/comments/:id", delete(handlers::community::delete_comment))
+        .route("/api/community/boards/:slug/posts", post(handlers::community::create_post_by_slug))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::auth_middleware));
 
-    // 관리자 라우터 (관리자 권한 필요) - 실제로 구현된 함수들만 포함
-    let admin_routes = Router::new()
+    // 관리자 인증 라우터 (미들웨어 적용 안함)
+    let admin_auth_routes = Router::new()
+        .route("/api/admin/login", post(handlers::admin::admin_login))
+        .route("/api/admin/refresh", post(handlers::admin::admin_refresh));
+
+    // 관리자 보호 라우터 (미들웨어 적용)
+    let admin_protected_routes = Router::new()
+        // 관리자 로그아웃
+        .route("/api/admin/logout", post(handlers::admin::admin_logout))
+        // 관리자 프로필
+        .route("/api/admin/me", get(handlers::admin::admin_me))
         // 대시보드
         .route("/api/admin/dashboard/stats", get(handlers::admin::get_dashboard_stats))
         // 사용자 관리
@@ -81,24 +116,48 @@ async fn main() {
         .route("/api/admin/boards", get(handlers::admin::get_boards))
         // 댓글 관리
         .route("/api/admin/comments", get(handlers::admin::get_comments))
-        .layer(from_fn_with_state(state.clone(), middleware::admin_middleware));
+        // 메뉴 관리
+        .route("/api/admin/menus", get(handlers::menu::get_menus))
+        .route("/api/admin/menus", put(handlers::menu::update_menus))
+        // 페이지 관리
+        .route("/api/admin/pages", get(handlers::page::get_pages))
+        .route("/api/admin/pages", post(handlers::page::create_page))
+        .route("/api/admin/pages/:id", get(handlers::page::get_page))
+        .route("/api/admin/pages/:id", put(handlers::page::update_page))
+        .route("/api/admin/pages/:id", delete(handlers::page::delete_page))
+        .route("/api/admin/pages/:id/status", put(handlers::page::update_page_status))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::admin_middleware));
 
     // 라우터 결합
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
-        .merge(admin_routes)
+        .merge(admin_auth_routes)
+        .merge(admin_protected_routes)
+        // 정적 파일 서빙
+        .nest_service("/uploads", ServeDir::new("static/uploads"))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    println!("Server running on port {}", port);
+    info!("Server starting on port {}", port);
     
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
-        .await
-        .unwrap();
-    axum::serve(listener, app)
-        .await
-        .unwrap();
+    let listener = match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
+        Ok(listener) => {
+            info!("Server bound to port {}", port);
+            listener
+        }
+        Err(e) => {
+            error!("Failed to bind to port {}: {}", port, e);
+            std::process::exit(1);
+        }
+    };
+
+    info!("Server is running and ready to accept connections");
+    
+    if let Err(e) = axum::serve(listener, app).await {
+        error!("Server error: {}", e);
+        std::process::exit(1);
+    }
 }
 
 

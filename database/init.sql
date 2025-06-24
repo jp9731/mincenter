@@ -15,6 +15,7 @@ CREATE TYPE processing_status AS ENUM ('pending', 'processing', 'completed', 'fa
 CREATE TYPE entity_type AS ENUM ('post', 'gallery', 'user_profile', 'comment', 'draft');
 CREATE TYPE file_purpose AS ENUM ('main', 'attachment', 'thumbnail');
 CREATE TYPE notification_type AS ENUM ('comment', 'like', 'system', 'announcement');
+CREATE TYPE menu_type AS ENUM ('page', 'board', 'url');
 
 -- 사용자 테이블
 CREATE TABLE users (
@@ -65,11 +66,44 @@ CREATE TABLE point_transactions (
 CREATE TABLE boards (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
     category VARCHAR(50),
     display_order INTEGER DEFAULT 0,
     is_public BOOLEAN DEFAULT TRUE,
     allow_anonymous BOOLEAN DEFAULT FALSE,
+    -- 파일 업로드 설정
+    allow_file_upload BOOLEAN DEFAULT TRUE,
+    max_files INTEGER DEFAULT 5,
+    max_file_size BIGINT DEFAULT 10485760, -- 10MB
+    allowed_file_types TEXT[], -- ['image/*', 'application/pdf']
+    -- 리치 텍스트 에디터 설정
+    allow_rich_text BOOLEAN DEFAULT TRUE,
+    -- 기타 설정
+    require_category BOOLEAN DEFAULT FALSE,
+    allow_comments BOOLEAN DEFAULT TRUE,
+    allow_likes BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- boards.name에 UNIQUE 제약조건 추가
+ALTER TABLE boards ADD CONSTRAINT boards_name_unique UNIQUE (name);
+
+-- boards.slug에 UNIQUE 제약조건 추가
+ALTER TABLE boards ADD CONSTRAINT boards_slug_unique UNIQUE (slug);
+
+-- 메뉴 테이블
+CREATE TABLE menus (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    menu_type menu_type NOT NULL,
+    target_id UUID, -- 페이지 ID 또는 게시판 ID
+    url VARCHAR(500), -- 외부 링크 URL
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    parent_id UUID REFERENCES menus(id) ON DELETE CASCADE, -- 2단 메뉴인 경우 1단 메뉴 ID
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -317,6 +351,9 @@ CREATE INDEX idx_notifications_read ON notifications(is_read);
 CREATE INDEX idx_point_transactions_user_id ON point_transactions(user_id);
 CREATE INDEX idx_categories_board_id ON categories(board_id);
 CREATE INDEX idx_categories_is_active ON categories(is_active);
+CREATE INDEX idx_menus_parent_id ON menus(parent_id);
+CREATE INDEX idx_menus_display_order ON menus(display_order);
+CREATE INDEX idx_menus_is_active ON menus(is_active);
 
 -- 전문 검색을 위한 인덱스
 CREATE INDEX idx_posts_title_gin ON posts USING gin(to_tsvector('korean', title));
@@ -334,6 +371,7 @@ $$ language 'plpgsql';
 -- 트리거 적용
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_menus_updated_at BEFORE UPDATE ON menus FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_posts_updated_at BEFORE UPDATE ON posts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON comments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -350,6 +388,14 @@ INSERT INTO boards (id, name, description, category, display_order) VALUES
     (uuid_generate_v4(), '봉사활동 후기', '봉사활동 참여 후기를 공유해주세요', 'review', 2),
     (uuid_generate_v4(), '자유게시판', '자유롭게 소통하는 공간입니다', 'free', 3),
     (uuid_generate_v4(), '질문과 답변', '궁금한 것들을 질문해주세요', 'qna', 4);
+
+-- 기본 메뉴 데이터
+INSERT INTO menus (id, name, description, menu_type, display_order, is_active) VALUES
+    (uuid_generate_v4(), '소개', '봉사단체 소개', 'page', 1, true),
+    (uuid_generate_v4(), '봉사활동', '봉사활동 안내', 'page', 2, true),
+    (uuid_generate_v4(), '커뮤니티', '회원 커뮤니티', 'board', 3, true),
+    (uuid_generate_v4(), '후원', '후원 안내', 'page', 4, true),
+    (uuid_generate_v4(), '문의', '문의하기', 'page', 5, true);
 
 INSERT INTO organization_info (name, description, address, phone, email) VALUES
     ('따뜻한 마음 봉사단', '장애인을 위한 다양한 봉사활동을 펼치는 단체입니다.', '서울특별시 강남구 테헤란로 123', '02-1234-5678', 'info@warmheart.org');
@@ -408,5 +454,56 @@ BEGIN
     GET DIAGNOSTICS deleted_count = ROW_COUNT;
     
     RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 안내 페이지 테이블
+CREATE TABLE pages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    meta_title VARCHAR(255),
+    meta_description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+    is_published BOOLEAN NOT NULL DEFAULT FALSE,
+    published_at TIMESTAMP WITH TIME ZONE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    view_count INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0
+);
+
+-- 페이지 인덱스
+CREATE INDEX idx_pages_slug ON pages(slug);
+CREATE INDEX idx_pages_status ON pages(status);
+CREATE INDEX idx_pages_published ON pages(is_published);
+CREATE INDEX idx_pages_sort_order ON pages(sort_order);
+CREATE INDEX idx_pages_created_at ON pages(created_at);
+
+-- 페이지 업데이트 트리거
+CREATE OR REPLACE FUNCTION update_pages_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_pages_updated_at
+    BEFORE UPDATE ON pages
+    FOR EACH ROW
+    EXECUTE FUNCTION update_pages_updated_at();
+
+-- 페이지 조회수 증가 함수
+CREATE OR REPLACE FUNCTION increment_page_view_count(page_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE pages 
+    SET view_count = view_count + 1 
+    WHERE id = page_id;
 END;
 $$ LANGUAGE plpgsql;

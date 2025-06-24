@@ -10,6 +10,7 @@ use crate::{
     AppState,
 };
 use axum::extract::State;
+use tracing::{info, error, debug};
 
 pub fn cors() -> CorsLayer {
     CorsLayer::new()
@@ -60,9 +61,6 @@ pub async fn admin_middleware(
     // 토큰 검증
     let claims = verify_token(token, &state.config)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // 관리자 권한 확인 (임시로 모든 인증된 사용자를 관리자로 처리)
-    // 실제로는 데이터베이스에서 사용자 역할을 확인해야 함
 
     // 요청에 사용자 정보 추가
     let mut request = request;

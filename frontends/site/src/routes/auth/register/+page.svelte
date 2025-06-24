@@ -13,7 +13,8 @@
 
 	let formError = '';
 
-	async function handleSubmit() {
+	async function handleSubmit(e: Event) {
+		e.preventDefault();
 		formError = '';
 
 		if (form.password !== form.passwordConfirm) {
@@ -45,7 +46,7 @@
 			</p>
 		</div>
 
-		<form class="mt-8 space-y-6" on:submit|preventDefault={handleSubmit}>
+		<form class="mt-8 space-y-6" onsubmit={handleSubmit}>
 			<div class="space-y-4">
 				<div>
 					<label for="name" class="sr-only">이름</label>

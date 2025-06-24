@@ -9,42 +9,36 @@
 	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { adminUser } from '$lib/stores/admin';
-	import { adminLogin } from '$lib/api/admin.js';
+	import { adminLogin, isLoading, error } from '$lib/stores/admin';
+	import { onMount } from 'svelte';
 
 	let email = '';
 	let password = '';
-	let isLoading = false;
-	let error = '';
 
-	async function handleLogin() {
+	onMount(() => {
+		// 이미 로그인된 경우 대시보드로 리다이렉트
+		const token = localStorage.getItem('admin_token');
+		if (token) {
+			goto('/');
+		}
+	});
+
+	async function handleLogin(e: Event) {
+		e.preventDefault();
 		if (!email || !password) {
-			error = '이메일과 비밀번호를 입력해주세요.';
+			error.set('이메일과 비밀번호를 입력해주세요.');
 			return;
 		}
 
-		isLoading = true;
-		error = '';
-
-		try {
-			const result = await adminLogin(email, password);
-
-			// 토큰 저장
-			localStorage.setItem('admin_token', result.token);
-			adminUser.set(result.user);
-
-			// 대시보드로 이동 (완전한 페이지 새로고침)
-			window.location.href = '/';
-		} catch (e: any) {
-			error = e.message || '로그인에 실패했습니다.';
-		} finally {
-			isLoading = false;
+		const success = await adminLogin(email, password);
+		if (success) {
+			goto('/');
 		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
-			handleLogin();
+			handleLogin(event);
 		}
 	}
 </script>
@@ -62,10 +56,10 @@
 				<CardDescription>관리자 계정으로 로그인하여 시스템을 관리하세요.</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<form class="space-y-6" on:submit|preventDefault={handleLogin}>
-					{#if error}
+				<form class="space-y-6" onsubmit={handleLogin}>
+					{#if $error}
 						<div class="rounded-md border border-red-200 bg-red-50 p-3">
-							<p class="text-sm text-red-700">{error}</p>
+							<p class="text-sm text-red-700">{$error}</p>
 						</div>
 					{/if}
 
@@ -75,10 +69,10 @@
 							id="email"
 							type="email"
 							bind:value={email}
-							on:keydown={handleKeydown}
+							onkeydown={handleKeydown}
 							placeholder="관리자 이메일을 입력하세요"
 							required
-							disabled={isLoading}
+							disabled={$isLoading}
 						/>
 					</div>
 
@@ -90,15 +84,15 @@
 							id="password"
 							type="password"
 							bind:value={password}
-							on:keydown={handleKeydown}
+							onkeydown={handleKeydown}
 							placeholder="비밀번호를 입력하세요"
 							required
-							disabled={isLoading}
+							disabled={$isLoading}
 						/>
 					</div>
 
-					<Button type="submit" class="w-full" disabled={isLoading}>
-						{isLoading ? '로그인 중...' : '로그인'}
+					<Button type="submit" class="w-full" disabled={$isLoading}>
+						{$isLoading ? '로그인 중...' : '로그인'}
 					</Button>
 				</form>
 

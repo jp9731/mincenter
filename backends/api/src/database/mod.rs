@@ -11,3 +11,7 @@ pub async fn connect() -> Result<PgPool, sqlx::Error> {
         .connect(&database_url)
         .await
 }
+
+pub async fn get_database() -> Result<PgPool, sqlx::Error> {
+    connect().await
+}

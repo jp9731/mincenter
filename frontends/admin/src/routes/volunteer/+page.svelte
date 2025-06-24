@@ -276,8 +276,8 @@
 					</div>
 				</div>
 				<DialogFooter>
-					<Button variant="outline" on:click={closeCreateDialog}>취소</Button>
-					<Button on:click={handleCreateActivity}>생성</Button>
+					<Button variant="outline" onclick={closeCreateDialog}>취소</Button>
+					<Button onclick={handleCreateActivity}>생성</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

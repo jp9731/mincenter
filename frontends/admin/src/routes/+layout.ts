@@ -1,34 +1,26 @@
 import type { LayoutLoad } from './$types.js';
-import { browser, dev } from '$app/environment';
+import { browser } from '$app/environment';
+import { redirect } from '@sveltejs/kit';
+import { get } from 'svelte/store';
+import { initializeAdminAuth, isAdminAuthenticated } from '$lib/stores/admin';
 
-export const load: LayoutLoad = async ({ url }: { url: URL }) => {
+export const load: LayoutLoad = async ({ url, fetch }) => {
   // 브라우저 환경에서만 인증 확인
   if (browser) {
-    const token = localStorage.getItem('admin_token');
     const isLoginPage = url.pathname === '/login';
 
-    // dev && console.log('Layout Load Debug:', {
-    //   pathname: url.pathname,
-    //   isLoginPage,
-    //   hasToken: !!token,
-    //   token: token
-    // });
+    // 관리자 인증 상태 초기화
+    await initializeAdminAuth(fetch);
 
-    // 로그인 페이지이고 토큰이 있으면 대시보드로 리다이렉트
-    if (isLoginPage && token) {
-      console.log('Redirecting from login to dashboard');
-      window.location.href = '/';
-      return {};
+    // 로그인 페이지이고 인증되어 있으면 대시보드로 리다이렉트
+    if (isLoginPage && get(isAdminAuthenticated)) {
+      throw redirect(302, '/');
     }
 
-    // 로그인 페이지가 아니고 토큰이 없으면 로그인 페이지로 리다이렉트
-    if (!isLoginPage && !token) {
-      console.log('Redirecting to login page');
-      window.location.href = '/login';
-      return {};
+    // 로그인 페이지가 아니고 인증되어 있지 않으면 로그인 페이지로 리다이렉트
+    if (!isLoginPage && !get(isAdminAuthenticated)) {
+      throw redirect(302, '/login');
     }
-
-    console.log('No redirect needed');
   }
 
   return {};

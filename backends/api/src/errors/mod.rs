@@ -17,6 +17,9 @@ pub enum ApiError {
   #[error("Validation error: {0}")]
   Validation(String),
   
+  #[error("Bad request: {0}")]
+  BadRequest(String),
+  
   #[error("Database error: {0}")]
   Database(#[from] sqlx::Error),
   
@@ -33,6 +36,7 @@ impl IntoResponse for ApiError {
           ApiError::Authentication(msg) => (StatusCode::UNAUTHORIZED, msg),
           ApiError::Authorization(msg) => (StatusCode::FORBIDDEN, msg),
           ApiError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
+          ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
           ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
           ApiError::Database(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
           ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),

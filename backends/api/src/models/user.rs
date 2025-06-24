@@ -7,11 +7,19 @@ pub struct User {
     pub id: Uuid,
     pub email: Option<String>,  // Option으로 변경
     pub name: Option<String>,   // Option으로 변경
-    pub role: Option<String>,   // 역할 필드 추가
+    pub role: Option<UserRole>,   // user_role enum 타입으로 변경
     #[serde(skip_serializing)]
     pub password_hash: Option<String>,  // Option으로 변경
     pub created_at: Option<DateTime<Utc>>,  // Option으로 변경
     pub updated_at: Option<DateTime<Utc>>,  // Option으로 변경
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
+#[sqlx(type_name = "user_role", rename_all = "lowercase")]
+pub enum UserRole {
+    User,
+    Admin,
+    SuperAdmin,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -63,7 +71,8 @@ pub struct AuthResponse {
 #[derive(Debug, Serialize)]
 pub struct AdminAuthResponse {
     pub user: AdminUser,
-    pub token: String,
+    pub access_token: String,
+    pub refresh_token: String,
 }
 
 #[derive(Debug, Serialize)]

@@ -8,7 +8,8 @@
 	let password = '';
 	let formError = '';
 
-	async function handleSubmit() {
+	async function handleSubmit(e: Event) {
+		e.preventDefault();
 		formError = '';
 		const success = await login(email, password);
 		if (success) {
@@ -29,7 +30,7 @@
 			</p>
 		</div>
 
-		<form class="mt-8 space-y-6" on:submit|preventDefault={handleSubmit}>
+		<form class="mt-8 space-y-6" onsubmit={handleSubmit}>
 			<div class="space-y-4">
 				<div>
 					<label for="email" class="sr-only">이메일</label>

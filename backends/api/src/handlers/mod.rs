@@ -1,14 +1,19 @@
+use axum::response::IntoResponse;
+
+pub mod admin;
 pub mod auth;
 pub mod community;
-pub mod admin;
+pub mod menu;
+pub mod page;
+pub mod upload;
 
-use axum::{
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
-use serde_json::json;
+pub use admin::*;
+pub use auth::*;
+pub use community::*;
+pub use menu::*;
+pub use page::*;
+pub use upload::*;
 
 pub async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, Json(json!({ "status": "ok" })))
+    "OK"
 }

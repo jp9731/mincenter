@@ -83,6 +83,69 @@ export interface Comment {
   status: 'published' | 'hidden';
 }
 
+// 페이지 관리 타입
+export interface Page {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  excerpt?: string;
+  meta_title?: string;
+  meta_description?: string;
+  status: 'draft' | 'published' | 'archived';
+  is_published: boolean;
+  published_at?: string;
+  created_by: string;
+  created_by_name?: string;
+  updated_by?: string;
+  updated_by_name?: string;
+  created_at: string;
+  updated_at: string;
+  view_count: number;
+  sort_order: number;
+}
+
+// 페이지 생성 요청 타입
+export interface CreatePageRequest {
+  slug: string;
+  title: string;
+  content: string;
+  excerpt?: string;
+  meta_title?: string;
+  meta_description?: string;
+  status: 'draft' | 'published' | 'archived';
+  is_published: boolean;
+  sort_order?: number;
+}
+
+// 페이지 수정 요청 타입
+export interface UpdatePageRequest {
+  slug?: string;
+  title?: string;
+  content?: string;
+  excerpt?: string;
+  meta_title?: string;
+  meta_description?: string;
+  status?: 'draft' | 'published' | 'archived';
+  is_published?: boolean;
+  sort_order?: number;
+}
+
+// 페이지 상태 업데이트 타입
+export interface PageStatusUpdate {
+  status: 'draft' | 'published' | 'archived';
+  is_published: boolean;
+}
+
+// 페이지 목록 응답 타입
+export interface PageListResponse {
+  pages: Page[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
 // 봉사 활동 타입
 export interface VolunteerActivity {
   id: string;

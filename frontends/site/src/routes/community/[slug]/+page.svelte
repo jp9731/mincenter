@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
@@ -20,7 +19,7 @@
 		tags,
 		isLoading,
 		error,
-		fetchPosts,
+		fetchPostsBySlug,
 		fetchBoards,
 		fetchCategories,
 		fetchTags
@@ -29,22 +28,19 @@
 	import { canCreatePost } from '$lib/utils/permissions';
 	import type { Post, PostFilter } from '$lib/types/community';
 
+	export let data;
 	let searchQuery = '';
 	let selectedTags: string[] = [];
 	let currentSort = 'latest';
 
 	// 게시판 이름을 반응형으로 계산
-	$: boardName = $boards.find((board: any) => board.id === page.params.board_id)?.name || '게시판';
+	$: boardName = $boards.find((board: any) => board.slug === data.slug)?.name || '게시판';
 
 	onMount(async () => {
-		console.log('aaaaa');
-		console.log(page);
-		console.log('aaaaa');
-		const boardId = page.params.board_id;
+		const slug = data.slug;
 		await Promise.all([
-			fetchPosts({
+			fetchPostsBySlug(slug, {
 				search: '',
-				board_id: boardId,
 				tags: [],
 				sort: 'latest',
 				page: 1,
@@ -54,16 +50,12 @@
 			fetchCategories(),
 			fetchTags()
 		]);
-
-		console.log('aaaaa');
-		console.log($boards);
 	});
 
 	function handleSearch() {
-		const boardId = page.params.board_id;
-		fetchPosts({
+		const slug = data.slug;
+		fetchPostsBySlug(slug, {
 			search: searchQuery,
-			category: boardId,
 			tags: selectedTags,
 			sort: currentSort,
 			page: 1,
@@ -73,10 +65,9 @@
 
 	function handleSortChange(value: string) {
 		currentSort = value;
-		const boardId = page.params.board_id;
-		fetchPosts({
+		const slug = data.slug;
+		fetchPostsBySlug(slug, {
 			search: searchQuery,
-			category: boardId,
 			tags: selectedTags,
 			sort: value as 'latest' | 'popular' | 'comments',
 			page: 1,
@@ -115,7 +106,7 @@
 		</div>
 		{#if $isAuthenticated && canCreatePost()}
 			<Button asChild>
-				<a href="/community/write?board={page.params.board_id}">글쓰기</a>
+				<a href="/community/{data.slug}/write">글쓰기</a>
 			</Button>
 		{:else if !$isAuthenticated}
 			<Button variant="outline" asChild>
@@ -131,14 +122,14 @@
 				type="text"
 				placeholder="검색어를 입력하세요"
 				bind:value={searchQuery}
-				on:keydown={(e) => e.key === 'Enter' && handleSearch()}
+				onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 				class="flex-1"
 			/>
-			<Button on:click={handleSearch}>검색</Button>
+			<Button onclick={handleSearch}>검색</Button>
 		</div>
 
 		<div class="flex items-center gap-4">
-			<Select value={currentSort} onValueChange={handleSortChange}>
+			<Select type="single" value={currentSort} onValueChange={handleSortChange}>
 				<SelectTrigger class="w-[180px]">
 					{getSortLabel(currentSort)}
 				</SelectTrigger>
@@ -155,7 +146,7 @@
 				<Badge
 					variant={selectedTags.includes(tag.id) ? 'default' : 'outline'}
 					class="cursor-pointer"
-					on:click={() => handleTagClick(tag.id)}
+					onclick={() => handleTagClick(tag.id)}
 				>
 					{tag.name} ({tag.postCount})
 				</Badge>
@@ -178,7 +169,7 @@
 						<div class="flex items-start justify-between">
 							<div>
 								<CardTitle>
-									<a href="/community/{post.board_id}/{post.id}" class="hover:underline">
+									<a href="/community/{data.slug}/{post.id}" class="hover:underline">
 										{post.title}
 									</a>
 								</CardTitle>

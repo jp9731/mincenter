@@ -13,7 +13,7 @@ import {
   refreshAuthToken
 } from '$lib/utils/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const user = writable<User | null>(null);
 export const isAuthenticated = writable(false);
@@ -59,9 +59,13 @@ async function fetchUserProfile() {
     });
 
     if (response.ok) {
-      const userData = await response.json();
-      user.set(userData);
-      isAuthenticated.set(true);
+      const apiResponse = await response.json();
+      if (apiResponse.success) {
+        user.set(apiResponse.data);
+        isAuthenticated.set(true);
+      } else {
+        throw new Error(apiResponse.message || 'Failed to fetch user profile');
+      }
     } else {
       throw new Error('Failed to fetch user profile');
     }
@@ -114,6 +118,7 @@ export async function login(email: string, password: string) {
 // 로그아웃
 export async function logout() {
   try {
+    console.log('logout');
     const refreshToken = getRefreshToken();
     if (refreshToken) {
       // 서버에 로그아웃 요청

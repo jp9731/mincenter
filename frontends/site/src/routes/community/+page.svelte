@@ -30,20 +30,19 @@
 	import type { Post, PostFilter } from '$lib/types/community';
 
 	let searchQuery = '';
-	let selectedCategory = '';
+	let selectedBoard = '';
 	let selectedTags: string[] = [];
 
 	onMount(async () => {
 		await Promise.all([
 			fetchPosts({
 				search: '',
-				category: '',
+				board_id: '',
 				tags: [],
 				sort: 'latest',
 				page: 1,
 				limit: 10
 			}),
-			fetchCategories(),
 			fetchBoards(),
 			fetchTags()
 		]);
@@ -53,7 +52,7 @@
 		postFilter.update((filter: PostFilter) => ({
 			...filter,
 			search: searchQuery,
-			category: selectedCategory,
+			board_id: selectedBoard,
 			tags: selectedTags
 		}));
 		fetchPosts($postFilter);
@@ -67,8 +66,8 @@
 		fetchPosts($postFilter);
 	}
 
-	function handleCategoryChange(value: string) {
-		selectedCategory = value;
+	function handleBoardChange(value: string) {
+		selectedBoard = value;
 		handleSearch();
 	}
 
@@ -94,10 +93,10 @@
 		}
 	}
 
-	function getCategoryLabel(categoryId: string) {
-		if (!categoryId) return '전체';
-		const category = $categories.find((c) => c.id === categoryId);
-		return category ? category.name : '카테고리';
+	function getBoardLabel(boardId: string) {
+		if (!boardId) return '전체 게시판';
+		const board = $boards.find((b) => b.id === boardId);
+		return board ? board.name : '게시판 선택';
 	}
 </script>
 
@@ -106,7 +105,7 @@
 		<h1 class="text-3xl font-bold">커뮤니티</h1>
 		{#if $isAuthenticated && canCreatePost()}
 			<Button asChild>
-				<a href="/community/write">글쓰기</a>
+				<a href="/community/general/write">글쓰기</a>
 			</Button>
 		{:else if !$isAuthenticated}
 			<Button variant="outline" asChild>
@@ -122,14 +121,14 @@
 				type="text"
 				placeholder="검색어를 입력하세요"
 				bind:value={searchQuery}
-				on:keydown={(e) => e.key === 'Enter' && handleSearch()}
+				onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 				class="flex-1"
 			/>
-			<Button on:click={handleSearch}>검색</Button>
+			<Button onclick={handleSearch}>검색</Button>
 		</div>
 
 		<div class="flex items-center gap-4">
-			<Select value={$postFilter.sort} onValueChange={handleSortChange}>
+			<Select type="single" value={$postFilter.sort} onValueChange={handleSortChange}>
 				<SelectTrigger class="w-[180px]">
 					{getSortLabel($postFilter.sort)}
 				</SelectTrigger>
@@ -140,14 +139,14 @@
 				</SelectContent>
 			</Select>
 
-			<Select value={selectedCategory} onValueChange={handleCategoryChange}>
+			<Select type="single" value={selectedBoard} onValueChange={handleBoardChange}>
 				<SelectTrigger class="w-[180px]">
-					{getCategoryLabel(selectedCategory)}
+					{getBoardLabel(selectedBoard)}
 				</SelectTrigger>
 				<SelectContent>
-					<SelectItem value="">전체</SelectItem>
-					{#each $categories as category}
-						<SelectItem value={category.id}>{category.name}</SelectItem>
+					<SelectItem value="">전체 게시판</SelectItem>
+					{#each $boards as board}
+						<SelectItem value={board.id}>{board.name}</SelectItem>
 					{/each}
 				</SelectContent>
 			</Select>
@@ -158,7 +157,7 @@
 				<Badge
 					variant={selectedTags.includes(tag.id) ? 'default' : 'outline'}
 					class="cursor-pointer"
-					on:click={() => handleTagClick(tag.id)}
+					onclick={() => handleTagClick(tag.id)}
 				>
 					{tag.name} ({tag.postCount})
 				</Badge>
@@ -181,12 +180,12 @@
 						<div class="flex items-start justify-between">
 							<div>
 								<CardTitle>
-									<a href="/community/{post.board_id}/{post.id}" class="hover:underline">
+									<a href="/community/{post.board_slug}/{post.id}" class="hover:underline">
 										{post.title}
 									</a>
 								</CardTitle>
 								<CardDescription>
-									<a href="/community/{post.board_id}" class="text-blue-600 hover:underline">
+									<a href="/community/{post.board_slug}" class="text-blue-600 hover:underline">
 										{post.board_name}
 									</a>
 									· {new Date(post.created_at).toLocaleDateString()}

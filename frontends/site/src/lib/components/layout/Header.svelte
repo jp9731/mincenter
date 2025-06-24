@@ -1,27 +1,91 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Icon, Bars3, XMark, User, ArrowRightOnRectangle } from 'svelte-hero-icons';
 	import { user, isAuthenticated, logout } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
+	import { getSiteMenus, type MenuTree } from '$lib/api/site.js';
 
 	let mobileMenuOpen = false;
+	let menus: MenuTree[] = [];
+	let loading = true;
 
-	const navigation = [
-		{ name: '민들레는요', href: '/about' },
-		{ name: '공지사항', href: '/community/4c9cee50-1cf9-4b57-b320-959bb28d5b5a' },
-
-		{ name: '사업소개', href: '/services' },
-		{ name: '정보마당', href: '/community' },
-		// { name: '갤러리', href: '/gallery' },
-		// { name: '참여하기', href: '/participate' },
-		{ name: '후원하기', href: '/donation' }
-	];
+	onMount(async () => {
+		try {
+			const response = await getSiteMenus();
+			if (response.success && response.data) {
+				menus = response.data.menus;
+			}
+		} catch (error) {
+			console.error('메뉴 로드 실패:', error);
+			// 폴백 메뉴
+			menus = [
+				{
+					id: '1',
+					name: '민들레는요',
+					url: '/about',
+					menu_type: 'page',
+					display_order: 1,
+					is_active: true,
+					children: []
+				},
+				{
+					id: '2',
+					name: '사업소개',
+					url: '/services',
+					menu_type: 'page',
+					display_order: 2,
+					is_active: true,
+					children: []
+				},
+				{
+					id: '3',
+					name: '정보마당',
+					url: '/community',
+					menu_type: 'board',
+					display_order: 3,
+					is_active: true,
+					children: []
+				},
+				{
+					id: '4',
+					name: '후원하기',
+					url: '/donation',
+					menu_type: 'page',
+					display_order: 4,
+					is_active: true,
+					children: []
+				}
+			];
+		} finally {
+			loading = false;
+		}
+	});
 
 	// 로그아웃 처리
 	async function handleLogout() {
+		console.log('handleLogout');
 		await logout();
 		goto('/');
+	}
+
+	function getMenuUrl(menu: MenuTree): string {
+		if (menu.url) {
+			return menu.url;
+		}
+		if (menu.menu_type === 'board' && menu.target_id) {
+			return `/community/${menu.target_id}`;
+		}
+		if (menu.menu_type === 'page' && menu.target_id) {
+			return `/pages/${menu.target_id}`;
+		}
+		return '#';
+	}
+
+	function isActiveMenu(menu: MenuTree): boolean {
+		const menuUrl = getMenuUrl(menu);
+		return $page.url.pathname.startsWith(menuUrl);
 	}
 </script>
 
@@ -41,16 +105,38 @@
 
 			<!-- 데스크톱 메뉴 -->
 			<div class="hidden md:flex md:items-center md:space-x-8">
-				{#each navigation as item}
-					<a
-						href={item.href}
-						class="hover:text-primary-600 px-3 py-2 text-sm font-medium text-gray-700"
-						class:border-b-2={$page.url.pathname.startsWith(item.href)}
-						class:border-primary-600={$page.url.pathname.startsWith(item.href)}
-					>
-						{item.name}
-					</a>
-				{/each}
+				{#if !loading}
+					{#each menus as menu}
+						<div class="group relative">
+							<a
+								href={getMenuUrl(menu)}
+								class="hover:text-primary-600 px-3 py-2 text-sm font-medium text-gray-700"
+								class:border-b-2={isActiveMenu(menu)}
+								class:border-primary-600={isActiveMenu(menu)}
+							>
+								{menu.name}
+							</a>
+							{#if menu.children && menu.children.length > 0}
+								<div
+									class="invisible absolute left-0 z-50 mt-2 w-48 rounded-md bg-white opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100"
+								>
+									<div class="py-1">
+										{#each menu.children as child}
+											<a
+												href={getMenuUrl(child)}
+												class="hover:text-primary-600 block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+												class:bg-primary-50={isActiveMenu(child)}
+												class:text-primary-600={isActiveMenu(child)}
+											>
+												{child.name}
+											</a>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/each}
+				{/if}
 
 				<div class="flex items-center space-x-4">
 					{#if $isAuthenticated && $user}
@@ -61,7 +147,7 @@
 								<Icon src={User} class="h-4 w-4" />
 								<span>마이페이지</span>
 							</Button>
-							<Button variant="outline" on:click={handleLogout} class="flex items-center space-x-1">
+							<Button variant="outline" onclick={handleLogout} class="flex items-center space-x-1">
 								<Icon src={ArrowRightOnRectangle} class="h-4 w-4" />
 								<span>로그아웃</span>
 							</Button>
@@ -81,7 +167,7 @@
 					class="hover:text-primary-600 focus:ring-primary-500 inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset"
 					aria-controls="mobile-menu"
 					aria-expanded={mobileMenuOpen}
-					on:click={() => (mobileMenuOpen = !mobileMenuOpen)}
+					onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
 				>
 					<span class="sr-only">메뉴 열기</span>
 					{#if mobileMenuOpen}
@@ -97,16 +183,34 @@
 		{#if mobileMenuOpen}
 			<div class="md:hidden" id="mobile-menu">
 				<div class="space-y-1 pb-3 pt-2">
-					{#each navigation as item}
-						<a
-							href={item.href}
-							class="hover:text-primary-600 block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
-							class:bg-primary-50={$page.url.pathname.startsWith(item.href)}
-							class:text-primary-600={$page.url.pathname.startsWith(item.href)}
-						>
-							{item.name}
-						</a>
-					{/each}
+					{#if !loading}
+						{#each menus as menu}
+							<div>
+								<a
+									href={getMenuUrl(menu)}
+									class="hover:text-primary-600 block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
+									class:bg-primary-50={isActiveMenu(menu)}
+									class:text-primary-600={isActiveMenu(menu)}
+								>
+									{menu.name}
+								</a>
+								{#if menu.children && menu.children.length > 0}
+									<div class="ml-4 space-y-1">
+										{#each menu.children as child}
+											<a
+												href={getMenuUrl(child)}
+												class="hover:text-primary-600 block px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+												class:bg-primary-50={isActiveMenu(child)}
+												class:text-primary-600={isActiveMenu(child)}
+											>
+												{child.name}
+											</a>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/each}
+					{/if}
 				</div>
 				<div class="border-t border-gray-200 pb-3 pt-4">
 					{#if $isAuthenticated && $user}
@@ -118,7 +222,7 @@
 									<Icon src={User} class="mr-2 h-4 w-4" />
 									마이페이지
 								</Button>
-								<Button variant="outline" on:click={handleLogout} class="w-full justify-start">
+								<Button variant="outline" onclick={handleLogout} class="w-full justify-start">
 									<Icon src={ArrowRightOnRectangle} class="mr-2 h-4 w-4" />
 									로그아웃
 								</Button>

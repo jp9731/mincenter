@@ -84,6 +84,23 @@ export async function createPost(post: Partial<Post>) {
   }
 }
 
+// slug 기반 게시글 작성
+export async function createPostBySlug(slug: string, post: Partial<Post>) {
+  isLoading.set(true);
+  error.set(null);
+
+  try {
+    const data = await api.createPostBySlug(slug, post);
+    posts.update(posts => [data, ...posts]);
+    return data;
+  } catch (e: any) {
+    error.set(e.message || '게시글 작성에 실패했습니다.');
+    return null;
+  } finally {
+    isLoading.set(false);
+  }
+}
+
 // 게시글 수정
 export async function updatePost(postId: string, data: Partial<Post>) {
   isLoading.set(true);

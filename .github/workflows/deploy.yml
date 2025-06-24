@@ -1,0 +1,61 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy to server
+      run: |
+        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          # 프로젝트 디렉토리로 이동
+          cd /opt/mincenter/www
+          
+          # 최신 코드 가져오기
+          git pull origin main
+          
+          # 환경 변수 파일이 없으면 생성
+          if [ ! -f .env ]; then
+            echo "환경 변수 파일이 없습니다. 배포를 중단합니다."
+            exit 1
+          fi
+          
+          # 기존 컨테이너 중지 및 제거
+          docker-compose down
+          
+          # 새 이미지 빌드 및 시작
+          docker-compose up -d --build
+          
+          # 불필요한 이미지 정리
+          docker image prune -f
+          
+          # 헬스체크
+          sleep 30
+          docker-compose ps
+          
+          echo "배포가 완료되었습니다."
+        EOF
+        
+    - name: Health check
+      run: |
+        sleep 60
+        curl -f ${{ secrets.SITE_URL }}/health || echo "사이트 헬스체크 실패"
+        curl -f ${{ secrets.ADMIN_URL }}/health || echo "관리자 페이지 헬스체크 실패"
+        curl -f ${{ secrets.API_URL }}/health || echo "API 헬스체크 실패" 

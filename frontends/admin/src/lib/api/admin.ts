@@ -1,298 +1,303 @@
 import type {
   AdminUser,
-  DashboardStats,
-  User,
-  Post,
-  Board,
-  Comment,
-  VolunteerActivity,
-  Donation,
-  Notification,
-  SystemLog,
-  PaginationParams,
-  FilterParams,
   ApiResponse
-} from '$lib/types/admin.js';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
-// 관리자 인증 토큰 가져오기
-function getAdminAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('admin_token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
-
-// 공통 API 요청 함수
-async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAdminAuthHeaders(),
-      ...options?.headers,
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      // 인증 실패 시 로그인 페이지로 리다이렉트
-      window.location.href = '/login';
-      throw new Error('인증이 필요합니다.');
-    }
-    throw new Error(`API Error: ${response.status}`);
-  }
-
-  const data: ApiResponse<T> = await response.json();
-  if (!data.success) {
-    throw new Error(data.message || 'API 요청에 실패했습니다.');
-  }
-
-  return data.data!;
-}
+} from '$lib/types/admin';
+import { authenticatedAdminFetch } from '$lib/stores/admin';
 
 // 관리자 로그인
-export async function adminLogin(email: string, password: string): Promise<{ user: AdminUser; token: string }> {
-  const response = await fetch(`${API_BASE}/api/admin/auth/login`, {
+export async function adminLogin(email: string, password: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  user: AdminUser;
+}> {
+  const res = await fetch(`http://localhost:8080/api/admin/login`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,
       password,
       service_type: 'admin'
-    }),
+    })
   });
+  const json: ApiResponse<{
+    access_token: string;
+    refresh_token: string;
+    user: AdminUser;
+  }> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
 
-  if (!response.ok) {
-    throw new Error('로그인에 실패했습니다.');
-  }
+// 관리자 프로필 가져오기
+export async function getAdminProfile(): Promise<AdminUser> {
+  const res = await authenticatedAdminFetch('/api/admin/me');
+  const json: ApiResponse<AdminUser> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
 
-  const data: ApiResponse<{ user: AdminUser; token: string }> = await response.json();
-  if (!data.success) {
-    throw new Error(data.message || '로그인에 실패했습니다.');
-  }
-
-  return data.data!;
+// 관리자 정보 조회
+export async function getAdminMe(fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/me', {}, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
 // 대시보드 통계
-export async function getDashboardStats(): Promise<DashboardStats> {
-  return apiRequest<DashboardStats>('/api/admin/dashboard/stats');
+export async function getDashboardStats(fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/dashboard/stats', {}, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-// 사용자 관리
-export async function getUsers(params?: PaginationParams & FilterParams): Promise<{ users: User[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/users`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ users: User[]; pagination: PaginationParams }>(endpoint);
+// 사용자 목록
+export async function getUsers(params?: {
+  search?: string;
+  status?: string;
+  role?: string;
+  page?: number;
+  limit?: number;
+}, fetchFn?: typeof fetch): Promise<{ users: any[]; pagination: any }> {
+  const searchParams = new URLSearchParams();
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.role) searchParams.set('role', params.role);
+  if (params?.page) searchParams.set('page', params.page.toString());
+  if (params?.limit) searchParams.set('limit', params.limit.toString());
+  const res = await authenticatedAdminFetch(`/api/admin/users?${searchParams}`, {}, fetchFn);
+  const json: ApiResponse<{ users: any[]; pagination: any }> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function getUser(id: string): Promise<User> {
-  return apiRequest<User>(`/api/admin/users/${id}`);
+// 게시판 목록
+export async function getBoards(fetchFn?: typeof fetch): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/boards', {}, fetchFn);
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function updateUser(id: string, data: Partial<User>): Promise<User> {
-  return apiRequest<User>(`/api/admin/users/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-}
-
-export async function deleteUser(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/users/${id}`, {
-    method: 'DELETE'
-  });
-}
-
-export async function suspendUser(id: string, reason: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/users/${id}/suspend`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
-  });
-}
-
-export async function activateUser(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/users/${id}/activate`, {
-    method: 'POST'
-  });
-}
-
-// 게시글 관리
-export async function getPosts(params?: PaginationParams & FilterParams): Promise<{ posts: Post[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/posts`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ posts: Post[]; pagination: PaginationParams }>(endpoint);
-}
-
-export async function getPost(id: string): Promise<Post> {
-  return apiRequest<Post>(`/api/admin/posts/${id}`);
-}
-
-export async function updatePost(id: string, data: Partial<Post>): Promise<Post> {
-  return apiRequest<Post>(`/api/admin/posts/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-}
-
-export async function deletePost(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/posts/${id}`, {
-    method: 'DELETE'
-  });
-}
-
-export async function hidePost(id: string, reason: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/posts/${id}/hide`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
-  });
-}
-
-// 게시판 관리
-export async function getBoards(): Promise<Board[]> {
-  return apiRequest<Board[]>('/api/admin/boards');
-}
-
-export async function createBoard(data: Partial<Board>): Promise<Board> {
-  return apiRequest<Board>('/api/admin/boards', {
+// 게시판 생성
+export async function createBoard(data: any): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/boards', {
     method: 'POST',
     body: JSON.stringify(data)
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function updateBoard(id: string, data: Partial<Board>): Promise<Board> {
-  return apiRequest<Board>(`/api/admin/boards/${id}`, {
+// 게시판 수정
+export async function updateBoard(id: string, data: any): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data)
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
+// 게시판 삭제
 export async function deleteBoard(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/boards/${id}`, {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
     method: 'DELETE'
   });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
 }
 
-// 댓글 관리
-export async function getComments(params?: PaginationParams & FilterParams): Promise<{ comments: Comment[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/comments`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ comments: Comment[]; pagination: PaginationParams }>(endpoint);
+// 게시글 목록
+export async function getPosts(params?: {
+  search?: string;
+  board_id?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}, fetchFn?: typeof fetch): Promise<{ posts: any[]; pagination: any }> {
+  const searchParams = new URLSearchParams();
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.board_id) searchParams.set('board', params.board_id);
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.page) searchParams.set('page', params.page.toString());
+  if (params?.limit) searchParams.set('limit', params.limit.toString());
+  const res = await authenticatedAdminFetch(`/api/admin/posts?${searchParams}`, {}, fetchFn);
+  const json: ApiResponse<{ posts: any[]; pagination: any }> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function deleteComment(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/comments/${id}`, {
-    method: 'DELETE'
+// 게시글 숨김/보이기
+export async function togglePostVisibility(id: string, hidden: boolean): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/posts/${id}/visibility`, {
+    method: 'PUT',
+    body: JSON.stringify({ hidden })
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function hideComment(id: string, reason: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/comments/${id}/hide`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
+// 댓글 목록
+export async function getComments(params?: {
+  search?: string;
+  post_id?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}, fetchFn?: typeof fetch): Promise<{ comments: any[]; pagination: any }> {
+  const searchParams = new URLSearchParams();
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.post_id) searchParams.set('post', params.post_id);
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.page) searchParams.set('page', params.page.toString());
+  if (params?.limit) searchParams.set('limit', params.limit.toString());
+  const res = await authenticatedAdminFetch(`/api/admin/comments?${searchParams}`, {}, fetchFn);
+  const json: ApiResponse<{ comments: any[]; pagination: any }> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 댓글 숨김/보이기
+export async function toggleCommentVisibility(id: string, hidden: boolean): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/comments/${id}/visibility`, {
+    method: 'PUT',
+    body: JSON.stringify({ hidden })
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-// 봉사 활동 관리
-export async function getVolunteerActivities(params?: PaginationParams & FilterParams): Promise<{ activities: VolunteerActivity[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/volunteer/activities`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ activities: VolunteerActivity[]; pagination: PaginationParams }>(endpoint);
-}
-
-export async function createVolunteerActivity(data: Partial<VolunteerActivity>): Promise<VolunteerActivity> {
-  return apiRequest<VolunteerActivity>('/api/admin/volunteer/activities', {
-    method: 'POST',
-    body: JSON.stringify(data)
+// 사용자 상태 변경
+export async function updateUserStatus(id: string, status: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status })
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function updateVolunteerActivity(id: string, data: Partial<VolunteerActivity>): Promise<VolunteerActivity> {
-  return apiRequest<VolunteerActivity>(`/api/admin/volunteer/activities/${id}`, {
+// 사용자 역할 변경
+export async function updateUserRole(id: string, role: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${id}/role`, {
+    method: 'PUT',
+    body: JSON.stringify({ role })
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 사이트 설정 가져오기
+export async function getSiteSettings(): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/site/settings');
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 사이트 설정 저장
+export async function saveSiteSettings(data: any): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/site/settings', {
     method: 'PUT',
     body: JSON.stringify(data)
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function deleteVolunteerActivity(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/volunteer/activities/${id}`, {
-    method: 'DELETE'
-  });
+// 메뉴 목록
+export async function getMenus(fetchFn?: typeof fetch): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/menus', {}, fetchFn);
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-// 후원 관리
-export async function getDonations(params?: PaginationParams & FilterParams): Promise<{ donations: Donation[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/donations`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ donations: Donation[]; pagination: PaginationParams }>(endpoint);
-}
-
-export async function updateDonation(id: string, data: Partial<Donation>): Promise<Donation> {
-  return apiRequest<Donation>(`/api/admin/donations/${id}`, {
+// 메뉴 저장
+export async function saveMenus(data: any[]): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/menus', {
     method: 'PUT',
     body: JSON.stringify(data)
   });
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-// 알림 관리
-export async function getNotifications(params?: PaginationParams): Promise<{ notifications: Notification[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/notifications`, window.location.origin);
+// 페이지 목록 조회
+export async function getPages(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}, fetchFn?: typeof fetch): Promise<{ pages: any[]; total: number; page: number; limit: number; total_pages: number }> {
+  const url = new URL('/api/admin/pages', 'http://localhost:8080');
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
     });
   }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ notifications: Notification[]; pagination: PaginationParams }>(endpoint);
+  const res = await authenticatedAdminFetch(url.pathname + url.search, {}, fetchFn);
+  const json: ApiResponse<{ pages: any[]; total: number; page: number; limit: number; total_pages: number }> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function createNotification(data: Partial<Notification>): Promise<Notification> {
-  return apiRequest<Notification>('/api/admin/notifications', {
+// 단일 페이지 조회
+export async function getPage(id: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/pages/${id}`);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 페이지 생성
+export async function createPage(data: any): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/pages', {
     method: 'POST',
     body: JSON.stringify(data)
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-export async function sendNotification(id: string): Promise<void> {
-  return apiRequest<void>(`/api/admin/notifications/${id}/send`, {
-    method: 'POST'
+// 페이지 수정
+export async function updatePage(id: string, data: any): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/pages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
   });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 }
 
-// 시스템 로그
-export async function getSystemLogs(params?: PaginationParams & FilterParams): Promise<{ logs: SystemLog[]; pagination: PaginationParams }> {
-  const url = new URL(`${API_BASE}/api/admin/system/logs`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
-    });
-  }
-  const endpoint = url.toString().replace(window.location.origin, '');
-  return apiRequest<{ logs: SystemLog[]; pagination: PaginationParams }>(endpoint);
+// 페이지 상태 업데이트
+export async function updatePageStatus(id: string, data: { status: string; is_published: boolean }): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/pages/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 페이지 삭제
+export async function deletePage(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/pages/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
 } 
