@@ -1,12 +1,10 @@
-name: Deploy to Production
+name: Test SSH Connection
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  deploy:
+  test-ssh:
     runs-on: ubuntu-latest
     
     steps:
@@ -19,6 +17,7 @@ jobs:
         if [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
           echo "❌ DEPLOY_SSH_KEY가 비어있습니다!"
           echo "GitHub Secrets에서 DEPLOY_SSH_KEY를 설정해주세요."
+          echo "가이드: docs/GITHUB_SECRETS_SETUP.md"
           exit 1
         else
           echo "✅ DEPLOY_SSH_KEY가 설정되어 있습니다."
@@ -67,17 +66,22 @@ jobs:
       run: |
         ssh-keyscan -H -p 22000 ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Deploy to server
+    - name: Test SSH Connection
       run: |
-        ssh ${{ secrets.DEPLOY_HOST }} << 'EOF'
-          cd ${{ secrets.DEPLOY_PATH }}
-          git pull origin main
-          ./scripts/deploy.sh
-        EOF
+        echo "SSH 연결을 테스트합니다..."
+        ssh ${{ secrets.DEPLOY_HOST }} "echo '✅ SSH 연결 성공!'; whoami; pwd; date"
         
-    - name: Health check
+    - name: Test Project Path
       run: |
-        sleep 60
-        curl -f http://${{ secrets.DEPLOY_HOST }}:13000/health || echo "사이트 헬스체크 실패"
-        curl -f http://${{ secrets.DEPLOY_HOST }}:13001/health || echo "관리자 페이지 헬스체크 실패"
-        curl -f http://${{ secrets.DEPLOY_HOST }}:18080/health || echo "API 헬스체크 실패" 
+        echo "프로젝트 경로를 테스트합니다..."
+        ssh ${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && echo '✅ 프로젝트 경로 접근 성공!'; pwd; ls -la"
+        
+    - name: Test Docker
+      run: |
+        echo "Docker 상태를 확인합니다..."
+        ssh ${{ secrets.DEPLOY_HOST }} "docker --version; docker-compose --version; docker ps"
+        
+    - name: Test System Info
+      run: |
+        echo "시스템 정보를 확인합니다..."
+        ssh ${{ secrets.DEPLOY_HOST }} "uname -a; cat /etc/redhat-release; free -h; df -h" 

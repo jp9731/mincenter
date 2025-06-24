@@ -88,8 +88,8 @@ else
     exit 1
 fi
 
-# API 헬스체크
-if curl -f http://localhost:$API_PORT/health > /dev/null 2>&1; then
+# API 헬스체크 (포트 18080)
+if curl -f http://localhost:18080/health > /dev/null 2>&1; then
     log_info "✅ API: 정상"
 else
     log_error "❌ API: 비정상"
@@ -97,8 +97,8 @@ else
     exit 1
 fi
 
-# Site 헬스체크
-if curl -f http://localhost:$SITE_PORT > /dev/null 2>&1; then
+# Site 헬스체크 (포트 3000)
+if curl -f http://localhost:3000 > /dev/null 2>&1; then
     log_info "✅ Site: 정상"
 else
     log_error "❌ Site: 비정상"
@@ -106,8 +106,8 @@ else
     exit 1
 fi
 
-# Admin 헬스체크
-if curl -f http://localhost:$ADMIN_PORT > /dev/null 2>&1; then
+# Admin 헬스체크 (포트 13001)
+if curl -f http://localhost:13001 > /dev/null 2>&1; then
     log_info "✅ Admin: 정상"
 else
     log_error "❌ Admin: 비정상"
@@ -125,9 +125,9 @@ log_info "서비스 상태:"
 docker-compose -f docker-compose.prod.yml ps
 
 log_info "접속 URL:"
-echo "  - 메인 사이트: http://localhost:$SITE_PORT"
-echo "  - 관리자 페이지: http://localhost:$ADMIN_PORT"
-echo "  - API: http://localhost:$API_PORT"
+echo "  - 메인 사이트: http://localhost:3000"
+echo "  - 관리자 페이지: http://localhost:13001"
+echo "  - API: http://localhost:18080"
 
 # 10. 배포 로그 저장
 echo "$(date): 배포 완료 - 커밋: $(git rev-parse --short HEAD)" >> deploy.log
