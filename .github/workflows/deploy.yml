@@ -66,9 +66,15 @@ jobs:
           PreferredAuthentications publickey
           PubkeyAuthentication yes
           PasswordAuthentication no
+          ServerAliveInterval 60
+          ServerAliveCountMax 3
         EOF
         
         chmod 600 ~/.ssh/config
+        
+        # SSH 키 파일 생성
+        echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
         
     - name: Add server to known hosts
       run: |
@@ -77,19 +83,26 @@ jobs:
     - name: Test SSH Connection
       run: |
         echo "SSH 연결을 테스트합니다..."
-        ssh -v -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo 'SSH 연결 성공!'"
+        ssh -v -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo 'SSH 연결 성공!' && whoami && pwd"
         
     - name: Deploy to server
       run: |
         ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
           cd ${{ secrets.DEPLOY_PATH }}
+          echo "현재 디렉토리: $(pwd)"
+          echo "Git 상태 확인..."
+          git status
+          echo "최신 코드 가져오기..."
           git pull origin main
+          echo "배포 스크립트 실행..."
+          chmod +x scripts/deploy.sh
           ./scripts/deploy.sh
         EOF
         
     - name: Health check
       run: |
         sleep 60
+        echo "헬스체크 시작..."
         curl -f http://${{ secrets.DEPLOY_HOST }}:13000/health || echo "사이트 헬스체크 실패"
         curl -f http://${{ secrets.DEPLOY_HOST }}:13001/health || echo "관리자 페이지 헬스체크 실패"
         curl -f http://${{ secrets.DEPLOY_HOST }}:18080/health || echo "API 헬스체크 실패" 
