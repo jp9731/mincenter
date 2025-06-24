@@ -112,8 +112,8 @@ else
     exit 1
 fi
 
-# Site 헬스체크 (포트 3000)
-if curl -f http://localhost:3000 > /dev/null 2>&1; then
+# Site 헬스체크 (포트 13000)
+if curl -f http://localhost:13000 > /dev/null 2>&1; then
     log_info "Site: 정상"
 else
     log_error "Site: 비정상"
@@ -140,7 +140,7 @@ log_info "서비스 상태:"
 docker-compose -f docker-compose.prod.yml ps
 
 log_info "접속 URL:"
-echo "  - 메인 사이트: http://localhost:3000"
+echo "  - 메인 사이트: http://localhost:13000"
 echo "  - 관리자 페이지: http://localhost:13001"
 echo "  - API: http://localhost:18080"
 

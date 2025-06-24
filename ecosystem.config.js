@@ -8,14 +8,14 @@ module.exports = {
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
-        API_URL: 'http://localhost:8080',
-        PUBLIC_API_URL: 'https://your-domain.com/api',
+        PORT: 13000,
+        API_URL: 'http://localhost:18080',
+        PUBLIC_API_URL: 'https://api.mincenter.kr',
         SESSION_SECRET: process.env.SESSION_SECRET || 'your-session-secret'
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 13000
       },
       error_file: './logs/site-error.log',
       out_file: './logs/site-out.log',
@@ -38,15 +38,15 @@ module.exports = {
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001,
-        API_URL: 'http://localhost:8080',
-        PUBLIC_API_URL: 'https://your-domain.com/api',
+        PORT: 13001,
+        API_URL: 'http://localhost:18080',
+        PUBLIC_API_URL: 'https://api.mincenter.kr',
         SESSION_SECRET: process.env.ADMIN_SESSION_SECRET || 'your-admin-session-secret',
-        ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@your-domain.com'
+        ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@mincenter.kr'
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 3001
+        PORT: 13001
       },
       error_file: './logs/admin-error.log',
       out_file: './logs/admin-out.log',
