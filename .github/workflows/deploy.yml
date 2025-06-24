@@ -1,4 +1,4 @@
-name: Deploy to Ubuntu Server
+name: Deploy to Production
 
 on:
   push:
@@ -25,32 +25,9 @@ jobs:
     - name: Deploy to server
       run: |
         ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-          # 프로젝트 디렉토리로 이동
-          cd /opt/mincenter/www
-          
-          # 최신 코드 가져오기
+          cd ${{ secrets.PROJECT_PATH }}
           git pull origin main
-          
-          # 환경 변수 파일이 없으면 생성
-          if [ ! -f .env ]; then
-            echo "환경 변수 파일이 없습니다. 배포를 중단합니다."
-            exit 1
-          fi
-          
-          # 기존 컨테이너 중지 및 제거
-          docker-compose down
-          
-          # 새 이미지 빌드 및 시작
-          docker-compose up -d --build
-          
-          # 불필요한 이미지 정리
-          docker image prune -f
-          
-          # 헬스체크
-          sleep 30
-          docker-compose ps
-          
-          echo "배포가 완료되었습니다."
+          ./scripts/deploy.sh
         EOF
         
     - name: Health check

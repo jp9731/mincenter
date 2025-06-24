@@ -1,8 +1,8 @@
-version: '3.8'
+version: '3.7'
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:13
     container_name: ${APP_NAME}_postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -30,8 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: ${APP_NAME}_api
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
@@ -58,8 +57,7 @@ services:
         - PUBLIC_API_URL=${PUBLIC_API_URL}
     container_name: ${APP_NAME}_site
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${SITE_PORT}
@@ -81,8 +79,7 @@ services:
         - PUBLIC_API_URL=${PUBLIC_API_URL}
     container_name: ${APP_NAME}_admin
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${ADMIN_PORT}
@@ -97,7 +94,7 @@ services:
       - internal
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.20-alpine
     container_name: ${APP_NAME}_nginx
     depends_on:
       - site
@@ -121,7 +118,7 @@ services:
       - external
 
   redis:
-    image: redis:7-alpine
+    image: redis:6-alpine
     container_name: ${APP_NAME}_redis
     command: redis-server --requirepass ${REDIS_PASSWORD}
     environment:
