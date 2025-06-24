@@ -18,12 +18,12 @@ RUN npm run build || (echo "Build failed. Checking for errors..." && exit 1)
 FROM node:20-alpine
 WORKDIR /app
 
-# 빌드 결과물 복사
+# 빌드 결과물만 복사 (SvelteKit은 모든 의존성을 번들링하므로 node_modules 불필요)
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 
-# 프로덕션 의존성만 설치
-RUN npm ci --only=production --no-audit --no-fund
+# SvelteKit 애플리케이션은 빌드 시점에 모든 의존성을 번들링하므로
+# 프로덕션에서 추가 의존성 설치 불필요
 
 ENV PORT=13001
 EXPOSE ${PORT}
