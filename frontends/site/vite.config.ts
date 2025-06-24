@@ -12,5 +12,17 @@ export default defineConfig({
 				secure: false
 			}
 		}
+	},
+	build: {
+		// 메모리 최적화 설정
+		chunkSizeWarningLimit: 1000,
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					vendor: ['svelte', '@sveltejs/kit'],
+					ui: ['lucide-svelte', 'bits-ui']
+				}
+			}
+		}
 	}
 });
