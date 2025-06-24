@@ -68,6 +68,12 @@ services:
     ports:
       - "127.0.0.1:${SITE_PORT}:${SITE_PORT}"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     networks:
       - internal
 
@@ -91,6 +97,12 @@ services:
     ports:
       - "127.0.0.1:${ADMIN_PORT}:${ADMIN_PORT}"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     networks:
       - internal
 
