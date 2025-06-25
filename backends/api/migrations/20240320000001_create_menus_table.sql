@@ -1,8 +1,12 @@
--- Create menu_type enum
-CREATE TYPE menu_type AS ENUM ('page', 'board', 'url');
+-- Create menu_type enum (IF NOT EXISTS)
+DO $$ BEGIN
+    CREATE TYPE menu_type AS ENUM ('page', 'board', 'url');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
--- Create menus table
-CREATE TABLE menus (
+-- Create menus table (IF NOT EXISTS)
+CREATE TABLE IF NOT EXISTS menus (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -16,12 +20,12 @@ CREATE TABLE menus (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create index for better performance
-CREATE INDEX idx_menus_parent_id ON menus(parent_id);
-CREATE INDEX idx_menus_display_order ON menus(display_order);
-CREATE INDEX idx_menus_is_active ON menus(is_active);
+-- Create index for better performance (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_menus_parent_id ON menus(parent_id);
+CREATE INDEX IF NOT EXISTS idx_menus_display_order ON menus(display_order);
+CREATE INDEX IF NOT EXISTS idx_menus_is_active ON menus(is_active);
 
--- Create trigger to update updated_at
+-- Create trigger to update updated_at (IF NOT EXISTS)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -30,15 +34,38 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_menus_updated_at BEFORE UPDATE ON menus
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$ BEGIN
+    CREATE TRIGGER update_menus_updated_at BEFORE UPDATE ON menus
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
--- Insert sample menu data
-INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) VALUES
-('회사안내', '회사 소개 및 안내', 'page', NULL, '/about', 1, true, NULL),
-('봉사활동', '봉사 활동 관련', 'board', NULL, '/volunteer', 2, true, NULL),
-('후원하기', '후원 관련 정보', 'page', NULL, '/donate', 3, true, NULL),
-('커뮤니티', '커뮤니티 게시판', 'board', NULL, '/community', 4, true, NULL),
-('공지사항', '공지사항 게시판', 'board', NULL, '/notice', 1, true, (SELECT id FROM menus WHERE name = '커뮤니티')),
-('자유게시판', '자유게시판', 'board', NULL, '/free', 2, true, (SELECT id FROM menus WHERE name = '커뮤니티')),
-('질문과 답변', 'Q&A 게시판', 'board', NULL, '/qna', 3, true, (SELECT id FROM menus WHERE name = '커뮤니티')); 
+-- Insert sample menu data (IF NOT EXISTS)
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '회사안내', '회사 소개 및 안내', 'page', NULL, '/about', 1, true, NULL
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '회사안내');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '봉사활동', '봉사 활동 관련', 'board', NULL, '/volunteer', 2, true, NULL
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '봉사활동');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '후원하기', '후원 관련 정보', 'page', NULL, '/donate', 3, true, NULL
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '후원하기');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '커뮤니티', '커뮤니티 게시판', 'board', NULL, '/community', 4, true, NULL
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '커뮤니티');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '공지사항', '공지사항 게시판', 'board', NULL, '/notice', 1, true, (SELECT id FROM menus WHERE name = '커뮤니티')
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '공지사항');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '자유게시판', '자유게시판', 'board', NULL, '/free', 2, true, (SELECT id FROM menus WHERE name = '커뮤니티')
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '자유게시판');
+
+INSERT INTO menus (name, description, menu_type, target_id, url, display_order, is_active, parent_id) 
+SELECT '질문과 답변', 'Q&A 게시판', 'board', NULL, '/qna', 3, true, (SELECT id FROM menus WHERE name = '커뮤니티')
+WHERE NOT EXISTS (SELECT 1 FROM menus WHERE name = '질문과 답변'); 

@@ -1,7 +1,7 @@
 -- Add migration script here
 
--- Create pages table
-CREATE TABLE pages (
+-- Create pages table (IF NOT EXISTS)
+CREATE TABLE IF NOT EXISTS pages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug VARCHAR(255) UNIQUE NOT NULL,
     title VARCHAR(500) NOT NULL,
@@ -20,19 +20,19 @@ CREATE TABLE pages (
     sort_order INTEGER NOT NULL DEFAULT 0
 );
 
--- Create index for slug
-CREATE INDEX idx_pages_slug ON pages(slug);
+-- Create index for slug (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug);
 
--- Create index for status and published
-CREATE INDEX idx_pages_status_published ON pages(status, is_published);
+-- Create index for status and published (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_pages_status_published ON pages(status, is_published);
 
--- Create index for sort order
-CREATE INDEX idx_pages_sort_order ON pages(sort_order);
+-- Create index for sort order (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_pages_sort_order ON pages(sort_order);
 
--- Create index for created_at
-CREATE INDEX idx_pages_created_at ON pages(created_at);
+-- Create index for created_at (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_pages_created_at ON pages(created_at);
 
--- Create function to increment view count
+-- Create function to increment view count (IF NOT EXISTS)
 CREATE OR REPLACE FUNCTION increment_page_view_count(page_id UUID)
 RETURNS void AS $$
 BEGIN
@@ -42,7 +42,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger to update updated_at
+-- Create trigger to update updated_at (IF NOT EXISTS)
 CREATE OR REPLACE FUNCTION update_pages_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -51,7 +51,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_update_pages_updated_at
-    BEFORE UPDATE ON pages
-    FOR EACH ROW
-    EXECUTE FUNCTION update_pages_updated_at();
+DO $$ BEGIN
+    CREATE TRIGGER trigger_update_pages_updated_at
+        BEFORE UPDATE ON pages
+        FOR EACH ROW
+        EXECUTE FUNCTION update_pages_updated_at();
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
