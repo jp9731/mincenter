@@ -98,19 +98,15 @@ if [ -f "docker-compose.prod.yml" ]; then
     docker ps -aq --filter "name=${APP_NAME:-mincenter}_" | xargs -r docker rm -f || true
 fi
 
-# 2. 최신 이미지 가져오기
-log_info "최신 이미지를 가져옵니다..."
-docker-compose -f docker-compose.prod.yml pull
-
-# 3. 새 이미지 빌드
+# 2. 새 이미지 빌드
 log_info "새 이미지를 빌드합니다..."
 docker-compose -f docker-compose.prod.yml build --no-cache
 
-# 4. 컨테이너 시작
+# 3. 컨테이너 시작
 log_info "컨테이너를 시작합니다..."
 docker-compose -f docker-compose.prod.yml up -d
 
-# 5. 데이터베이스 마이그레이션 실행
+# 4. 데이터베이스 마이그레이션 실행
 log_info "데이터베이스 마이그레이션을 실행합니다..."
 if [ -f "scripts/migrate.sh" ]; then
     chmod +x scripts/migrate.sh
@@ -119,6 +115,15 @@ else
     log_warn "마이그레이션 스크립트가 없습니다. 수동으로 실행하세요."
 fi
 
+# 5. 데이터베이스 헬스체크
+log_info "데이터베이스 헬스체크를 수행합니다..."
+
+# PostgreSQL 헬스체크
+if docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB > /dev/null 2>&1; then
+    log_info "PostgreSQL: 정상"
+else
+    log_error "PostgreSQL: 비정상"
+    log_info "컨테이너 로그를 확인하세요: docker-compose -f docker-compose.prod.yml logs postgres"
 # 6. API 서버 재시작 (수동 빌드)
 log_info "API 서버를 재시작합니다..."
 cd backends/api
