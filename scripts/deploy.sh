@@ -80,9 +80,23 @@ log_info "배포를 시작합니다..."
 # 호환성 체크
 check_centos_compatibility
 
-# 1. 기존 컨테이너 중지 (API 제외)
-log_info "기존 컨테이너를 중지합니다..."
-docker-compose -f docker-compose.prod.yml down
+# 1. 기존 컨테이너 완전 중지 및 정리
+log_info "기존 컨테이너를 완전히 중지하고 정리합니다..."
+
+# Docker Compose로 실행 중인 컨테이너 중지
+if [ -f "docker-compose.prod.yml" ]; then
+    log_info "Docker Compose 컨테이너 중지..."
+    docker-compose -f docker-compose.prod.yml down --remove-orphans --timeout 30 || true
+    
+    # 네트워크 정리 (강제로)
+    log_info "Docker 네트워크 정리..."
+    docker network prune -f || true
+    
+    # 관련된 모든 컨테이너 강제 종료
+    log_info "관련 컨테이너 강제 종료..."
+    docker ps -q --filter "name=${APP_NAME:-mincenter}_" | xargs -r docker kill || true
+    docker ps -aq --filter "name=${APP_NAME:-mincenter}_" | xargs -r docker rm -f || true
+fi
 
 # 2. 최신 이미지 가져오기
 log_info "최신 이미지를 가져옵니다..."

@@ -1,107 +1,72 @@
-version: '3.7'
+version: '3.8'
 
 services:
   postgres:
     image: postgres:13
-    container_name: ${APP_NAME}_postgres
+    container_name: ${APP_NAME:-mincenter}_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      POSTGRES_DB: ${POSTGRES_DB:-mincenter}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     ports:
-      - "127.0.0.1:${POSTGRES_PORT}:5432"
-    restart: unless-stopped
+      - "5432:5432"
+    networks:
+      - internal
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mincenter}"]
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - internal
+      start_period: 40s
 
   site:
-    build:
-      context: ./frontends/site
-      dockerfile: Dockerfile
-      args:
-        - API_URL=${API_URL}
-        - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME}_site
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${SITE_PORT}
-      API_URL: ${PUBLIC_API_URL}
-      PUBLIC_API_URL: ${PUBLIC_API_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-    ports:
-      - "127.0.0.1:${SITE_PORT}:${SITE_PORT}"
+    image: ${DOCKER_REGISTRY:-localhost}/${APP_NAME:-mincenter}_site:latest
+    container_name: ${APP_NAME:-mincenter}_site
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
+    ports:
+      - "13000:3000"
     networks:
       - internal
-
-  admin:
-    build:
-      context: ./frontends/admin
-      dockerfile: Dockerfile
-      args:
-        - API_URL=${API_URL}
-        - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME}_admin
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${ADMIN_PORT}
-      API_URL: ${PUBLIC_API_URL}
-      PUBLIC_API_URL: ${PUBLIC_API_URL}
-      SESSION_SECRET: ${ADMIN_SESSION_SECRET}
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-    ports:
-      - "127.0.0.1:${ADMIN_PORT}:${ADMIN_PORT}"
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    networks:
-      - internal
-
-  redis:
-    image: redis:6-alpine
-    container_name: ${APP_NAME}_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "127.0.0.1:${REDIS_PORT}:6379"
-    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
+
+  admin:
+    image: ${DOCKER_REGISTRY:-localhost}/${APP_NAME:-mincenter}_admin:latest
+    container_name: ${APP_NAME:-mincenter}_admin
+    restart: unless-stopped
+    ports:
+      - "13001:3000"
     networks:
       - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:
     driver: local
-  redis_data:
-    driver: local
 
 networks:
   internal:
-    name: ${APP_NAME}_internal
     driver: bridge
+    name: ${APP_NAME:-mincenter}_internal
+    driver_opts:
+      com.docker.network.bridge.name: ${APP_NAME:-mincenter}_internal

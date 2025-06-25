@@ -35,6 +35,16 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 ```
 
+#### Docker Compose 설치
+```bash
+# Docker Compose 설치
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# 심볼릭 링크 생성
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+```
+
 #### Rust 설치
 ```bash
 # Rust 설치
@@ -292,3 +302,231 @@ docker-compose -f docker-compose.prod.yml exec -T postgres psql -U mincenter min
 2. **데이터베이스**: PostgreSQL 설정 최적화
 3. **Redis**: 메모리 사용량 모니터링
 4. **프론트엔드**: 정적 파일 압축 및 캐싱 
+
+### Docker 네트워크 삭제 오류
+
+**오류 메시지:**
+```
+failed to remove network ***_internal: Error response from daemon: error while removing network: network ***_internal id *** has active endpoints
+```
+
+**해결 방법:**
+
+#### 1. 정리 스크립트 사용 (권장)
+```bash
+# Docker 정리 스크립트 실행
+chmod +x scripts/cleanup.sh
+./scripts/cleanup.sh
+```
+
+#### 2. 수동 정리
+```bash
+# 모든 컨테이너 중지
+docker-compose -f docker-compose.prod.yml down --remove-orphans
+
+# 관련 컨테이너 강제 종료
+docker ps -q --filter "name=mincenter_" | xargs -r docker kill
+docker ps -aq --filter "name=mincenter_" | xargs -r docker rm -f
+
+# 네트워크 정리
+docker network prune -f
+
+# 특정 네트워크 강제 삭제
+docker network rm mincenter_internal 2>/dev/null || true
+```
+
+### API 서버 빌드 오류
+
+**문제:** Docker 내부에서 Rust 빌드 실패
+
+**해결 방법:**
+```bash
+# 로컬에서 Rust 빌드
+cd backends/api
+cargo build --release
+
+# 빌드된 바이너리를 서버에 업로드
+scp target/release/minshool-api user@server:/path/to/deployment/
+```
+
+### 데이터베이스 연결 오류
+
+**문제:** PostgreSQL 컨테이너가 시작되지 않음
+
+**해결 방법:**
+```bash
+# 컨테이너 로그 확인
+docker-compose -f docker-compose.prod.yml logs postgres
+
+# 데이터베이스 설정 확인
+docker-compose -f docker-compose.prod.yml exec postgres psql -U postgres -d mincenter
+```
+
+## 서비스 관리
+
+### API 서버 관리
+```bash
+# API 서버 시작
+./scripts/api-service.sh start
+
+# API 서버 중지
+./scripts/api-service.sh stop
+
+# API 서버 재시작
+./scripts/api-service.sh restart
+
+# API 서버 상태 확인
+./scripts/api-service.sh status
+```
+
+### Docker 컨테이너 관리
+```bash
+# 컨테이너 상태 확인
+docker-compose -f docker-compose.prod.yml ps
+
+# 컨테이너 로그 확인
+docker-compose -f docker-compose.prod.yml logs [service_name]
+
+# 컨테이너 재시작
+docker-compose -f docker-compose.prod.yml restart [service_name]
+```
+
+### 데이터베이스 마이그레이션
+```bash
+# 마이그레이션 실행
+./scripts/migrate.sh
+
+# 마이그레이션 상태 확인
+cd backends/api
+cargo sqlx migrate info
+```
+
+## 모니터링
+
+### 헬스체크
+```bash
+# PostgreSQL 헬스체크
+curl -f http://localhost:5432
+
+# API 헬스체크
+curl -f http://localhost:18080/health
+
+# Site 헬스체크
+curl -f http://localhost:13000
+
+# Admin 헬스체크
+curl -f http://localhost:13001
+```
+
+### 로그 모니터링
+```bash
+# 실시간 로그 확인
+docker-compose -f docker-compose.prod.yml logs -f
+
+# API 로그 확인
+tail -f backends/api/api.log
+```
+
+## 백업 및 복구
+
+### 데이터베이스 백업
+```bash
+# PostgreSQL 백업
+docker-compose -f docker-compose.prod.yml exec postgres pg_dump -U postgres mincenter > backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+### 데이터베이스 복구
+```bash
+# PostgreSQL 복구
+docker-compose -f docker-compose.prod.yml exec -T postgres psql -U postgres mincenter < backup_file.sql
+```
+
+## 보안 고려사항
+
+### 방화벽 설정
+```bash
+# 필요한 포트만 열기
+sudo firewall-cmd --permanent --add-port=13000/tcp  # Site
+sudo firewall-cmd --permanent --add-port=13001/tcp  # Admin
+sudo firewall-cmd --permanent --add-port=18080/tcp  # API
+sudo firewall-cmd --reload
+```
+
+### SSL/TLS 설정
+- Nginx를 사용하여 SSL 터미네이션 구성
+- Let's Encrypt를 통한 무료 SSL 인증서 발급
+
+## 성능 최적화
+
+### Docker 리소스 제한
+```yaml
+# docker-compose.prod.yml에 추가
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+```
+
+### PostgreSQL 최적화
+```bash
+# postgresql.conf 설정 최적화
+shared_buffers = 256MB
+effective_cache_size = 1GB
+work_mem = 4MB
+maintenance_work_mem = 64MB
+```
+
+## 트러블슈팅
+
+### 일반적인 문제들
+
+1. **포트 충돌**
+   - `netstat -tulpn | grep :13000`로 포트 사용 확인
+   - 다른 포트로 변경하거나 기존 서비스 중지
+
+2. **권한 문제**
+   - Docker 그룹에 사용자 추가 확인
+   - 파일 권한 확인: `ls -la scripts/`
+
+3. **메모리 부족**
+   - `free -h`로 메모리 사용량 확인
+   - 불필요한 컨테이너 정리
+
+4. **디스크 공간 부족**
+   - `df -h`로 디스크 사용량 확인
+   - Docker 이미지 및 볼륨 정리
+
+### 로그 분석
+```bash
+# 오류 로그 필터링
+docker-compose -f docker-compose.prod.yml logs | grep -i error
+
+# 최근 로그 확인
+docker-compose -f docker-compose.prod.yml logs --tail=100
+```
+
+## 업데이트 및 유지보수
+
+### 정기적인 업데이트
+```bash
+# 1. 코드 업데이트
+git pull origin main
+
+# 2. Docker 이미지 재빌드
+docker-compose -f docker-compose.prod.yml build --no-cache
+
+# 3. 서비스 재시작
+./scripts/deploy.sh
+```
+
+### 백업 스케줄링
+```bash
+# crontab에 백업 작업 추가
+0 2 * * * /path/to/backup_script.sh
+```
+
+이 가이드를 따라하면 CentOS 7 환경에서 안정적으로 MinCenter를 배포하고 운영할 수 있습니다. 
