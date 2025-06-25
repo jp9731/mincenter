@@ -25,9 +25,20 @@ services:
       start_period: 40s
 
   site:
-    image: ${DOCKER_REGISTRY:-localhost}/${APP_NAME:-mincenter}_site:latest
+    build:
+      context: ./frontends/site
+      dockerfile: Dockerfile
+      args:
+        - API_URL=${API_URL:-http://localhost:18080}
+        - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
     container_name: ${APP_NAME:-mincenter}_site
     restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      SESSION_SECRET: ${SESSION_SECRET:-default_secret}
     ports:
       - "13000:3000"
     networks:
@@ -43,9 +54,21 @@ services:
       start_period: 40s
 
   admin:
-    image: ${DOCKER_REGISTRY:-localhost}/${APP_NAME:-mincenter}_admin:latest
+    build:
+      context: ./frontends/admin
+      dockerfile: Dockerfile
+      args:
+        - API_URL=${API_URL:-http://localhost:18080}
+        - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
     container_name: ${APP_NAME:-mincenter}_admin
     restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      SESSION_SECRET: ${ADMIN_SESSION_SECRET:-default_admin_secret}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@localhost}
     ports:
       - "13001:3000"
     networks:
