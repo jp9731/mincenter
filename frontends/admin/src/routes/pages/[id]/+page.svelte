@@ -249,7 +249,7 @@
 						<Button
 							variant="outline"
 							class="w-full"
-							on:click={() => window.open(`/pages/${pageData.slug}`, '_blank')}
+							onclick={() => window.open(`/pages/${pageData.slug}`, '_blank')}
 						>
 							<ExternalLink class="mr-2 h-4 w-4" />
 							사이트에서 보기

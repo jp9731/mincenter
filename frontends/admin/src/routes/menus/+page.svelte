@@ -33,13 +33,13 @@
 		AlertDialogTrigger
 	} from '$lib/components/ui/alert-dialog';
 	import { PlusIcon, EditIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-svelte';
-	import { getMenus, saveMenus, getBoards } from '$lib/api/admin';
+	import { getMenus, saveMenus, getBoards, getPages } from '$lib/api/admin';
 
 	interface Menu {
 		id: string;
 		name: string;
 		description?: string;
-		menu_type: 'page' | 'board' | 'url';
+		menu_type: 'page' | 'board' | 'url' | 'calendar';
 		target_id?: string;
 		url?: string;
 		display_order: number;
@@ -74,7 +74,7 @@
 	let formData = {
 		name: '',
 		description: '',
-		menu_type: 'page' as 'page' | 'board' | 'url',
+		menu_type: 'page' as 'page' | 'board' | 'url' | 'calendar',
 		target_id: '',
 		url: '',
 		display_order: 1,
@@ -86,6 +86,11 @@
 	let selectedMenuType = 'page';
 	let selectedParentId = '';
 	let selectedTargetId = '';
+
+	// 메뉴 타입 변경 시 처리
+	$: if (selectedMenuType === 'calendar') {
+		formData.url = '/calendar';
+	}
 
 	onMount(async () => {
 		await loadMenus();
@@ -115,12 +120,13 @@
 	}
 
 	async function loadPages() {
-		// 임시 페이지 데이터 (실제로는 API에서 가져와야 함)
-		pages = [
-			{ id: '1', title: '회사안내', slug: '/about' },
-			{ id: '2', title: '후원하기', slug: '/donate' },
-			{ id: '3', title: '오시는 길', slug: '/contact' }
-		];
+		try {
+			const result = await getPages();
+			pages = result.pages;
+		} catch (error) {
+			console.error('페이지 로드 실패:', error);
+			errorMessage = error instanceof Error ? error.message : '페이지를 불러오는데 실패했습니다.';
+		}
 	}
 
 	function resetForm() {
@@ -161,7 +167,7 @@
 
 	async function saveMenu() {
 		// Update formData with selected values
-		formData.menu_type = selectedMenuType as 'page' | 'board' | 'url';
+		formData.menu_type = selectedMenuType as 'page' | 'board' | 'url' | 'calendar';
 		formData.parent_id = selectedParentId || '';
 		formData.target_id = selectedTargetId || '';
 
@@ -228,6 +234,8 @@
 				return '게시판';
 			case 'url':
 				return '외부링크';
+			case 'calendar':
+				return '일정';
 			default:
 				return type;
 		}
@@ -301,6 +309,7 @@
 							<SelectContent>
 								<SelectItem value="page">안내페이지</SelectItem>
 								<SelectItem value="board">게시판</SelectItem>
+								<SelectItem value="calendar">일정</SelectItem>
 								<SelectItem value="url">외부링크</SelectItem>
 							</SelectContent>
 						</Select>
@@ -359,6 +368,12 @@
 					<div class="space-y-2">
 						<Label for="url">외부 URL</Label>
 						<Input id="url" bind:value={formData.url} placeholder="https://example.com" />
+					</div>
+				{:else if selectedMenuType === 'calendar'}
+					<div class="space-y-2">
+						<Label for="url">일정 페이지 URL</Label>
+						<Input id="url" bind:value={formData.url} placeholder="/calendar" readonly />
+						<p class="text-sm text-gray-500">일정 메뉴는 자동으로 /calendar 경로로 설정됩니다.</p>
 					</div>
 				{/if}
 

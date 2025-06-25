@@ -46,7 +46,7 @@ pub async fn register(
   let user = sqlx::query_as::<_, User>(
       "INSERT INTO users (email, name, password_hash, created_at, updated_at, role)
       VALUES ($1, $2, $3, NOW(), NOW(), 'user')
-      RETURNING id, email, name, role::text, password_hash, created_at, updated_at"
+      RETURNING *"
   )
   .bind(&data.email)
   .bind(&data.name)
@@ -84,7 +84,7 @@ pub async fn login(
   Json(data): Json<LoginRequest>,
 ) -> Result<AxumJson<ApiResponse<AuthResponse>>, StatusCode> {
   let user = match sqlx::query_as::<_, User>(
-      "SELECT id, email, name, role, password_hash, created_at, updated_at FROM users WHERE email = $1"
+      "SELECT * FROM users WHERE email = $1"
   )
   .bind(&data.email)
   .fetch_optional(&state.pool)
@@ -237,7 +237,7 @@ pub async fn me(
   Extension(claims): Extension<crate::utils::auth::Claims>,
 ) -> Result<AxumJson<ApiResponse<User>>, StatusCode> {
   let user = sqlx::query_as::<_, User>(
-    "SELECT id, email, name, role, password_hash, created_at, updated_at FROM users WHERE id = $1"
+    "SELECT * FROM users WHERE id = $1"
   )
   .bind(claims.sub)
   .fetch_optional(&state.pool)

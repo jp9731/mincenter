@@ -310,7 +310,7 @@
 											<Button
 												variant="outline"
 												size="sm"
-												on:click={() => handleSendNotification(notification.id)}
+												onclick={() => handleSendNotification(notification.id)}
 											>
 												발송
 											</Button>
@@ -318,7 +318,7 @@
 										<Button
 											variant="outline"
 											size="sm"
-											on:click={() => openDetailDialog(notification)}
+											onclick={() => openDetailDialog(notification)}
 										>
 											상세
 										</Button>
@@ -340,7 +340,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									on:click={() => handlePageChange($notificationsPagination.page - 1)}
+									onclick={() => handlePageChange($notificationsPagination.page - 1)}
 								>
 									이전
 								</Button>
@@ -349,7 +349,7 @@
 								<Button
 									variant="outline"
 									size="sm"
-									on:click={() => handlePageChange($notificationsPagination.page + 1)}
+									onclick={() => handlePageChange($notificationsPagination.page + 1)}
 								>
 									다음
 								</Button>
@@ -416,11 +416,11 @@
 			</div>
 		{/if}
 		<DialogFooter>
-			<Button variant="outline" on:click={closeDetailDialog}>닫기</Button>
+			<Button variant="outline" onclick={closeDetailDialog}>닫기</Button>
 			{#if selectedNotification && !selectedNotification.sent_at}
 				<Button
 					variant="default"
-					on:click={() => {
+					onclick={() => {
 						handleSendNotification(selectedNotification.id);
 						closeDetailDialog();
 					}}

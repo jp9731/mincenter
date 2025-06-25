@@ -72,6 +72,31 @@ export async function getUsers(params?: {
   return json.data;
 }
 
+// 사용자 상세 정보 조회
+export async function getUser(id: string, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${id}`, {}, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 사용자 정보 수정
+export async function updateUser(id: string, data: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  status?: string;
+}, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
 // 게시판 목록
 export async function getBoards(fetchFn?: typeof fetch): Promise<any[]> {
   const res = await authenticatedAdminFetch('/api/admin/boards', {}, fetchFn);
@@ -335,4 +360,43 @@ export async function sendNotification(id: string): Promise<any> {
   const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   return json.data;
+}
+
+// 캘린더 일정 목록 조회
+export async function getCalendarEvents(): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/calendar/events');
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 일정 추가
+export async function createCalendarEvent(data: any): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/calendar/events', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 일정 수정
+export async function updateCalendarEvent(id: string, data: any): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/calendar/events/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 일정 삭제
+export async function deleteCalendarEvent(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/calendar/events/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
 } 

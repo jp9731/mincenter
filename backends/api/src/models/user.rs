@@ -7,9 +7,16 @@ pub struct User {
     pub id: Uuid,
     pub email: Option<String>,  // Option으로 변경
     pub name: Option<String>,   // Option으로 변경
+    pub phone: Option<String>,
+    pub profile_image: Option<String>,
+    pub points: Option<i32>,
     pub role: Option<UserRole>,   // user_role enum 타입으로 변경
+    pub status: Option<UserStatus>,
     #[serde(skip_serializing)]
     pub password_hash: Option<String>,  // Option으로 변경
+    pub email_verified: Option<bool>,
+    pub email_verified_at: Option<DateTime<Utc>>,
+    pub last_login_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,  // Option으로 변경
     pub updated_at: Option<DateTime<Utc>>,  // Option으로 변경
 }
@@ -20,6 +27,14 @@ pub enum UserRole {
     User,
     Admin,
     SuperAdmin,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
+#[sqlx(type_name = "user_status", rename_all = "lowercase")]
+pub enum UserStatus {
+    Active,
+    Inactive,
+    Suspended,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -6,6 +6,7 @@
 	import { user, isAuthenticated, logout } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 	import { getSiteMenus, type MenuTree } from '$lib/api/site.js';
+	import { User as UserIcon } from 'lucide-svelte';
 
 	let mobileMenuOpen = false;
 	let menus: MenuTree[] = [];
@@ -16,6 +17,7 @@
 			const response = await getSiteMenus();
 			if (response.success && response.data) {
 				menus = response.data.menus;
+				
 			}
 		} catch (error) {
 			console.error('메뉴 로드 실패:', error);
@@ -50,10 +52,19 @@
 				},
 				{
 					id: '4',
+					name: '일정',
+					url: '/calendar',
+					menu_type: 'page',
+					display_order: 4,
+					is_active: true,
+					children: []
+				},
+				{
+					id: '5',
 					name: '후원하기',
 					url: '/donation',
 					menu_type: 'page',
-					display_order: 4,
+					display_order: 5,
 					is_active: true,
 					children: []
 				}
@@ -74,11 +85,14 @@
 		if (menu.url) {
 			return menu.url;
 		}
-		if (menu.menu_type === 'board' && menu.target_id) {
-			return `/community/${menu.target_id}`;
+		if (menu.menu_type.toLowerCase() === 'board' && menu.slug) {
+			return `/community/${menu.slug}`;
 		}
-		if (menu.menu_type === 'page' && menu.target_id) {
-			return `/pages/${menu.target_id}`;
+		if (menu.menu_type.toLowerCase() === 'page' && menu.slug) {
+			return `/pages/${menu.slug}`;
+		}
+		if (menu.menu_type.toLowerCase() === 'calendar') {
+			return '/calendar';
 		}
 		return '#';
 	}
@@ -138,24 +152,39 @@
 					{/each}
 				{/if}
 
-				<div class="flex items-center space-x-4">
+				<div class="flex items-center">
 					{#if $isAuthenticated && $user}
-						<!-- 로그인된 상태 -->
-						<div class="flex items-center space-x-2">
-							<span class="text-sm text-gray-700">안녕하세요, {$user.name}님</span>
-							<Button variant="ghost" href="/my" class="flex items-center space-x-1">
-								<Icon src={User} class="h-4 w-4" />
-								<span>마이페이지</span>
-							</Button>
-							<Button variant="outline" onclick={handleLogout} class="flex items-center space-x-1">
-								<Icon src={ArrowRightOnRectangle} class="h-4 w-4" />
-								<span>로그아웃</span>
-							</Button>
+						<!-- 로그인 상태: PC 드롭다운/모바일 기존 방식 -->
+						<details class="hidden md:block relative group">
+							<summary class="flex items-center gap-2 cursor-pointer select-none outline-none">
+								{#if $user.profile_image}
+									<img src="{$user.profile_image}" alt="프로필 이미지" class="w-8 h-8 rounded-full object-cover border" />
+								{:else}
+									<UserIcon class="w-6 h-6" />
+								{/if}
+								<span>{$user.name} 님</span>
+							</summary>
+							<div class="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded z-50 border">
+								<div class="px-4 py-2 text-sm">포인트: {($user.points ?? 0).toLocaleString()}</div>
+								<a href="/my" class="block px-4 py-2 text-sm hover:bg-gray-100">마이페이지</a>
+								<form method="POST" action="/logout">
+									<button type="submit" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">로그아웃</button>
+								</form>
+							</div>
+						</details>
+						<div class="flex md:hidden items-center gap-2">
+							<span>안녕하세요, {user.name}님</span>
+							<a href="/my">마이페이지</a>
+							<form method="POST" action="/logout">
+								<button type="submit">로그아웃</button>
+							</form>
 						</div>
 					{:else}
-						<!-- 로그인되지 않은 상태 -->
-						<Button variant="ghost" href="/auth/login">로그인</Button>
-						<Button href="/auth/register">회원가입</Button>
+						<!-- 비로그인 상태: 로그인/회원가입 버튼 -->
+						<div class="flex items-center gap-2">
+							<Button variant="ghost" href="/auth/login">로그인</Button>
+							<Button href="/auth/register">회원가입</Button>
+						</div>
 					{/if}
 				</div>
 			</div>
@@ -219,7 +248,11 @@
 							<div class="mb-3 text-sm text-gray-700">안녕하세요, {$user.name}님</div>
 							<div class="space-y-2">
 								<Button variant="ghost" href="/my" class="w-full justify-start">
-									<Icon src={User} class="mr-2 h-4 w-4" />
+									{#if $user.profile_image}
+										<img src="{$user.profile_image}" alt="프로필 이미지" class="w-6 h-6 rounded-full object-cover border mr-2" />
+									{:else}
+										<Icon src={UserIcon} class="mr-2 h-4 w-4" />
+									{/if}
 									마이페이지
 								</Button>
 								<Button variant="outline" onclick={handleLogout} class="w-full justify-start">

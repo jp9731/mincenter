@@ -12,6 +12,24 @@ use crate::AppState;
 use crate::utils::auth::{generate_tokens, hash_refresh_token, get_current_user, Claims};
 use chrono::{Utc, Duration};
 use jsonwebtoken::{decode, DecodingKey, Validation};
+use uuid::Uuid;
+use serde_json;
+
+// Pagination 정보 구조체
+#[derive(Serialize)]
+pub struct PaginationInfo {
+    pub page: i64,
+    pub limit: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+// 사용자 목록 응답 구조체
+#[derive(Serialize)]
+pub struct UsersResponse {
+    pub users: Vec<User>,
+    pub pagination: PaginationInfo,
+}
 
 // Admin 로그인
 pub async fn admin_login(
@@ -19,12 +37,6 @@ pub async fn admin_login(
     Json(data): Json<AdminLoginRequest>,
 ) -> Result<Json<ApiResponse<AdminAuthResponse>>, StatusCode> {
     info!("Admin login attempt for email: {}", data.email);
-    
-    // 관리자 계정 확인 (임시로 하드코딩된 계정 사용)
-    if data.email != "admin@example.com" || data.password != "admin123" {
-        warn!("Admin login failed for email: {} - invalid credentials", data.email);
-        return Ok(Json(ApiResponse::<AdminAuthResponse>::error("잘못된 이메일 또는 비밀번호입니다.")));
-    }
 
     // DB에서 실제 admin 계정 찾기
     let admin_user_db = match sqlx::query_as::<_, User>(
@@ -35,14 +47,29 @@ pub async fn admin_login(
     .await {
         Ok(Some(user)) => user,
         Ok(None) => {
-            error!("Admin user not found in database: {}", data.email);
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            warn!("Admin login failed for email: {} - not found", data.email);
+            return Ok(Json(ApiResponse::<AdminAuthResponse>::error("잘못된 이메일 또는 비밀번호입니다.")));
         }
         Err(e) => {
             error!("Failed to fetch admin user from database: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
+
+    // 비밀번호 체크
+    if !crate::utils::auth::verify_password(&data.password, admin_user_db.password_hash.as_deref().unwrap_or("")) {
+        warn!("Admin login failed for email: {} - wrong password", data.email);
+        return Ok(Json(ApiResponse::<AdminAuthResponse>::error("잘못된 이메일 또는 비밀번호입니다.")));
+    }
+
+    // role 체크
+    match admin_user_db.role {
+        Some(crate::models::user::UserRole::Admin) | Some(crate::models::user::UserRole::SuperAdmin) => {}
+        _ => {
+            warn!("Admin login failed for email: {} - not admin", data.email);
+            return Ok(Json(ApiResponse::<AdminAuthResponse>::error("관리자 권한이 없습니다.")));
+        }
+    }
 
     // 관리자 사용자 정보 생성
     let admin_user = AdminUser {
@@ -126,7 +153,7 @@ pub async fn admin_me(
         id: admin_user_db.id,
         name: admin_user_db.name.unwrap_or_else(|| "관리자".to_string()),
         email: admin_user_db.email.unwrap_or_else(|| "admin@example.com".to_string()),
-        role: admin_user_db.role.map(|r| format!("{:?}", r)).unwrap_or_else(|| "super_admin".to_string()),
+        role: admin_user_db.role.map(|r| format!("{:?}", r).to_lowercase()).unwrap_or_else(|| "user".to_string()),
         permissions: vec![
             "dashboard.view".to_string(),
             "users.view".to_string(),
@@ -263,27 +290,43 @@ pub struct UserQuery {
 pub async fn get_users(
     State(state): State<AppState>,
     Query(query): Query<UserQuery>,
-) -> Result<Json<ApiResponse<Vec<User>>>, StatusCode> {
+) -> Result<Json<ApiResponse<UsersResponse>>, StatusCode> {
     debug!("Fetching users with query: {:?}", query);
     
     let page = query.page.unwrap_or(1);
     let limit = query.limit.unwrap_or(20);
     let offset = (page - 1) * limit;
 
-    let mut sql = "SELECT * FROM users".to_string();
+    // 전체 사용자 수 조회
+    let mut count_sql = "SELECT COUNT(*) FROM users".to_string();
     let mut conditions = Vec::new();
 
-    if let Some(search) = query.search {
+    if let Some(search) = &query.search {
         conditions.push(format!("(username ILIKE '%{}%' OR email ILIKE '%{}%' OR name ILIKE '%{}%')", search, search, search));
     }
 
-    if let Some(status) = query.status {
+    if let Some(status) = &query.status {
         conditions.push(format!("status = '{}'", status));
     }
 
-    if let Some(role) = query.role {
+    if let Some(role) = &query.role {
         conditions.push(format!("role = '{}'", role));
     }
+
+    if !conditions.is_empty() {
+        count_sql.push_str(&format!(" WHERE {}", conditions.join(" AND ")));
+    }
+
+    let total_users = sqlx::query_scalar::<_, i64>(&count_sql)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to count users: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // 사용자 목록 조회
+    let mut sql = "SELECT * FROM users".to_string();
 
     if !conditions.is_empty() {
         sql.push_str(&format!(" WHERE {}", conditions.join(" AND ")));
@@ -301,8 +344,197 @@ pub async fn get_users(
         }
     };
 
-    info!("Retrieved {} users", users.len());
-    Ok(Json(ApiResponse::success(users, "사용자 목록")))
+    let total_pages = (total_users + limit - 1) / limit;
+
+    let pagination = PaginationInfo {
+        page,
+        limit,
+        total: total_users,
+        total_pages,
+    };
+
+    let response = UsersResponse {
+        users: users.clone(),
+        pagination,
+    };
+
+    info!("Retrieved {} users out of {} total", users.len(), total_users);
+    Ok(Json(ApiResponse::success(response, "사용자 목록")))
+}
+
+// 사용자 상세 정보 조회
+pub async fn get_user(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
+    debug!("Fetching user details for user ID: {}", user_id);
+    
+    // 사용자 기본 정보 조회
+    let user = sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to fetch user: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    match user {
+        Some(user) => {
+            // 게시글 수 조회
+            let post_count = sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM posts WHERE user_id = $1",
+                user_id
+            )
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(Some(0))
+            .unwrap_or(0);
+
+            // 포인트 잔액 조회
+            let point_balance = sqlx::query_scalar!(
+                "SELECT points FROM users WHERE id = $1",
+                user_id
+            )
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(Some(0))
+            .unwrap_or(0);
+
+            // JSON 응답 구성
+            let user_data = serde_json::json!({
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "role": user.role.map(|r| format!("{:?}", r).to_lowercase()),
+                "status": user.status.map(|s| format!("{:?}", s).to_lowercase()),
+                "profile_image": user.profile_image,
+                "last_login_at": user.last_login_at,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
+                "post_count": post_count,
+                "point_balance": point_balance
+            });
+
+            info!("User details retrieved successfully for user ID: {}", user_id);
+            Ok(Json(ApiResponse::success(user_data, "사용자 상세 정보")))
+        },
+        None => {
+            warn!("User not found with ID: {}", user_id);
+            Err(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+// 사용자 정보 수정
+#[derive(Deserialize)]
+pub struct UpdateUserRequest {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub role: Option<String>,
+    pub status: Option<String>,
+}
+
+pub async fn update_user(
+    State(state): State<AppState>,
+    Path(user_id): Path<Uuid>,
+    Json(data): Json<UpdateUserRequest>,
+) -> Result<Json<ApiResponse<User>>, StatusCode> {
+    debug!("Updating user with ID: {}", user_id);
+    
+    // 사용자 존재 확인
+    let existing_user = sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE id = $1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to check user existence: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if existing_user.is_none() {
+        warn!("User not found with ID: {}", user_id);
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // 업데이트할 필드들 구성
+    let mut updates = Vec::new();
+    let mut params: Vec<String> = Vec::new();
+    let mut param_count = 0;
+
+    if let Some(name) = data.name {
+        param_count += 1;
+        updates.push(format!("name = ${}", param_count));
+        params.push(name);
+    }
+
+    if let Some(email) = data.email {
+        param_count += 1;
+        updates.push(format!("email = ${}", param_count));
+        params.push(email);
+    }
+
+    if let Some(phone) = data.phone {
+        param_count += 1;
+        updates.push(format!("phone = ${}", param_count));
+        params.push(phone);
+    }
+
+    if let Some(role) = data.role {
+        param_count += 1;
+        updates.push(format!("role = ${}::user_role", param_count));
+        params.push(role);
+    }
+
+    if let Some(status) = data.status {
+        param_count += 1;
+        updates.push(format!("status = ${}::user_status", param_count));
+        params.push(status);
+    }
+
+    // updated_at 필드 추가 (파라미터 없음)
+    updates.push("updated_at = NOW()".to_string());
+
+    if updates.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // 업데이트 쿼리 실행
+    param_count += 1;
+    let sql = format!(
+        "UPDATE users SET {} WHERE id = ${} RETURNING *",
+        updates.join(", "),
+        param_count
+    );
+    params.push(user_id.to_string());
+
+    let mut query_builder = sqlx::query_as::<_, User>(&sql);
+    for (i, param) in params.iter().enumerate() {
+        if i == params.len() - 1 {
+            // 마지막 파라미터는 UUID
+            query_builder = query_builder.bind(user_id);
+        } else {
+            // 나머지는 문자열
+            query_builder = query_builder.bind(param);
+        }
+    }
+
+    let updated_user = query_builder
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to update user: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    info!("User updated successfully with ID: {}", user_id);
+    Ok(Json(ApiResponse::success(updated_user, "사용자 정보가 수정되었습니다.")))
 }
 
 // 게시글 관리

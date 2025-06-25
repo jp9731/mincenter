@@ -354,27 +354,33 @@ async fn build_menu_tree(pool: &sqlx::PgPool) -> Result<Vec<MenuTree>, sqlx::Err
     // 각 1단 메뉴에 하위 메뉴 추가
     let mut menu_trees = Vec::new();
     for root_menu in root_menus {
-        let children: Vec<MenuTree> = all_menus.iter()
-            .filter(|menu| menu.parent_id == Some(root_menu.id))
-            .map(|menu| MenuTree {
-                id: menu.id,
-                name: menu.name.clone(),
-                description: menu.description.clone(),
-                menu_type: menu.menu_type.clone(),
-                target_id: menu.target_id,
-                url: menu.url.clone(),
-                display_order: menu.display_order,
-                is_active: menu.is_active,
-                children: Vec::new(),
-            })
-            .collect();
+        let mut children = Vec::new();
+        for menu in &all_menus {
+            if menu.parent_id == Some(root_menu.id) {
+                let slug = get_slug_for_menu(pool, &menu.menu_type, menu.target_id).await;
+                children.push(MenuTree {
+                    id: menu.id,
+                    name: menu.name.clone(),
+                    description: menu.description.clone(),
+                    menu_type: menu.menu_type.clone(),
+                    target_id: menu.target_id,
+                    slug,
+                    url: menu.url.clone(),
+                    display_order: menu.display_order,
+                    is_active: menu.is_active,
+                    children: Vec::new(),
+                });
+            }
+        }
 
+        let slug = get_slug_for_menu(pool, &root_menu.menu_type, root_menu.target_id).await;
         let menu_tree = MenuTree {
             id: root_menu.id,
             name: root_menu.name,
             description: root_menu.description,
             menu_type: root_menu.menu_type,
             target_id: root_menu.target_id,
+            slug,
             url: root_menu.url,
             display_order: root_menu.display_order,
             is_active: root_menu.is_active,
@@ -385,6 +391,34 @@ async fn build_menu_tree(pool: &sqlx::PgPool) -> Result<Vec<MenuTree>, sqlx::Err
     }
 
     Ok(menu_trees)
+}
+
+// 메뉴 타입과 target_id에 따라 slug 조회
+async fn get_slug_for_menu(pool: &sqlx::PgPool, menu_type: &MenuType, target_id: Option<Uuid>) -> Option<String> {
+    if let Some(id) = target_id {
+        match menu_type {
+            MenuType::Board => {
+                // 게시판에서 slug 조회
+                sqlx::query_scalar::<_, String>("SELECT slug FROM boards WHERE id = $1")
+                    .bind(id)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None)
+            },
+            MenuType::Page => {
+                // 페이지에서 slug 조회
+                sqlx::query_scalar::<_, String>("SELECT slug FROM pages WHERE id = $1")
+                    .bind(id)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None)
+            },
+            MenuType::Calendar => None, // 일정 타입은 slug가 필요 없음
+            MenuType::Url => None, // URL 타입은 slug가 필요 없음
+        }
+    } else {
+        None
+    }
 }
 
 // 메뉴 순서 변경

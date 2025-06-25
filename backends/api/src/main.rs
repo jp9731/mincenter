@@ -77,6 +77,8 @@ async fn main() {
         .route("/api/pages/:slug", get(handlers::page::get_page_by_slug))
         // 사이트 메뉴 (공개)
         .route("/api/site/menus", get(handlers::menu::get_site_menus))
+        // 공개 일정 (사이트용)
+        .route("/api/calendar/events", get(handlers::calendar::get_public_events))
         // 파일 업로드
         .route("/api/upload/posts", post(handlers::upload::upload_post_file))
         .route("/api/upload/profiles", post(handlers::upload::upload_profile_file))
@@ -110,6 +112,8 @@ async fn main() {
         .route("/api/admin/dashboard/stats", get(handlers::admin::get_dashboard_stats))
         // 사용자 관리
         .route("/api/admin/users", get(handlers::admin::get_users))
+        .route("/api/admin/users/:id", get(handlers::admin::get_user))
+        .route("/api/admin/users/:id", put(handlers::admin::update_user))
         // 게시글 관리
         .route("/api/admin/posts", get(handlers::admin::get_posts))
         // 게시판 관리
@@ -126,6 +130,11 @@ async fn main() {
         .route("/api/admin/pages/:id", put(handlers::page::update_page))
         .route("/api/admin/pages/:id", delete(handlers::page::delete_page))
         .route("/api/admin/pages/:id/status", put(handlers::page::update_page_status))
+        // 일정 관리
+        .route("/api/admin/calendar/events", get(handlers::calendar::get_events))
+        .route("/api/admin/calendar/events", post(handlers::calendar::create_event))
+        .route("/api/admin/calendar/events/:id", put(handlers::calendar::update_event))
+        .route("/api/admin/calendar/events/:id", delete(handlers::calendar::delete_event))
         .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::admin_middleware));
 
     // 라우터 결합

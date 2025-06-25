@@ -12,9 +12,10 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # 초기화 스크립트 자동 실행
-      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # 초기화 스크립트 자동 실행 (순서 중요)
+      - ./database/korean-setup.sql:/docker-entrypoint-initdb.d/01-korean-setup.sql:ro
+      - ./database/init.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
       # 설정 파일 마운트
       - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     ports:

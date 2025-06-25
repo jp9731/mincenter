@@ -3,6 +3,7 @@ pub mod response;
 pub mod community;
 pub mod menu;
 pub mod page;
+pub mod calendar;
 
 pub use user::*;
 pub use response::*;

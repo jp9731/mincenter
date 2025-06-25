@@ -15,7 +15,7 @@ CREATE TYPE processing_status AS ENUM ('pending', 'processing', 'completed', 'fa
 CREATE TYPE entity_type AS ENUM ('post', 'gallery', 'user_profile', 'comment', 'draft');
 CREATE TYPE file_purpose AS ENUM ('main', 'attachment', 'thumbnail');
 CREATE TYPE notification_type AS ENUM ('comment', 'like', 'system', 'announcement');
-CREATE TYPE menu_type AS ENUM ('page', 'board', 'url');
+CREATE TYPE menu_type AS ENUM ('page', 'board', 'calendar', 'url');
 
 -- 사용자 테이블
 CREATE TABLE users (
@@ -381,6 +381,8 @@ CREATE TRIGGER update_organization_info_updated_at BEFORE UPDATE ON organization
 CREATE TRIGGER update_hero_sections_updated_at BEFORE UPDATE ON hero_sections FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_site_settings_updated_at BEFORE UPDATE ON site_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_drafts_updated_at BEFORE UPDATE ON drafts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_pages_updated_at BEFORE UPDATE ON pages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_calendar_events_updated_at BEFORE UPDATE ON calendar_events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- 기본 데이터 삽입
 INSERT INTO boards (id, name, description, category, display_order) VALUES
@@ -484,20 +486,6 @@ CREATE INDEX idx_pages_published ON pages(is_published);
 CREATE INDEX idx_pages_sort_order ON pages(sort_order);
 CREATE INDEX idx_pages_created_at ON pages(created_at);
 
--- 페이지 업데이트 트리거
-CREATE OR REPLACE FUNCTION update_pages_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_update_pages_updated_at
-    BEFORE UPDATE ON pages
-    FOR EACH ROW
-    EXECUTE FUNCTION update_pages_updated_at();
-
 -- 페이지 조회수 증가 함수
 CREATE OR REPLACE FUNCTION increment_page_view_count(page_id UUID)
 RETURNS VOID AS $$
@@ -507,3 +495,24 @@ BEGIN
     WHERE id = page_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- 일정(캘린더) 테이블
+CREATE TABLE calendar_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    start_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_at TIMESTAMP WITH TIME ZONE,
+    all_day BOOLEAN DEFAULT FALSE,
+    color VARCHAR(20),
+    is_public BOOLEAN DEFAULT FALSE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for is_public field
+CREATE INDEX idx_calendar_events_is_public ON calendar_events(is_public);
+
+-- Update existing events to be public by default
+UPDATE calendar_events SET is_public = TRUE WHERE is_public IS NULL; 

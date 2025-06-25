@@ -6,6 +6,7 @@ pub mod community;
 pub mod menu;
 pub mod page;
 pub mod upload;
+pub mod calendar;
 
 pub use admin::*;
 pub use auth::*;

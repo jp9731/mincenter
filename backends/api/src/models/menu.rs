@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 pub enum MenuType {
     Page,    // 안내페이지
     Board,   // 게시판
+    Calendar, // 일정
     Url,     // 외부링크
 }
 
@@ -62,6 +63,7 @@ pub struct MenuTree {
     pub description: Option<String>,
     pub menu_type: MenuType,
     pub target_id: Option<Uuid>,
+    pub slug: Option<String>, // 게시판이나 페이지의 slug
     pub url: Option<String>,
     pub display_order: i32,
     pub is_active: bool,

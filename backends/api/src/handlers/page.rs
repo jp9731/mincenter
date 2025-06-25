@@ -50,14 +50,17 @@ pub async fn get_pages(
 
     // 상태 필터 추가
     if let Some(status_filter) = status {
-        let status_condition = " AND p.status = $2";
-        sql.push_str(status_condition);
-        count_sql.push_str(status_condition);
+        let param_index = params.len() + 1;
+        let status_condition = format!(" AND p.status = ${}", param_index);
+        sql.push_str(&status_condition);
+        count_sql.push_str(&status_condition);
         params.push(status_filter);
     }
 
     // 정렬 및 페이징
-    sql.push_str(" ORDER BY p.sort_order ASC, p.created_at DESC LIMIT $3 OFFSET $4");
+    let limit_param = params.len() + 1;
+    let offset_param = params.len() + 2;
+    sql.push_str(&format!(" ORDER BY p.sort_order ASC, p.created_at DESC LIMIT ${} OFFSET ${}", limit_param, offset_param));
 
     // 총 개수 조회
     let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql);

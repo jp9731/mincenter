@@ -21,6 +21,7 @@
 	} from '$lib/components/ui/table';
 	import { loadUsers, users, usersPagination, suspendUser, activateUser } from '$lib/stores/admin';
 	import type { User } from '$lib/types/admin';
+	import { goto } from '$app/navigation';
 
 	let searchQuery = '';
 	let statusFilter = '';
@@ -99,7 +100,9 @@
 			<h1 class="text-3xl font-bold text-gray-900">사용자 관리</h1>
 			<p class="mt-2 text-gray-600">시스템에 등록된 사용자들을 관리합니다.</p>
 		</div>
-		<Button>새 사용자 추가</Button>
+		<div>
+			<a href="/users/create" class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-white font-medium hover:bg-primary-700 transition">새 사용자 추가</a>
+		</div>
 	</div>
 
 	<!-- 검색 및 필터 -->
@@ -196,17 +199,17 @@
 							<TableCell>{user.email}</TableCell>
 							<TableCell>
 								{@const roleBadge = getRoleBadge(user.role)}
-								<Badge variant={roleBadge.variant}>{roleBadge.text}</Badge>
+								<Badge variant={roleBadge.variant as "default" | "destructive" | "secondary" | "outline" | undefined}>{roleBadge.text}</Badge>
 							</TableCell>
 							<TableCell>
 								{@const statusBadge = getStatusBadge(user.status)}
-								<Badge variant={statusBadge.variant}>{statusBadge.text}</Badge>
+								<Badge variant={statusBadge.variant as "default" | "destructive" | "secondary" | "outline" | undefined}>{statusBadge.text}</Badge>
 							</TableCell>
 							<TableCell>
 								{new Date(user.created_at).toLocaleDateString('ko-KR')}
 							</TableCell>
 							<TableCell>{user.post_count}</TableCell>
-							<TableCell>{user.point_balance.toLocaleString()}</TableCell>
+							<TableCell>{(user.point_balance ?? 0).toLocaleString()}</TableCell>
 							<TableCell>
 								<div class="flex space-x-2">
 									{#if user.status === 'active'}
@@ -218,7 +221,7 @@
 											활성화
 										</Button>
 									{/if}
-									<Button variant="outline" size="sm">상세보기</Button>
+									<a href={`/users/${user.id}`} class="inline-flex items-center rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100 transition">상세보기</a>
 								</div>
 							</TableCell>
 						</TableRow>
@@ -227,7 +230,7 @@
 			</Table>
 
 			<!-- 페이지네이션 -->
-			{#if $usersPagination.total_pages > 1}
+			{#if $usersPagination.totalPages > 1}
 				<div class="mt-6 flex justify-center">
 					<div class="flex space-x-2">
 						{#if currentPage > 1}
@@ -236,7 +239,7 @@
 							</Button>
 						{/if}
 
-						{#each Array.from({ length: $usersPagination.total_pages }, (_, i) => i + 1) as pageNum}
+						{#each Array.from({ length: $usersPagination.totalPages }, (_, i) => i + 1) as pageNum}
 							<Button
 								variant={currentPage === pageNum ? 'default' : 'outline'}
 								size="sm"
@@ -246,7 +249,7 @@
 							</Button>
 						{/each}
 
-						{#if currentPage < $usersPagination.total_pages}
+						{#if currentPage < $usersPagination.totalPages}
 							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage + 1)}>
 								다음
 							</Button>
