@@ -35,10 +35,30 @@ load_env() {
     
     if [ -f ".env" ]; then
         log_info ".env 파일에서 환경 변수 로드"
-        export $(grep -v '^#' .env | xargs)
+        # 안전한 환경 변수 로드
+        while IFS= read -r line; do
+            if [[ ! "$line" =~ ^[[:space:]]*# ]] && [[ -n "$line" ]]; then
+                var_name=$(echo "$line" | cut -d'=' -f1)
+                var_value=$(echo "$line" | cut -d'=' -f2-)
+                
+                if [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                    export "$var_name=$var_value"
+                fi
+            fi
+        done < .env
     elif [ -f "backends/api/.env" ]; then
         log_info "backends/api/.env 파일에서 환경 변수 로드"
-        export $(grep -v '^#' backends/api/.env | xargs)
+        # 안전한 환경 변수 로드
+        while IFS= read -r line; do
+            if [[ ! "$line" =~ ^[[:space:]]*# ]] && [[ -n "$line" ]]; then
+                var_name=$(echo "$line" | cut -d'=' -f1)
+                var_value=$(echo "$line" | cut -d'=' -f2-)
+                
+                if [[ "$var_name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                    export "$var_name=$var_value"
+                fi
+            fi
+        done < backends/api/.env
     else
         log_warning "환경 변수 파일을 찾을 수 없습니다. 기본값 사용"
         # 기본값 설정
