@@ -90,6 +90,6 @@ volumes:
 networks:
   internal:
     driver: bridge
-    name: ${APP_NAME:-mincenter}_internal
+    name: minc_int
     driver_opts:
-      com.docker.network.bridge.name: ${APP_NAME:-mincenter}_internal
+      com.docker.network.bridge.name: minc_int
