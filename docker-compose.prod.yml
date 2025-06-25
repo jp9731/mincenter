@@ -9,20 +9,21 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-mincenter}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mincenter}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
