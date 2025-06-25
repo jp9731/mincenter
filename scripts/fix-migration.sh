@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 마이그레이션 오류 해결 스크립트
+# 마이그레이션 오류 해결 스크립트 (납품 시 비활성화)
 # PostgreSQL에서 마이그레이션 실행 시 발생하는 오류들을 해결
 
 set -e
@@ -284,56 +284,14 @@ check_migration_status() {
 
 # 메인 실행 함수
 main() {
-    log_info "=== 마이그레이션 오류 해결 스크립트 시작 ==="
+    log_info "=== 마이그레이션 오류 해결 스크립트 (비활성화) ==="
     
-    # 환경 변수 로드
-    load_env
+    log_warning "⚠️  이 스크립트는 납품을 위해 비활성화되었습니다."
+    log_info "데이터베이스 스키마 변경사항은 수동으로 적용하세요."
+    log_info "필요한 경우 직접 DB에 접속하여 변경사항을 적용하시기 바랍니다."
     
-    # 데이터베이스 연결 테스트
-    if ! test_db_connection; then
-        log_error "데이터베이스 연결에 실패했습니다. Docker 컨테이너가 실행 중인지 확인해주세요."
-        exit 1
-    fi
-    
-    # 사용자 선택
-    echo -e "${YELLOW}다음 중 어떤 작업을 수행하시겠습니까?${NC}"
-    echo "1) 기존 타입 및 객체 정리 후 마이그레이션 실행"
-    echo "2) 마이그레이션 초기화 후 재실행"
-    echo "3) 안전한 마이그레이션 실행 (기존 데이터 보존)"
-    echo "4) 마이그레이션 상태 확인"
-    echo "5) 종료"
-    
-    read -p "선택 (1-5): " choice
-    
-    case $choice in
-        1)
-            log_info "기존 타입 및 객체 정리 후 마이그레이션 실행을 선택했습니다."
-            cleanup_existing_objects
-            run_migrations
-            ;;
-        2)
-            log_info "마이그레이션 초기화 후 재실행을 선택했습니다."
-            reset_migrations
-            ;;
-        3)
-            log_info "안전한 마이그레이션 실행을 선택했습니다."
-            run_safe_migrations
-            ;;
-        4)
-            log_info "마이그레이션 상태 확인을 선택했습니다."
-            check_migration_status
-            ;;
-        5)
-            log_info "스크립트를 종료합니다."
-            exit 0
-            ;;
-        *)
-            log_error "잘못된 선택입니다."
-            exit 1
-            ;;
-    esac
-    
-    log_success "=== 마이그레이션 오류 해결 스크립트 완료 ==="
+    log_success "=== 마이그레이션 스크립트 종료 ==="
+    log_info "납품 시 수동으로 DB 스키마를 관리하세요."
 }
 
 # 스크립트 실행

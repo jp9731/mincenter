@@ -72,11 +72,15 @@ docker-compose -f docker-compose.prod.yml build --no-cache
 log_info "컨테이너를 시작합니다..."
 docker-compose -f docker-compose.prod.yml up -d
 
-# 6. 헬스체크 대기
+# 6. 데이터베이스 마이그레이션 (납품 시 수동 처리)
+log_info "데이터베이스 마이그레이션은 수동으로 처리합니다..."
+log_warn "납품 시에는 직접 DB에 접속하여 스키마 변경사항을 적용하세요."
+
+# 7. 헬스체크 대기
 log_info "서비스가 시작될 때까지 대기합니다..."
 sleep 45
 
-# 7. 헬스체크
+# 8. 헬스체크
 log_info "헬스체크를 수행합니다..."
 
 # PostgreSQL 헬스체크
@@ -115,11 +119,11 @@ else
     exit 1
 fi
 
-# 8. 불필요한 이미지 정리
+# 9. 불필요한 이미지 정리
 log_info "불필요한 이미지를 정리합니다..."
 docker image prune -f
 
-# 9. 배포 완료
+# 10. 배포 완료
 log_step "배포가 완료되었습니다!"
 log_info "서비스 상태:"
 docker-compose -f docker-compose.prod.yml ps
@@ -129,7 +133,7 @@ echo "  - 메인 사이트: http://localhost:3000"
 echo "  - 관리자 페이지: http://localhost:13001"
 echo "  - API: http://localhost:18080"
 
-# 10. 배포 로그 저장
+# 11. 배포 로그 저장
 echo "$(date): 배포 완료 - 커밋: $(git rev-parse --short HEAD)" >> deploy.log
 
 log_info "자동 배포가 성공적으로 완료되었습니다! 🎉" 

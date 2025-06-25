@@ -138,51 +138,12 @@ docker-compose -f docker-compose.prod.yml build --no-cache
 log_info "컨테이너를 시작합니다..."
 docker-compose -f docker-compose.prod.yml up -d
 
-# 4. 데이터베이스 마이그레이션 실행
-log_info "데이터베이스 마이그레이션을 실행합니다..."
-if [ -f "scripts/migrate.sh" ]; then
-    chmod +x scripts/migrate.sh
-    ./scripts/migrate.sh
-else
-    log_warn "마이그레이션 스크립트가 없습니다. 수동으로 실행하세요."
-fi
+# 4. 데이터베이스 마이그레이션 실행 (납품 시 수동 처리)
+log_info "데이터베이스 마이그레이션은 수동으로 처리합니다..."
+log_warn "납품 시에는 직접 DB에 접속하여 스키마 변경사항을 적용하세요."
 
 # 5. 데이터베이스 헬스체크
 log_info "데이터베이스 헬스체크를 수행합니다..."
-
-# PostgreSQL 헬스체크
-if docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB > /dev/null 2>&1; then
-    log_info "PostgreSQL: 정상"
-else
-    log_error "PostgreSQL: 비정상"
-    log_info "컨테이너 로그를 확인하세요: docker-compose -f docker-compose.prod.yml logs postgres"
-# 6. API 서버 재시작 (수동 빌드)
-log_info "API 서버를 재시작합니다..."
-cd backends/api
-
-# 기존 API 프로세스 종료
-log_info "기존 API 프로세스를 종료합니다..."
-pkill -f minshool-api || true
-sleep 2
-
-# API 서버 재빌드
-log_info "API 서버를 재빌드합니다..."
-cargo build --release
-
-# API 서버 시작
-log_info "API 서버를 시작합니다..."
-nohup ./target/release/minshool-api > api.log 2>&1 &
-API_PID=$!
-echo $API_PID > api.pid
-
-cd ../..
-
-# 6. 헬스체크 대기
-log_info "서비스가 시작될 때까지 대기합니다..."
-sleep 45
-
-# 7. 헬스체크
-log_info "헬스체크를 수행합니다..."
 
 # PostgreSQL 헬스체크
 if docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB > /dev/null 2>&1; then
@@ -220,28 +181,13 @@ else
     exit 1
 fi
 
-# 8. 불필요한 이미지 정리
+# 6. 불필요한 이미지 정리
 log_info "불필요한 이미지를 정리합니다..."
 docker image prune -f
 
-# 9. 배포 완료
+# 7. 배포 완료
 log_info "배포가 완료되었습니다!"
 log_info "서비스 상태:"
 docker-compose -f docker-compose.prod.yml ps
-
-log_info "API 프로세스 상태:"
-if [ -f "backends/api/api.pid" ]; then
-    API_PID=$(cat backends/api/api.pid)
-    if ps -p $API_PID > /dev/null; then
-        log_info "API 프로세스 (PID: $API_PID): 실행 중"
-    else
-        log_warn "API 프로세스가 종료되었습니다."
-    fi
-fi
-
-log_info "접속 URL:"
-echo "  - 메인 사이트: http://localhost:13000"
-echo "  - 관리자 페이지: http://localhost:13001"
-echo "  - API: http://localhost:18080"
 
 log_info "CentOS 7에서 성공적으로 배포되었습니다!" 

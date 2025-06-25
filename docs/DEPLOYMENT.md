@@ -125,8 +125,9 @@ ADMIN_EMAIL=admin@example.com
 # 1. Docker 서비스 시작
 docker-compose -f docker-compose.prod.yml up -d
 
-# 2. 데이터베이스 마이그레이션
-./scripts/migrate.sh
+# 2. 데이터베이스 마이그레이션 (납품 시 수동 처리)
+# ./scripts/migrate.sh  # 비활성화됨
+echo "데이터베이스 스키마 변경사항은 수동으로 적용하세요."
 
 # 3. API 서비스 시작
 ./scripts/api-service.sh start
@@ -178,17 +179,16 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## 데이터베이스 관리
 
-### 마이그레이션
+### 마이그레이션 (납품 시 수동 처리)
 ```bash
-# 마이그레이션 실행
-./scripts/migrate.sh
+# 마이그레이션 스크립트는 납품을 위해 비활성화되었습니다.
+# ./scripts/migrate.sh  # 비활성화됨
 
-# 또는 수동으로
-cd backends/api
-sqlx migrate run
+# 데이터베이스 스키마 변경사항은 수동으로 적용하세요.
+# 직접 DB에 접속하여 필요한 변경사항을 적용하시기 바랍니다.
 ```
 
-### 마이그레이션 생성
+### 마이그레이션 생성 (개발용)
 ```bash
 cd backends/api
 

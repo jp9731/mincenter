@@ -147,18 +147,9 @@ jobs:
           else
             echo "배포 스크립트가 없습니다. 수동으로 배포를 진행합니다..."
             
-            # 데이터베이스 마이그레이션 실행 (초기화 없이)
-            echo "데이터베이스 마이그레이션 실행..."
-            cd backends/api
-            if command -v sqlx &> /dev/null; then
-              echo "sqlx-cli가 설치되어 있습니다. 마이그레이션을 실행합니다..."
-              sqlx migrate run
-            else
-              echo "sqlx-cli가 설치되지 않았습니다. 설치 후 마이그레이션을 실행합니다..."
-              cargo install sqlx-cli --no-default-features --features postgres
-              sqlx migrate run
-            fi
-            cd ../..
+            # 데이터베이스 마이그레이션 (납품 시 수동 처리)
+            echo "데이터베이스 마이그레이션은 수동으로 처리합니다..."
+            echo "납품 시에는 직접 DB에 접속하여 스키마 변경사항을 적용하세요."
             
             # Docker Compose 배포 (API 제외)
             if [ -f "docker-compose.prod.yml" ]; then
