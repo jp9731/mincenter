@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:13
+    image: postgres:13-alpine
     container_name: ${APP_NAME:-mincenter}_postgres
     restart: unless-stopped
     environment:
@@ -23,6 +23,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   site:
     build:
@@ -31,6 +37,8 @@ services:
       args:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
+      cache_from:
+        - node:18-alpine
     container_name: ${APP_NAME:-mincenter}_site
     restart: unless-stopped
     environment:
@@ -52,6 +60,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   admin:
     build:
@@ -60,6 +74,8 @@ services:
       args:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
+      cache_from:
+        - node:18-alpine
     container_name: ${APP_NAME:-mincenter}_admin
     restart: unless-stopped
     environment:
@@ -82,6 +98,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
 volumes:
   postgres_data:

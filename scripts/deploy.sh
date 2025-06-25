@@ -80,6 +80,38 @@ log_info "배포를 시작합니다..."
 # 호환성 체크
 check_centos_compatibility
 
+# 디스크 공간 체크
+check_disk_space() {
+    log_info "디스크 공간을 확인합니다..."
+    AVAILABLE_SPACE=$(df / | awk 'NR==2 {print $4}')
+    AVAILABLE_SPACE_GB=$((AVAILABLE_SPACE / 1024 / 1024))
+    
+    log_info "사용 가능한 공간: ${AVAILABLE_SPACE_GB}GB"
+    
+    if [ $AVAILABLE_SPACE_GB -lt 5 ]; then
+        log_warn "디스크 공간이 부족합니다. 정리를 시작합니다..."
+        if [ -f "scripts/disk-cleanup.sh" ]; then
+            chmod +x scripts/disk-cleanup.sh
+            ./scripts/disk-cleanup.sh
+        else
+            log_error "디스크 정리 스크립트가 없습니다. 수동으로 정리하세요."
+            exit 1
+        fi
+        
+        # 정리 후 다시 체크
+        AVAILABLE_SPACE=$(df / | awk 'NR==2 {print $4}')
+        AVAILABLE_SPACE_GB=$((AVAILABLE_SPACE / 1024 / 1024))
+        
+        if [ $AVAILABLE_SPACE_GB -lt 3 ]; then
+            log_error "디스크 공간이 여전히 부족합니다. 최소 3GB가 필요합니다."
+            exit 1
+        fi
+    fi
+}
+
+# 디스크 공간 체크
+check_disk_space
+
 # 1. 기존 컨테이너 완전 중지 및 정리
 log_info "기존 컨테이너를 완전히 중지하고 정리합니다..."
 
