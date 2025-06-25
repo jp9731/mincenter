@@ -54,6 +54,15 @@ check_centos_compatibility() {
         log_error "Docker Compose가 설치되지 않았습니다."
         exit 1
     fi
+    
+    # Rust 설치 확인
+    if command -v cargo &> /dev/null; then
+        RUST_VERSION=$(cargo --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        log_info "Rust 버전: $RUST_VERSION"
+    else
+        log_error "Rust가 설치되지 않았습니다. API 서버를 빌드할 수 없습니다."
+        exit 1
+    fi
 }
 
 # 환경 변수 확인
@@ -71,7 +80,7 @@ log_info "배포를 시작합니다..."
 # 호환성 체크
 check_centos_compatibility
 
-# 1. 기존 컨테이너 중지
+# 1. 기존 컨테이너 중지 (API 제외)
 log_info "기존 컨테이너를 중지합니다..."
 docker-compose -f docker-compose.prod.yml down
 
@@ -87,11 +96,41 @@ docker-compose -f docker-compose.prod.yml build --no-cache
 log_info "컨테이너를 시작합니다..."
 docker-compose -f docker-compose.prod.yml up -d
 
-# 5. 헬스체크 대기 (CentOS 7에서는 더 긴 대기 시간 필요)
+# 5. 데이터베이스 마이그레이션 실행
+log_info "데이터베이스 마이그레이션을 실행합니다..."
+if [ -f "scripts/migrate.sh" ]; then
+    chmod +x scripts/migrate.sh
+    ./scripts/migrate.sh
+else
+    log_warn "마이그레이션 스크립트가 없습니다. 수동으로 실행하세요."
+fi
+
+# 6. API 서버 재시작 (수동 빌드)
+log_info "API 서버를 재시작합니다..."
+cd backends/api
+
+# 기존 API 프로세스 종료
+log_info "기존 API 프로세스를 종료합니다..."
+pkill -f minshool-api || true
+sleep 2
+
+# API 서버 재빌드
+log_info "API 서버를 재빌드합니다..."
+cargo build --release
+
+# API 서버 시작
+log_info "API 서버를 시작합니다..."
+nohup ./target/release/minshool-api > api.log 2>&1 &
+API_PID=$!
+echo $API_PID > api.pid
+
+cd ../..
+
+# 6. 헬스체크 대기
 log_info "서비스가 시작될 때까지 대기합니다..."
 sleep 45
 
-# 6. 헬스체크
+# 7. 헬스체크
 log_info "헬스체크를 수행합니다..."
 
 # PostgreSQL 헬스체크
@@ -108,7 +147,7 @@ if curl -f http://localhost:18080/health > /dev/null 2>&1; then
     log_info "API: 정상"
 else
     log_error "API: 비정상"
-    log_info "컨테이너 로그를 확인하세요: docker-compose -f docker-compose.prod.yml logs api"
+    log_info "API 로그를 확인하세요: tail -f backends/api/api.log"
     exit 1
 fi
 
@@ -130,14 +169,24 @@ else
     exit 1
 fi
 
-# 7. 불필요한 이미지 정리
+# 8. 불필요한 이미지 정리
 log_info "불필요한 이미지를 정리합니다..."
 docker image prune -f
 
-# 8. 배포 완료
+# 9. 배포 완료
 log_info "배포가 완료되었습니다!"
 log_info "서비스 상태:"
 docker-compose -f docker-compose.prod.yml ps
+
+log_info "API 프로세스 상태:"
+if [ -f "backends/api/api.pid" ]; then
+    API_PID=$(cat backends/api/api.pid)
+    if ps -p $API_PID > /dev/null; then
+        log_info "API 프로세스 (PID: $API_PID): 실행 중"
+    else
+        log_warn "API 프로세스가 종료되었습니다."
+    fi
+fi
 
 log_info "접속 URL:"
 echo "  - 메인 사이트: http://localhost:13000"

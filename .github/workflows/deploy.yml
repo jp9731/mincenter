@@ -138,6 +138,7 @@ jobs:
           git status
           echo "최신 코드 가져오기..."
           git pull origin main
+          
           echo "배포 스크립트 실행..."
           if [ -f "scripts/deploy.sh" ]; then
             echo "배포 스크립트를 찾았습니다."
@@ -145,9 +146,21 @@ jobs:
             ./scripts/deploy.sh
           else
             echo "배포 스크립트가 없습니다. 수동으로 배포를 진행합니다..."
-            echo "사용 가능한 파일들:"
-            ls -la *.yml *.yaml 2>/dev/null || echo "YAML 파일이 없습니다."
-            # Docker Compose 배포
+            
+            # 데이터베이스 마이그레이션 실행 (초기화 없이)
+            echo "데이터베이스 마이그레이션 실행..."
+            cd backends/api
+            if command -v sqlx &> /dev/null; then
+              echo "sqlx-cli가 설치되어 있습니다. 마이그레이션을 실행합니다..."
+              sqlx migrate run
+            else
+              echo "sqlx-cli가 설치되지 않았습니다. 설치 후 마이그레이션을 실행합니다..."
+              cargo install sqlx-cli --no-default-features --features postgres
+              sqlx migrate run
+            fi
+            cd ../..
+            
+            # Docker Compose 배포 (API 제외)
             if [ -f "docker-compose.prod.yml" ]; then
               echo "docker-compose.prod.yml 파일을 찾았습니다."
               docker-compose -f docker-compose.prod.yml down
@@ -162,10 +175,29 @@ jobs:
               docker-compose up -d
             else
               echo "docker-compose 파일이 없습니다!"
-              echo "현재 디렉토리의 모든 파일:"
-              find . -type f -name "*.yml" -o -name "*.yaml" -o -name "*.sh" | head -20
               exit 1
             fi
+            
+            # API 서버 재시작 (수동 빌드)
+            echo "API 서버 재시작..."
+            cd backends/api
+            if [ -f "target/release/minshool-api" ]; then
+              echo "기존 API 프로세스 종료..."
+              pkill -f minshool-api || true
+              sleep 2
+              
+              echo "API 서버 재빌드..."
+              cargo build --release
+              
+              echo "API 서버 시작..."
+              nohup ./target/release/minshool-api > api.log 2>&1 &
+              echo "API 서버가 백그라운드에서 시작되었습니다."
+            else
+              echo "API 바이너리가 없습니다. 빌드 후 시작합니다..."
+              cargo build --release
+              nohup ./target/release/minshool-api > api.log 2>&1 &
+            fi
+            cd ../..
           fi
         EOF
         

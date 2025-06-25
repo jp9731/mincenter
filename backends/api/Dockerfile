@@ -13,12 +13,15 @@ RUN mkdir -p src && \
   cargo build --release || true && \
   rm -rf src
 
-# 소스 코드 복사 및 빌드
+# 소스 코드 복사
 COPY src ./src
 
-# SQLx 쿼리 캐시를 위한 환경 변수는 docker-compose에서 주입
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
+# SQLx 오프라인 모드 설정
+ENV SQLX_OFFLINE=true
+ENV SQLX_OFFLINE_DIR=.sqlx
+
+# sqlx-data 디렉토리가 있다면 복사
+COPY .sqlx ./sqlx-data/
 
 RUN cargo build --release
 
