@@ -179,6 +179,19 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## 데이터베이스 관리
 
+### 데이터 저장 방식
+이 프로젝트는 PostgreSQL 데이터를 호스트 파일 시스템에 직접 저장합니다:
+- **데이터 위치**: `./database/data/`
+- **장점**: `docker-compose down`을 해도 데이터가 보존됩니다
+- **백업**: `./database/backup_*.sql` 파일로 자동 백업됩니다
+
+### 데이터 마이그레이션 (Docker volume → 파일 시스템)
+기존 Docker volume을 사용하던 경우 파일 시스템으로 마이그레이션:
+```bash
+# 마이그레이션 스크립트 실행
+./scripts/migrate-db-to-filesystem.sh
+```
+
 ### 마이그레이션 (납품 시 수동 처리)
 ```bash
 # 마이그레이션 스크립트는 납품을 위해 비활성화되었습니다.

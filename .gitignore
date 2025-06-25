@@ -66,6 +66,8 @@ server.log
 *.db
 *.sqlite
 *.sqlite3
+database/data/
+database/backup_*.sql
 
 # Backup files
 *.bak
