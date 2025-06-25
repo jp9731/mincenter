@@ -4,22 +4,27 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 샘플 데이터 삽입 스크립트
 -- 개발 및 테스트용 데이터
 
+-- 관리자 계정 생성 (가장 먼저 생성)
+INSERT INTO users (email, password_hash, name, role, status, email_verified, points) VALUES
+    ('admin@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '관리자', 'admin', 'active', true, 0)
+ON CONFLICT (email) DO NOTHING;
+
 -- 게시판 생성
 INSERT INTO boards (
-    name, description, category, display_order, is_public, allow_anonymous,
+    name, slug, description, category, display_order, is_public, allow_anonymous,
     allow_file_upload, max_files, max_file_size, allowed_file_types,
     allow_rich_text, require_category, allow_comments, allow_likes
 ) VALUES
-    ('공지사항', '중요한 공지사항을 확인하세요', 'notice', 1, true, false,
+    ('공지사항', 'notice', '중요한 공지사항을 확인하세요', 'notice', 1, true, false,
      true, 3, 5242880, ARRAY['image/*', 'application/pdf'],
      true, true, true, false),
-    ('봉사활동 후기', '봉사활동 경험을 공유해보세요', 'review', 2, true, false,
+    ('봉사활동 후기', 'review', '봉사활동 경험을 공유해보세요', 'review', 2, true, false,
      true, 5, 10485760, ARRAY['image/*', 'video/*'],
      true, true, true, true),
-    ('자유게시판', '자유롭게 이야기를 나누세요', 'free', 3, true, false,
+    ('자유게시판', 'general', '자유롭게 이야기를 나누세요', 'free', 3, true, false,
      true, 5, 10485760, ARRAY['image/*'],
      true, false, true, true),
-    ('질문과 답변', '궁금한 점을 물어보세요', 'qna', 4, true, false,
+    ('질문과 답변', 'qna', '궁금한 점을 물어보세요', 'qna', 4, true, false,
      false, 0, 0, ARRAY[]::text[],
      true, true, true, false)
 ON CONFLICT (name) DO NOTHING;
@@ -373,10 +378,9 @@ WHERE u.status = 'active'
 GROUP BY u.id, u.name, u.email, u.points;
 
 -- 인덱스 추가 (성능 최적화)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_popularity ON posts((views * 0.1 + likes * 1.0) DESC);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_files_created_at ON files(created_at);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
-
+CREATE INDEX IF NOT EXISTS idx_posts_popularity ON posts((views * 0.1 + likes * 1.0) DESC);
+CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at);
+CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
 -- 마지막 업데이트: 사용자 포인트 계산
 UPDATE users SET points = (
     SELECT COALESCE(SUM(
