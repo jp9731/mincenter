@@ -66,7 +66,17 @@ docker-compose -f docker-compose.prod.yml down
 
 # 4. 새 이미지 빌드
 log_info "새 이미지를 빌드합니다..."
-docker-compose -f docker-compose.prod.yml build --no-cache
+# 메모리 부족 문제 해결을 위한 최적화된 빌드
+if [ -f "scripts/optimize-build.sh" ]; then
+    log_info "최적화된 빌드 스크립트 사용..."
+    chmod +x scripts/optimize-build.sh
+    ./scripts/optimize-build.sh
+else
+    log_warn "최적화 스크립트가 없습니다. 기본 빌드 사용..."
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    docker-compose -f docker-compose.prod.yml build --no-cache --parallel
+fi
 
 # 5. 컨테이너 시작
 log_info "컨테이너를 시작합니다..."

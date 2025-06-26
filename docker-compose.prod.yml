@@ -38,8 +38,11 @@ services:
       args:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
+        - NODE_ENV=production
       cache_from:
         - node:18-alpine
+      no_cache: false
+      pull: true
     container_name: ${APP_NAME:-mincenter}_site
     restart: unless-stopped
     environment:
@@ -64,9 +67,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
         reservations:
-          memory: 256M
+          memory: 512M
 
   admin:
     build:
@@ -75,8 +78,11 @@ services:
       args:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
+        - NODE_ENV=production
       cache_from:
         - node:18-alpine
+      no_cache: false
+      pull: true
     container_name: ${APP_NAME:-mincenter}_admin
     restart: unless-stopped
     environment:
@@ -102,9 +108,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
         reservations:
-          memory: 256M
+          memory: 512M
 
 networks:
   internal:
