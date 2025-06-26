@@ -106,9 +106,6 @@ services:
         reservations:
           memory: 256M
 
-volumes:
-  # postgres_data volume 제거 - 호스트 파일 시스템 사용
-
 networks:
   internal:
     driver: bridge
