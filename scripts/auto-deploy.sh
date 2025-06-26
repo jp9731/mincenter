@@ -102,15 +102,6 @@ else
     exit 1
 fi
 
-# API 헬스체크 (포트 18080)
-if curl -f http://localhost:18080/health > /dev/null 2>&1; then
-    log_info "✅ API: 정상"
-else
-    log_error "❌ API: 비정상"
-    docker-compose -f docker-compose.prod.yml logs api
-    exit 1
-fi
-
 # Site 헬스체크 (포트 3000)
 if curl -f http://localhost:3000 > /dev/null 2>&1; then
     log_info "✅ Site: 정상"

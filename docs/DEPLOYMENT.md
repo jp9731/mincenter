@@ -8,7 +8,9 @@
 - **Redis**: Docker 컨테이너로 실행  
 - **Site (Frontend)**: Docker 컨테이너로 실행
 - **Admin (Frontend)**: Docker 컨테이너로 실행
-- **API (Backend)**: 로컬 Rust 빌드로 실행
+- **API (Backend)**: 로컬 Rust 빌드로 실행 (배포 스크립트에서 제외)
+
+> **⚠️ 중요**: API 서버는 배포 스크립트에서 자동으로 관리되지 않습니다. API는 별도로 빌드하고 실행해야 합니다.
 
 ## 사전 요구사항
 

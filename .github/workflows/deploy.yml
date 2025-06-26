@@ -197,5 +197,4 @@ jobs:
         sleep 60
         echo "헬스체크 시작..."
         curl -f http://${{ secrets.DEPLOY_HOST }}:13000/health || echo "사이트 헬스체크 실패"
-        curl -f http://${{ secrets.DEPLOY_HOST }}:13001/health || echo "관리자 페이지 헬스체크 실패"
-        curl -f http://${{ secrets.DEPLOY_HOST }}:18080/health || echo "API 헬스체크 실패" 
+        curl -f http://${{ secrets.DEPLOY_HOST }}:13001/health || echo "관리자 페이지 헬스체크 실패" 

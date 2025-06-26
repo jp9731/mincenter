@@ -153,7 +153,7 @@ log_info "데이터베이스 마이그레이션은 수동으로 처리합니다.
 log_warn "납품 시에는 직접 DB에 접속하여 스키마 변경사항을 적용하세요."
 
 # 5. 데이터베이스 헬스체크
-log_info "데이터베이스 헬스체크를 수행합니다..."
+log_info "헬스체크를 수행합니다..."
 
 # PostgreSQL 헬스체크
 if docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB > /dev/null 2>&1; then
@@ -161,15 +161,6 @@ if docker-compose -f docker-compose.prod.yml exec -T postgres pg_isready -U $POS
 else
     log_error "PostgreSQL: 비정상"
     log_info "컨테이너 로그를 확인하세요: docker-compose -f docker-compose.prod.yml logs postgres"
-    exit 1
-fi
-
-# API 헬스체크 (포트 18080)
-if curl -f http://localhost:18080/health > /dev/null 2>&1; then
-    log_info "API: 정상"
-else
-    log_error "API: 비정상"
-    log_info "API 로그를 확인하세요: tail -f backends/api/api.log"
     exit 1
 fi
 
