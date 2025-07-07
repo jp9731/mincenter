@@ -1,0 +1,171 @@
+name: Deploy Frontend with Docker Services
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+  REMOTE_USER: ${{ secrets.REMOTE_USER }}
+  REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies (Site)
+      working-directory: ./frontends/site
+      run: npm ci
+      
+    - name: Install dependencies (Admin)
+      working-directory: ./frontends/admin
+      run: npm ci
+      
+    - name: Build Site Frontend
+      working-directory: ./frontends/site
+      run: npm run build
+      
+    - name: Build Admin Frontend
+      working-directory: ./frontends/admin
+      run: npm run build
+      
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Build Rust API
+      working-directory: ./backends/api
+      run: cargo build --release
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy Docker Services
+      run: |
+        echo "=== Deploying Docker Services ==="
+        
+        # 서버에 디렉토리 생성
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "mkdir -p /opt/mincenter/database /opt/mincenter/frontends/site /opt/mincenter/frontends/admin"
+        
+        # 배포용 docker-compose 파일 업로드
+        scp -P ${{ env.REMOTE_PORT }} docker-compose.deploy.yml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/
+        scp -P ${{ env.REMOTE_PORT }} database/init.sql ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/database/
+        scp -P ${{ env.REMOTE_PORT }} database/seed.sql ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/database/
+        
+        # 프론트엔드 소스 코드 업로드
+        rsync -avz -e "ssh -p ${{ env.REMOTE_PORT }}" --delete frontends/site/ ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/frontends/site/
+        rsync -avz -e "ssh -p ${{ env.REMOTE_PORT }}" --delete frontends/admin/ ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/frontends/admin/
+        
+        # Docker Compose 서비스 시작
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "cd /opt/mincenter && docker-compose -f docker-compose.deploy.yml up -d --build"
+        
+        echo "Docker services deployed successfully!"
+        
+    - name: Deploy Rust API
+      run: |
+        echo "=== Deploying Rust API ==="
+        
+        # 서버에 API 디렉토리 생성
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "mkdir -p /opt/mincenter-api"
+        
+        # 빌드된 바이너리 업로드
+        scp -P ${{ env.REMOTE_PORT }} backends/api/target/release/minshool-api ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter-api/
+        
+        # 실행 권한 설정
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "chmod +x /opt/mincenter-api/minshool-api"
+        
+        # systemd 서비스 파일 생성
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "sudo tee /etc/systemd/system/mincenter-api.service > /dev/null << 'EOF'
+        [Unit]
+        Description=MinCenter API Server
+        After=network.target
+        Wants=network.target
+        
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/opt/mincenter-api
+        ExecStart=/opt/mincenter-api/minshool-api
+        Restart=always
+        RestartSec=3
+        Environment=DATABASE_URL=postgresql://postgres:password@localhost:5432/mincenter
+        Environment=REDIS_URL=redis://:default_password@localhost:6379
+        Environment=JWT_SECRET=${{ secrets.JWT_SECRET }}
+        Environment=API_PORT=18080
+        Environment=RUST_LOG=info
+        Environment=CORS_ORIGIN=*
+        StandardOutput=journal
+        StandardError=journal
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF"
+        
+        # systemd 재로드 및 서비스 시작
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "sudo systemctl daemon-reload && sudo systemctl enable mincenter-api && sudo systemctl restart mincenter-api"
+        
+        echo "Rust API deployed successfully!"
+        
+    - name: Verify Deployment
+      run: |
+        echo "=== Verifying Deployment ==="
+        
+        # 잠시 대기
+        sleep 30
+        
+        # Docker 서비스 상태 확인
+        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "cd /opt/mincenter && docker-compose -f docker-compose.deploy.yml ps"
+        
+        # 데이터베이스 연결 확인
+        DB_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "docker exec mincenter-postgres pg_isready -U postgres" | grep -o "accepting connections" || echo "failed")
+        echo "Database Status: $DB_STATUS"
+        
+        # Redis 연결 확인
+        REDIS_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "docker exec mincenter-redis redis-cli -a default_password ping" | grep -o "PONG" || echo "failed")
+        echo "Redis Status: $REDIS_STATUS"
+        
+        # Rust API 서버 상태 확인
+        API_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/health || echo '000'")
+        echo "Rust API Status: $API_STATUS"
+        
+        # 프론트엔드 서비스 상태 확인
+        SITE_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo '000'")
+        ADMIN_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3001 || echo '000'")
+        
+        echo "Site Frontend Status: $SITE_STATUS"
+        echo "Admin Frontend Status: $ADMIN_STATUS"
+        
+        # 결과 요약
+        echo "=== Deployment Summary ==="
+        echo "PostgreSQL: $DB_STATUS"
+        echo "Redis: $REDIS_STATUS"
+        echo "Rust API: $API_STATUS"
+        echo "Site Frontend: $SITE_STATUS"
+        echo "Admin Frontend: $ADMIN_STATUS"
+        
+        if [ "$DB_STATUS" = "accepting connections" ] && [ "$REDIS_STATUS" = "PONG" ] && [ "$API_STATUS" = "200" ] && [ "$SITE_STATUS" = "200" ] && [ "$ADMIN_STATUS" = "200" ]; then
+          echo "✅ All services deployment successful!"
+        else
+          echo "❌ Some services may have issues"
+          exit 1
+        fi 

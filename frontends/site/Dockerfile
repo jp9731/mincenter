@@ -35,11 +35,11 @@ RUN npm ci --only=production --silent
 COPY --from=builder /app/build ./build
 
 # 포트 노출
-EXPOSE 13000
+EXPOSE 3000
 
 # 환경변수 설정
 ENV NODE_ENV=production
-ENV PORT=13000
+ENV PORT=3000
 
 # 애플리케이션 실행
-CMD ["node", "build/index.js", "--host", "0.0.0.0", "--port", "13000"]
+CMD ["node", "build/index.js", "--host", "0.0.0.0", "--port", "3000"]
