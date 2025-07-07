@@ -8,9 +8,9 @@
 		<script>
 			// 런타임 환경변수 설정
 			window.ENV = {
-				API_URL: '%sveltekit.env.API_URL%' || 'http://localhost:18080',
-				DOMAIN: '%sveltekit.env.DOMAIN%' || 'localhost',
-				NODE_ENV: '%sveltekit.env.NODE_ENV%' || 'development'
+				API_URL: '%sveltekit.env.PUBLIC_API_URL%' || 'http://localhost:18080',
+				DOMAIN: '%sveltekit.env.PUBLIC_DOMAIN%' || 'localhost',
+				NODE_ENV: '%sveltekit.env.PUBLIC_NODE_ENV%' || 'development'
 			};
 		</script>
 	</head>

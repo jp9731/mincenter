@@ -51,7 +51,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - API_BASE_URL=http://localhost:18080
+      - PUBLIC_API_URL=http://localhost:18080
+      - PUBLIC_DOMAIN=localhost
+      - PUBLIC_NODE_ENV=production
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
       interval: 30s
@@ -73,7 +75,9 @@ services:
       - "3001:3000"
     environment:
       - NODE_ENV=production
-      - API_BASE_URL=http://localhost:18080
+      - PUBLIC_API_URL=http://localhost:18080
+      - PUBLIC_DOMAIN=localhost
+      - PUBLIC_NODE_ENV=production
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
       interval: 30s
