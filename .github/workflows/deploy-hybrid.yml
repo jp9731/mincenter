@@ -83,9 +83,8 @@ jobs:
         
         # 서버에 디렉토리 생성 및 권한 설정
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
-          sudo mkdir -p ${{ env.DEPLOY_PATH }}/database ${{ env.DEPLOY_PATH }}/frontends/site ${{ env.DEPLOY_PATH }}/frontends/admin
-          sudo chown -R ${{ env.DEPLOY_USER }}:${{ env.DEPLOY_USER }} ${{ env.DEPLOY_PATH }}
-          sudo chmod -R 755 ${{ env.DEPLOY_PATH }}
+          mkdir -p ${{ env.DEPLOY_PATH }}/database ${{ env.DEPLOY_PATH }}/frontends/site ${{ env.DEPLOY_PATH }}/frontends/admin
+          chmod -R 755 ${{ env.DEPLOY_PATH }}
         "
         
         # 배포용 docker-compose 파일 업로드 (프론트엔드용으로 수정)
