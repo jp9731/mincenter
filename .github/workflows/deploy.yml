@@ -55,6 +55,7 @@ jobs:
             sudo systemctl start docker
             sudo systemctl enable docker
             sudo usermod -aG docker ${{ secrets.DEPLOY_USER }}
+            # 새 그룹 적용을 위해 로그아웃/로그인 필요하지만, 현재 세션에서는 sudo 사용
           fi
           
           # Docker Compose 설치 확인 및 설치
@@ -64,19 +65,19 @@ jobs:
             sudo chmod +x /usr/local/bin/docker-compose
           fi
           
-          # 4. Frontend 빌드 (Docker Node.js 20)
+          # 4. Frontend 빌드 (Docker Node.js 20) - sudo 사용
           echo "4. Frontend 빌드 중..."
           
           # Site 빌드
           echo "Site 빌드 중..."
-          docker run --rm -v "$(pwd)/frontends/site:/app" -w /app node:20-alpine sh -c "
+          sudo docker run --rm -v "$(pwd)/frontends/site:/app" -w /app node:20-alpine sh -c "
             npm ci
             npm run build
           "
           
           # Admin 빌드
           echo "Admin 빌드 중..."
-          docker run --rm -v "$(pwd)/frontends/admin:/app" -w /app node:20-alpine sh -c "
+          sudo docker run --rm -v "$(pwd)/frontends/admin:/app" -w /app node:20-alpine sh -c "
             npm ci
             npm run build
           "
@@ -85,10 +86,10 @@ jobs:
           echo "5. API 빌드 및 서비스 재시작 중..."
           bash scripts/server-build-api.sh
           
-          # 6. Docker 서비스 재시작 (PostgreSQL, Redis, Nginx)
+          # 6. Docker 서비스 재시작 (PostgreSQL, Redis, Nginx) - sudo 사용
           echo "6. Docker 서비스 재시작 중..."
-          docker-compose -f docker-compose.hybrid.yml down
-          docker-compose -f docker-compose.hybrid.yml up -d --build
+          sudo docker-compose -f docker-compose.hybrid.yml down
+          sudo docker-compose -f docker-compose.hybrid.yml up -d --build
           
           echo "=== 배포 완료 ==="
           
@@ -98,8 +99,8 @@ jobs:
           sudo systemctl status minshool-api --no-pager
           
           echo "Docker 서비스 상태:"
-          docker-compose -f docker-compose.hybrid.yml ps
+          sudo docker-compose -f docker-compose.hybrid.yml ps
           
           echo "포트 사용 현황:"
-          netstat -tlnp | grep -E ':(80|443|13000|13001|15432|16379|18080)'
+          sudo netstat -tlnp | grep -E ':(80|443|13000|13001|15432|16379|18080)'
         EOF 

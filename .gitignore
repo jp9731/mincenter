@@ -7,7 +7,7 @@ yarn-error.log*
 
 # SvelteKit
 .svelte-kit/
-# build/  # CentOS 7 바이너리를 위해 주석 처리
+build/ 
 dist/
 .output/
 .vercel/
