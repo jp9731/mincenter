@@ -6,7 +6,7 @@ WORKDIR /app
 # 패키지 파일 복사
 COPY package*.json ./
 COPY svelte.config.js ./
-COPY vite.config.js ./
+COPY vite.config.ts ./
 COPY tsconfig.json ./
 COPY tailwind.config.js ./
 
