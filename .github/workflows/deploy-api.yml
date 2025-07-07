@@ -95,7 +95,7 @@ jobs:
         EOF"
         
         # systemd 재로드 및 서비스 시작
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "sudo systemctl daemon-reload && sudo systemctl enable mincenter-api && sudo systemctl restart mincenter-api"
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "sudo systemctl daemon-reload && sudo systemctl enable mincenter-api && sudo systemctl restart mincenter-api"
         
         echo "Rust API deployed successfully!"
         
@@ -108,11 +108,11 @@ jobs:
         
         # Rust API 서버 상태 확인  
         echo "Checking Rust API status..."
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "systemctl status mincenter-api --no-pager" || true
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "systemctl status mincenter-api --no-pager" || true
         
         sleep 5
         
-        API_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/health || echo '000'")
+        API_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/health || echo '000'")
         echo "Rust API Status: $API_STATUS"
         
         if [ "$API_STATUS" = "200" ]; then
@@ -120,6 +120,6 @@ jobs:
         else
           echo "❌ Rust API deployment may have issues"
           echo "Service logs:"
-          ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "sudo journalctl -u mincenter-api --lines=20 --no-pager" || true
+          ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "sudo journalctl -u mincenter-api --lines=20 --no-pager" || true
           exit 1
         fi
