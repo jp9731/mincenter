@@ -1,42 +1,6 @@
 version: '3.8'
 
 services:
-  site:
-    build:
-      context: ./frontends/site
-    container_name: mincenter_site
-    ports:
-      - "13000:3000"
-    environment:
-      - NODE_ENV=production
-      - API_URL=http://api.mincenter.kr
-    depends_on:
-      - postgres
-      - redis
-    restart: always
-    networks:
-      - mincenter
-    volumes:
-      - ./frontends/site/static:/app/static
-
-  admin:
-    build:
-      context: ./frontends/admin
-    container_name: mincenter_admin
-    ports:
-      - "13001:3000"
-    environment:
-      - NODE_ENV=production
-      - API_URL=http://api.mincenter.kr
-    depends_on:
-      - postgres
-      - redis
-    restart: always
-    networks:
-      - mincenter
-    volumes:
-      - ./frontends/admin/static:/app/static
-
   postgres:
     image: postgres:15
     container_name: mincenter_postgres
@@ -78,8 +42,12 @@ services:
       - ./frontends/admin/static:/var/www/admin/static:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - site
-      - admin
+      - postgres
+      - redis
     restart: always
     networks:
-      - mincenter 
+      - mincenter
+
+networks:
+  mincenter:
+    driver: bridge 

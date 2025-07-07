@@ -13,139 +13,40 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Debug SSH Key
-      run: |
-        echo "DEPLOY_SSH_KEY 길이: ${#DEPLOY_SSH_KEY}"
-        if [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
-          echo "❌ DEPLOY_SSH_KEY가 비어있습니다!"
-          echo "GitHub Secrets에서 DEPLOY_SSH_KEY를 설정해주세요."
-          exit 1
-        else
-          echo "✅ DEPLOY_SSH_KEY가 설정되어 있습니다."
-        fi
-        
-        if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then
-          echo "❌ DEPLOY_HOST가 비어있습니다!"
-          exit 1
-        else
-          echo "✅ DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}"
-        fi
-        
-        if [ -z "${{ secrets.DEPLOY_USER }}" ]; then
-          echo "❌ DEPLOY_USER가 비어있습니다!"
-          exit 1
-        else
-          echo "✅ DEPLOY_USER: ${{ secrets.DEPLOY_USER }}"
-        fi
-        
-        if [ -z "${{ secrets.DEPLOY_PATH }}" ]; then
-          echo "❌ DEPLOY_PATH가 비어있습니다!"
-          exit 1
-        else
-          echo "✅ DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}"
-        fi
-      
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-        log-public-key: true
-        
-    - name: Configure SSH for CentOS 7
-      run: |
-        mkdir -p ~/.ssh
-        cat >> ~/.ssh/config << EOF
-        Host ${{ secrets.DEPLOY_HOST }}
-          HostName ${{ secrets.DEPLOY_HOST }}
-          User ${{ secrets.DEPLOY_USER }}
-          Port 22000
-          StrictHostKeyChecking no
-          UserKnownHostsFile /dev/null
-          IdentityFile ~/.ssh/id_rsa
-          IdentitiesOnly yes
-          PreferredAuthentications publickey
-          PubkeyAuthentication yes
-          PasswordAuthentication no
-          ServerAliveInterval 60
-          ServerAliveCountMax 3
-        EOF
-        
-        chmod 600 ~/.ssh/config
-        
-        # SSH 키 파일 생성
-        echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
         
     - name: Add server to known hosts
       run: |
-        ssh-keyscan -H -p 22000 ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Test SSH Connection
+    - name: Deploy to server
       run: |
-        echo "SSH 연결을 테스트합니다..."
-        ssh -v -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo 'SSH 연결 성공!' && whoami && pwd"
-        
-    - name: Setup Server Environment
-      run: |
-        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          # Git 설치 확인 및 설치
-          if ! command -v git &> /dev/null; then
-            echo "Git이 설치되지 않았습니다. 설치를 시작합니다..."
-            sudo yum install -y git
-          fi
-          
-          # 프로젝트 디렉토리 확인 및 생성
+        ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
           DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
           echo "배포 경로: $DEPLOY_PATH"
           
+          # 1. 프로젝트 디렉토리 확인 및 생성
           if [ ! -d "$DEPLOY_PATH" ]; then
-            echo "배포 디렉토리가 없습니다. 생성합니다..."
             sudo mkdir -p "$DEPLOY_PATH"
             sudo chown -R ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} "$DEPLOY_PATH"
           fi
           
-          # Git 저장소 확인
           cd "$DEPLOY_PATH"
-          echo "현재 디렉토리: $(pwd)"
-          echo "디렉토리 내용:"
-          ls -la
           
+          # 2. Git 저장소 확인 및 최신 코드 가져오기
           if [ ! -d ".git" ]; then
-            echo "Git 저장소가 없습니다. 클론합니다..."
             git clone https://github.com/jp9731/mincenter.git .
             sudo chown -R ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} "$DEPLOY_PATH"
           fi
           
-          echo "서버 환경 설정 완료"
-        EOF
-        
-    - name: Check for CentOS 7 binary
-      id: check-binary
-      run: |
-        if [ -f "build/centos7/minshool-api" ]; then
-          echo "binary_exists=true" >> $GITHUB_OUTPUT
-          echo "✅ CentOS 7 바이너리 발견: $(ls -la build/centos7/minshool-api)"
-        else
-          echo "binary_exists=false" >> $GITHUB_OUTPUT
-          echo "⚠️ CentOS 7 바이너리가 없습니다. API 배포를 건너뜁니다."
-          echo "로컬에서 './scripts/build-centos7.sh'를 실행한 후 다시 푸시하세요."
-        fi
-        
-    - name: Deploy to server
-      run: |
-        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-          echo "배포 경로: $DEPLOY_PATH"
-          cd "$DEPLOY_PATH"
-          echo "현재 디렉토리: $(pwd)"
-          echo "Git 상태 확인..."
-          git status
-          echo "최신 코드 가져오기..."
           git pull origin main
-
-          echo "=== 하이브리드 배포 시작 ==="
-
-          # 1. Docker 설치 확인 및 설치
+          
+          echo "=== 배포 시작 ==="
+          
+          # 3. Docker 설치 확인 및 설치
           if ! command -v docker &> /dev/null; then
             echo "Docker 설치 중..."
             sudo yum install -y yum-utils
@@ -153,57 +54,52 @@ jobs:
             sudo yum install -y docker-ce docker-ce-cli containerd.io
             sudo systemctl start docker
             sudo systemctl enable docker
-            sudo usermod -aG ${{ secrets.DEPLOY_USER }} docker
+            sudo usermod -aG docker ${{ secrets.DEPLOY_USER }}
           fi
-
+          
           # Docker Compose 설치 확인 및 설치
           if ! command -v docker-compose &> /dev/null; then
             echo "Docker Compose 설치 중..."
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           fi
-
-          # 2. API 서버에서 직접 빌드 및 서비스 재시작
+          
+          # 4. Frontend 빌드 (Docker Node.js 20)
+          echo "4. Frontend 빌드 중..."
+          
+          # Site 빌드
+          echo "Site 빌드 중..."
+          docker run --rm -v "$(pwd)/frontends/site:/app" -w /app node:20-alpine sh -c "
+            npm ci
+            npm run build
+          "
+          
+          # Admin 빌드
+          echo "Admin 빌드 중..."
+          docker run --rm -v "$(pwd)/frontends/admin:/app" -w /app node:20-alpine sh -c "
+            npm ci
+            npm run build
+          "
+          
+          # 5. API 서버에서 직접 빌드 및 서비스 재시작
+          echo "5. API 빌드 및 서비스 재시작 중..."
           bash scripts/server-build-api.sh
-
-          # 3. Docker 서비스 재시작
+          
+          # 6. Docker 서비스 재시작 (PostgreSQL, Redis, Nginx)
+          echo "6. Docker 서비스 재시작 중..."
+          docker-compose -f docker-compose.hybrid.yml down
           docker-compose -f docker-compose.hybrid.yml up -d --build
-        EOF
-        
-    - name: Health check
-      run: |
-        sleep 60
-        echo "헬스체크 시작..."
-        
-        # API 서버 상태 확인 (바이너리가 있는 경우)
-        if [ -f "build/centos7/minshool-api" ]; then
-          echo "API 서버 헬스체크..."
-          curl -f http://${{ secrets.DEPLOY_HOST }}:18080/health || echo "API 서버 헬스체크 실패"
-        fi
-        
-        # Docker 서비스 헬스체크
-        echo "Docker 서비스 헬스체크..."
-        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          echo "Docker 컨테이너 상태 확인..."
-          sudo docker-compose -f docker-compose.hybrid.yml ps
           
-          echo "PostgreSQL 헬스체크..."
-          sudo docker exec ${APP_NAME:-mincenter}_postgres pg_isready -U postgres || echo "PostgreSQL 헬스체크 실패"
+          echo "=== 배포 완료 ==="
           
-          echo "Redis 헬스체크..."
-          sudo docker exec ${APP_NAME:-mincenter}_redis redis-cli --raw incr ping || echo "Redis 헬스체크 실패"
+          # 7. 서비스 상태 확인
+          echo "7. 서비스 상태 확인..."
+          echo "API 서비스 상태:"
+          sudo systemctl status minshool-api --no-pager
           
-          echo "Site 헬스체크..."
-          curl -f http://localhost:13000/ || echo "Site 헬스체크 실패"
+          echo "Docker 서비스 상태:"
+          docker-compose -f docker-compose.hybrid.yml ps
           
-          echo "Admin 헬스체크..."
-          curl -f http://localhost:13001/ || echo "Admin 헬스체크 실패"
-          
-          echo "Nginx 헬스체크..."
-          curl -f http://localhost/ || echo "Nginx 헬스체크 실패"
-          
-          echo "서브도메인 헬스체크..."
-          curl -f http://mincenter.kr/ || echo "메인 사이트 헬스체크 실패"
-          curl -f http://admin.mincenter.kr/ || echo "관리자 사이트 헬스체크 실패"
-          curl -f http://api.mincenter.kr/health || echo "API 서버 헬스체크 실패"
+          echo "포트 사용 현황:"
+          netstat -tlnp | grep -E ':(80|443|13000|13001|15432|16379|18080)'
         EOF 
