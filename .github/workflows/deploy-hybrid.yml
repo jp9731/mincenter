@@ -120,8 +120,8 @@ jobs:
         echo "Redis Status: $REDIS_STATUS"
         
         # 프론트엔드 서비스 상태 확인
-        SITE_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo '000'")
-        ADMIN_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3001 || echo '000'")
+        SITE_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:13000 || echo '000'")
+        ADMIN_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:13001 || echo '000'")
         
         echo "Site Frontend Status: $SITE_STATUS"
         echo "Admin Frontend Status: $ADMIN_STATUS"
