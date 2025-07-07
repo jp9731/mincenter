@@ -16,17 +16,16 @@ RUN mkdir -p src && \
 # 소스 코드 복사
 COPY src ./src
 
-# SQLx 오프라인 모드 설정
-ENV SQLX_OFFLINE=true
-ENV SQLX_OFFLINE_DIR=.sqlx
+# SQLx 오프라인 모드 비활성화 (런타임에 데이터베이스 연결)
+ENV SQLX_OFFLINE=false
 
-# sqlx-data 디렉토리가 있다면 복사
-COPY .sqlx ./sqlx-data/
+# sqlx-data 디렉토리가 있다면 복사 (선택적)
+COPY .sqlx* ./sqlx-data/ 2>/dev/null || true
 
 RUN cargo build --release
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/minshool-api /usr/local/bin/api
 
