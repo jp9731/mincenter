@@ -17,3 +17,6 @@ database
 ### 기술사항
 - frontend : sveltekit
 - backend : rust axum
+- db : pgsql
+
+
