@@ -28,8 +28,8 @@ WORKDIR /app
 # 패키지 파일 복사
 COPY package*.json ./
 
-# 프로덕션 의존성만 설치
-RUN npm ci --only=production --silent
+# 프로덕션 의존성만 설치 (없으면 전체 설치)
+RUN npm ci --only=production --silent || npm ci --silent
 
 # 빌드된 파일 복사
 COPY --from=builder /app/build ./build
