@@ -1,450 +1,182 @@
+-- 민들레장애인자립생활센터 데이터베이스 시드 데이터
+-- PostgreSQL 시드 스크립트
+
 -- UUID 확장 활성화
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 샘플 데이터 삽입 스크립트
--- 개발 및 테스트용 데이터
+-- 1. 역할(Role) 데이터
+INSERT INTO roles (id, name, description, is_active, created_at, updated_at) VALUES
+('8251bd9c-7c8c-4a86-bf60-4e9189a4c5fa', 'super_admin', '시스템 전체 관리자 - 모든 권한을 가짐', true, NOW(), NOW()),
+('7f188600-b0ed-4dc6-bcdb-74c9916989ed', 'admin', '일반 관리자 - 대부분의 관리 기능 사용 가능', true, NOW(), NOW()),
+('950fce82-5b3a-4b1b-b2f1-8f67557ed209', 'moderator', '중재자 - 게시글과 댓글 관리', true, NOW(), NOW()),
+('4726d5b0-f6fb-4b9f-b65c-eec8df933dbc', 'editor', '편집자 - 콘텐츠 작성 및 편집', true, NOW(), NOW()),
+('3ae58427-d64c-417e-903c-fee48fd5b5e5', 'viewer', '조회자 - 읽기 전용 권한', true, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
 
--- 관리자 계정 생성 (가장 먼저 생성)
-INSERT INTO users (email, password_hash, name, role, status, email_verified, points) VALUES
-    ('admin@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '관리자', 'admin', 'active', true, 0)
+-- 2. 권한(Permission) 데이터
+INSERT INTO permissions (id, name, description, resource, action, is_active, created_at, updated_at) VALUES
+-- 사용자 관리 권한
+('ec04bc0b-5eec-4989-ab20-a6d455cb80ba', 'users.read', '사용자 목록 조회', 'users', 'read', true, NOW(), NOW()),
+('6896df6f-1cc4-4d9c-b2bc-a2ed4aef8ed2', 'users.create', '사용자 생성', 'users', 'create', true, NOW(), NOW()),
+('e2af9343-75e3-42db-a678-c24cc1eb9dda', 'users.update', '사용자 정보 수정', 'users', 'update', true, NOW(), NOW()),
+('5cc786f4-510e-4e28-ab4d-f979ad2e90ab', 'users.delete', '사용자 삭제', 'users', 'delete', true, NOW(), NOW()),
+('05ebc297-1aff-4d7d-8c0f-6b4ade9e7c05', 'users.roles', '사용자 역할 관리', 'users', 'roles', true, NOW(), NOW()),
+
+-- 게시판 관리 권한
+('188c9d63-b2a5-4f3a-88d3-4bf690ad715b', 'boards.read', '게시판 목록 조회', 'boards', 'read', true, NOW(), NOW()),
+('fc591480-ce7e-494a-abb1-f05da3b43c00', 'boards.create', '게시판 생성', 'boards', 'create', true, NOW(), NOW()),
+('c3f4db40-9e81-450e-884f-68f05a1b29ee', 'boards.update', '게시판 수정', 'boards', 'update', true, NOW(), NOW()),
+('05c8baa1-c491-4ad2-a35b-28028214048b', 'boards.delete', '게시판 삭제', 'boards', 'delete', true, NOW(), NOW()),
+
+-- 게시글 관리 권한
+('dd955dd2-e944-4751-92b2-e9f4930d2171', 'posts.read', '게시글 목록 조회', 'posts', 'read', true, NOW(), NOW()),
+('7ee6b121-79d5-451a-882a-e10e4b65c7b2', 'posts.create', '게시글 작성', 'posts', 'create', true, NOW(), NOW()),
+('08e17652-fc1c-477f-874e-327ca6175930', 'posts.update', '게시글 수정', 'posts', 'update', true, NOW(), NOW()),
+('240e0131-8cae-4bd6-90ac-c8f17c8daced', 'posts.delete', '게시글 삭제', 'posts', 'delete', true, NOW(), NOW()),
+('9eb4c166-f549-448f-9288-c1203f57f013', 'posts.moderate', '게시글 중재', 'posts', 'moderate', true, NOW(), NOW()),
+
+-- 댓글 관리 권한
+('0b2b682b-ddec-4ce0-be98-ffcbd61cdfc6', 'comments.read', '댓글 목록 조회', 'comments', 'read', true, NOW(), NOW()),
+('1213ae8b-eedc-4f1a-bbd4-a2625eb65d0a', 'comments.create', '댓글 작성', 'comments', 'create', true, NOW(), NOW()),
+('10d069a2-3995-45ff-a240-050f1fee0a7c', 'comments.update', '댓글 수정', 'comments', 'update', true, NOW(), NOW()),
+('586759ab-70e4-4909-81bc-cc9dbe76d64e', 'comments.delete', '댓글 삭제', 'comments', 'delete', true, NOW(), NOW()),
+('5447679d-6216-4454-b8fa-f0bd7d8bb5f9', 'comments.moderate', '댓글 중재', 'comments', 'moderate', true, NOW(), NOW()),
+
+-- 설정 관리 권한
+('38b38386-5b6a-4b4c-a774-dafb71663a9e', 'settings.read', '사이트 설정 조회', 'settings', 'read', true, NOW(), NOW()),
+('420d1ca8-24a1-4091-91ea-21e8fd898d36', 'settings.update', '사이트 설정 수정', 'settings', 'update', true, NOW(), NOW()),
+
+-- 메뉴 관리 권한
+('53c54c43-725a-4ff2-96af-05b1f4a42600', 'menus.read', '메뉴 목록 조회', 'menus', 'read', true, NOW(), NOW()),
+('7ae0adf5-6894-4f27-b5e3-9a1252b64d48', 'menus.create', '메뉴 생성', 'menus', 'create', true, NOW(), NOW()),
+('c47f6b36-4cc9-43d9-bd58-6767eea06026', 'menus.update', '메뉴 수정', 'menus', 'update', true, NOW(), NOW()),
+('18329519-90f5-4c46-bae3-fe8a96440dcf', 'menus.delete', '메뉴 삭제', 'menus', 'delete', true, NOW(), NOW()),
+
+-- 페이지 관리 권한
+('baf16a50-fe29-4664-ac57-aea87f27a8e1', 'pages.read', '페이지 목록 조회', 'pages', 'read', true, NOW(), NOW()),
+('53faa02c-0729-4db5-a672-47a689310388', 'pages.create', '페이지 생성', 'pages', 'create', true, NOW(), NOW()),
+('5e0a75e7-d4ac-4a8f-aabc-2fe7637150ae', 'pages.update', '페이지 수정', 'pages', 'update', true, NOW(), NOW()),
+('f3115d94-6574-4dcd-a693-cded458f6ec2', 'pages.delete', '페이지 삭제', 'pages', 'delete', true, NOW(), NOW()),
+
+-- 일정 관리 권한
+('d5fd800d-84e7-40d4-bb38-f802cbee49b3', 'calendar.read', '일정 목록 조회', 'calendar', 'read', true, NOW(), NOW()),
+('61a2391f-ed6a-47f7-a87e-e45087740bd3', 'calendar.create', '일정 생성', 'calendar', 'create', true, NOW(), NOW()),
+('c2083b31-4fa5-42dd-a264-679af6db51b2', 'calendar.update', '일정 수정', 'calendar', 'update', true, NOW(), NOW()),
+('90e15cca-f259-459b-a06d-ae7589882259', 'calendar.delete', '일정 삭제', 'calendar', 'delete', true, NOW(), NOW()),
+
+-- 역할 및 권한 관리
+('b819e4cd-d8f7-42b4-9adb-aeb96832dffd', 'roles.read', '역할 목록 조회', 'roles', 'read', true, NOW(), NOW()),
+('a71eebce-7bd1-4e1b-ba19-a87eefe1298a', 'roles.create', '역할 생성', 'roles', 'create', true, NOW(), NOW()),
+('06e77098-960c-4d8a-86a5-2919a5a463de', 'roles.update', '역할 수정', 'roles', 'update', true, NOW(), NOW()),
+('c87367bc-5722-47b9-a8d1-29664d67328a', 'roles.delete', '역할 삭제', 'roles', 'delete', true, NOW(), NOW()),
+('ba2168d1-a06b-491e-b73d-85f692a74fdb', 'permissions.read', '권한 목록 조회', 'permissions', 'read', true, NOW(), NOW()),
+('4ed5fa1f-bbb9-45fe-9e3c-95334b083c68', 'permissions.assign', '권한 할당', 'permissions', 'assign', true, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- 3. 역할-권한 매핑 (super_admin - 모든 권한)
+INSERT INTO role_permissions (role_id, permission_id, created_at) 
+SELECT '8251bd9c-7c8c-4a86-bf60-4e9189a4c5fa', id, NOW() 
+FROM permissions 
+WHERE is_active = true
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 4. 역할-권한 매핑 (admin - super_admin 제외 대부분 권한)
+INSERT INTO role_permissions (role_id, permission_id, created_at) 
+SELECT '7f188600-b0ed-4dc6-bcdb-74c9916989ed', id, NOW() 
+FROM permissions 
+WHERE is_active = true 
+  AND name NOT IN ('roles.delete', 'permissions.assign')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 5. 역할-권한 매핑 (moderator - 게시글/댓글 관리)
+INSERT INTO role_permissions (role_id, permission_id, created_at) 
+SELECT '950fce82-5b3a-4b1b-b2f1-8f67557ed209', id, NOW() 
+FROM permissions 
+WHERE resource IN ('boards', 'posts', 'comments') 
+  AND action IN ('read', 'create', 'update', 'delete', 'moderate')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 6. 역할-권한 매핑 (editor - 콘텐츠 작성/편집)
+INSERT INTO role_permissions (role_id, permission_id, created_at) 
+SELECT '4726d5b0-f6fb-4b9f-b65c-eec8df933dbc', id, NOW() 
+FROM permissions 
+WHERE (resource IN ('posts', 'comments') AND action IN ('create', 'update'))
+   OR (resource = 'pages' AND action IN ('read', 'create', 'update'))
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 7. 역할-권한 매핑 (viewer - 읽기 전용)
+INSERT INTO role_permissions (role_id, permission_id, created_at) 
+SELECT '3ae58427-d64c-417e-903c-fee48fd5b5e5', id, NOW() 
+FROM permissions 
+WHERE action = 'read'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- 8. 사이트 정보 데이터
+INSERT INTO site_info (id, site_name, catchphrase, address, phone, email, homepage, fax, representative_name, business_number, created_at, updated_at) VALUES
+('7486aeef-6900-41cc-954a-2d7eb82c449d', '민들레장애인자립생활센터', '함께 만들어가는 따뜻한 세상', '인천광역시 계양구 계산새로71 A동 201~202호(계산동, 하이베라스)', '032-542-9294', 'mincenter08@daum.net', 'https://mincenter.kr', '032-232-0739', '박길연', '131-80-12554', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- 9. 관리자 계정 생성
+INSERT INTO users (email, password_hash, name, role, status, email_verified, points, created_at, updated_at) VALUES
+('admin@mincenter.kr', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '시스템 관리자', 'admin', 'active', true, 0, NOW(), NOW()),
+('manager@mincenter.kr', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '센터 관리자', 'admin', 'active', true, 0, NOW(), NOW())
 ON CONFLICT (email) DO NOTHING;
 
--- 게시판 생성
-INSERT INTO boards (
-    name, slug, description, category, display_order, is_public, allow_anonymous,
-    allow_file_upload, max_files, max_file_size, allowed_file_types,
-    allow_rich_text, require_category, allow_comments, allow_likes
-) VALUES
-    ('공지사항', 'notice', '중요한 공지사항을 확인하세요', 'notice', 1, true, false,
-     true, 3, 5242880, ARRAY['image/*', 'application/pdf'],
-     true, true, true, false),
-    ('봉사활동 후기', 'review', '봉사활동 경험을 공유해보세요', 'review', 2, true, false,
-     true, 5, 10485760, ARRAY['image/*', 'video/*'],
-     true, true, true, true),
-    ('자유게시판', 'general', '자유롭게 이야기를 나누세요', 'free', 3, true, false,
-     true, 5, 10485760, ARRAY['image/*'],
-     true, false, true, true),
-    ('질문과 답변', 'qna', '궁금한 점을 물어보세요', 'qna', 4, true, false,
-     false, 0, 0, ARRAY[]::text[],
-     true, true, true, false)
+-- 10. 사용자 역할 할당 (관리자에게 super_admin 역할 부여)
+INSERT INTO user_roles (user_id, role_id, created_at) 
+SELECT u.id, '8251bd9c-7c8c-4a86-bf60-4e9189a4c5fa', NOW()
+FROM users u 
+WHERE u.email = 'admin@mincenter.kr'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id, created_at) 
+SELECT u.id, '7f188600-b0ed-4dc6-bcdb-74c9916989ed', NOW()
+FROM users u 
+WHERE u.email = 'manager@mincenter.kr'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- 11. 기본 게시판 데이터
+INSERT INTO boards (id, name, slug, description, category, display_order, is_public, allow_anonymous, allow_file_upload, max_files, created_at, updated_at) VALUES
+('b1b1b1b1-1111-1111-1111-111111111111', '공지사항', 'notice', '센터의 공지사항을 확인하세요', 'official', 1, true, false, true, 5, NOW(), NOW()),
+('b2b2b2b2-2222-2222-2222-222222222222', '자유게시판', 'free', '자유롭게 소통하는 공간입니다', 'community', 2, true, false, true, 3, NOW(), NOW()),
+('b3b3b3b3-3333-3333-3333-333333333333', '자료실', 'resource', '유용한 자료를 공유하세요', 'resource', 3, true, false, true, 10, NOW(), NOW()),
+('b4b4b4b4-4444-4444-4444-444444444444', '갤러리', 'gallery', '사진과 이미지를 공유하는 공간', 'media', 4, true, false, true, 20, NOW(), NOW())
+ON CONFLICT (slug) DO NOTHING;
+
+-- 12. 카테고리 데이터
+INSERT INTO categories (id, board_id, name, slug, description, display_order, is_active, created_at, updated_at) VALUES
+(uuid_generate_v4(), 'b2b2b2b2-2222-2222-2222-222222222222', '일반', 'general', '일반 게시글', 1, true, NOW(), NOW()),
+(uuid_generate_v4(), 'b3b3b3b3-3333-3333-3333-333333333333', '양식', 'forms', '각종 양식 자료', 1, true, NOW(), NOW()),
+(uuid_generate_v4(), 'b3b3b3b3-3333-3333-3333-333333333333', '안내서', 'guides', '이용 안내서', 2, true, NOW(), NOW())
+ON CONFLICT (board_id, slug) DO NOTHING;
+
+-- 13. 메뉴 데이터
+INSERT INTO menus (id, name, url, target, icon, display_order, parent_id, is_active, menu_type, created_at, updated_at) VALUES
+('m1m1m1m1-1111-1111-1111-111111111111', '홈', '/', '_self', 'home', 1, null, true, 'page', NOW(), NOW()),
+('m2m2m2m2-2222-2222-2222-222222222222', '센터소개', '/about', '_self', 'info', 2, null, true, 'page', NOW(), NOW()),
+('m3m3m3m3-3333-3333-3333-333333333333', '서비스', '/services', '_self', 'service', 3, null, true, 'page', NOW(), NOW()),
+('m4m4m4m4-4444-4444-4444-444444444444', '커뮤니티', '/community', '_self', 'community', 4, null, true, 'board', NOW(), NOW()),
+('m5m5m5m5-5555-5555-5555-555555555555', '일정', '/calendar', '_self', 'calendar', 5, null, true, 'calendar', NOW(), NOW()),
+('m6m6m6m6-6666-6666-6666-666666666666', '후원', '/donation', '_self', 'heart', 6, null, true, 'page', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
--- 카테고리 생성 (게시판별)
-DO $$
-DECLARE
-    board_notice_id uuid;
-    board_review_id uuid;
-    board_free_id uuid;
-    board_qna_id uuid;
-BEGIN
-    -- 게시판 ID 가져오기
-    SELECT id INTO board_notice_id FROM boards WHERE name = '공지사항';
-    SELECT id INTO board_review_id FROM boards WHERE name = '봉사활동 후기';
-    SELECT id INTO board_free_id FROM boards WHERE name = '자유게시판';
-    SELECT id INTO board_qna_id FROM boards WHERE name = '질문과 답변';
-    
-    -- 공지사항 카테고리
-    INSERT INTO categories (board_id, name, description, display_order) VALUES
-        (board_notice_id, '일반공지', '일반적인 공지사항', 1),
-        (board_notice_id, '긴급공지', '긴급한 공지사항', 2),
-        (board_notice_id, '행사안내', '다가오는 행사 안내', 3);
-    
-    -- 봉사활동 후기 카테고리
-    INSERT INTO categories (board_id, name, description, display_order) VALUES
-        (board_review_id, '복지관봉사', '복지관 관련 봉사활동 후기', 1),
-        (board_review_id, '교육봉사', '교육 관련 봉사활동 후기', 2),
-        (board_review_id, '행사봉사', '행사 지원 봉사활동 후기', 3),
-        (board_review_id, '기타봉사', '기타 봉사활동 후기', 4);
-    
-    -- 자유게시판 카테고리
-    INSERT INTO categories (board_id, name, description, display_order) VALUES
-        (board_free_id, '일반', '일반적인 이야기', 1),
-        (board_free_id, '정보공유', '유용한 정보 공유', 2),
-        (board_free_id, '모임후기', '봉사자 모임 후기', 3);
-    
-    -- 질문과 답변 카테고리
-    INSERT INTO categories (board_id, name, description, display_order) VALUES
-        (board_qna_id, '봉사활동', '봉사활동 관련 질문', 1),
-        (board_qna_id, '시설이용', '시설 이용 관련 질문', 2),
-        (board_qna_id, '기타', '기타 질문', 3);
-END $$;
-
--- 추가 사용자 생성 (테스트용)
-INSERT INTO users (email, password_hash, name, role, status, email_verified, points) VALUES
-    ('user1@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '김봉사', 'user', 'active', true, 150),
-    ('user2@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '이도움', 'user', 'active', true, 230),
-    ('user3@example.com', '$2b$12$GqE3.Nr9GwxQV3VCveevPeYNQM4B9yu1wlAuevumr0tAJfBEL0foG', '박나눔', 'user', 'active', true, 80)
-ON CONFLICT (email) DO NOTHING;
-
--- 히어로 섹션 데이터
-INSERT INTO hero_sections (title, subtitle, description, button_text, button_link, is_active, display_order) VALUES
-    ('함께하는 따뜻한 마음', '장애인과 함께하는 봉사활동', '우리의 작은 관심과 참여가 더 나은 세상을 만듭니다. 지금 봉사활동에 참여해보세요.', '봉사활동 참여하기', '/volunteer', true, 1),
-    ('나눔의 기쁨을 경험하세요', '매월 다양한 봉사활동 프로그램', '정기적인 봉사활동을 통해 의미있는 시간을 보내고 소중한 경험을 쌓아보세요.', '프로그램 보기', '/programs', false, 2)
-ON CONFLICT DO NOTHING;
-
--- 갤러리 데이터
-INSERT INTO galleries (title, description, category) VALUES
-    ('2024년 하반기 봉사활동', '지난 6개월간의 봉사활동 모습들을 모았습니다.', 'activity'),
-    ('장애인의 날 행사', '매년 4월 20일 장애인의 날 기념행사 사진들', 'event'),
-    ('여름 캠프 활동', '장애인 청소년들과 함께한 여름 캠프', 'camp')
-ON CONFLICT DO NOTHING;
-
--- 샘플 게시글 생성
-DO $$
-DECLARE
-    board_notice_id uuid;
-    board_review_id uuid;
-    board_free_id uuid;
-    board_qna_id uuid;
-    user1_id uuid;
-    user2_id uuid;
-    user3_id uuid;
-    admin_id uuid;
-BEGIN
-    -- 게시판 ID 가져오기
-    SELECT id INTO board_notice_id FROM boards WHERE name = '공지사항';
-    SELECT id INTO board_review_id FROM boards WHERE name = '봉사활동 후기';
-    SELECT id INTO board_free_id FROM boards WHERE name = '자유게시판';
-    SELECT id INTO board_qna_id FROM boards WHERE name = '질문과 답변';
-    
-    -- 사용자 ID 가져오기
-    SELECT id INTO admin_id FROM users WHERE email = 'admin@example.com';
-    SELECT id INTO user1_id FROM users WHERE email = 'user1@example.com';
-    SELECT id INTO user2_id FROM users WHERE email = 'user2@example.com';
-    SELECT id INTO user3_id FROM users WHERE email = 'user3@example.com';
-
-    -- 공지사항 게시글
-    INSERT INTO posts (board_id, user_id, title, content, is_notice, views) VALUES
-        (board_notice_id, admin_id, '[중요] 2024년 하반기 봉사활동 계획 안내', 
-         '안녕하세요. 따뜻한 마음 봉사단입니다.
-
-2024년 하반기 봉사활동 계획을 안내드립니다.
-
-## 주요 일정
-- 7월: 여름 장애인 캠프 (7/15-7/17)
-- 8월: 장애인 체육대회 지원 (8/20)
-- 9월: 추석 나눔 행사 (9/15)
-- 10월: 장애인 일자리 박람회 (10/12)
-- 11월: 김장 나눔 봉사 (11/20)
-- 12월: 연말 감사 행사 (12/22)
-
-많은 참여 부탁드립니다.', true, 156),
-        
-        (board_notice_id, admin_id, '봉사활동 참여 시 주의사항', 
-         '봉사활동 참여 전 반드시 확인해주세요.
-
-1. 활동 30분 전까지 도착
-2. 편안한 복장 착용
-3. 개인 물병 지참
-4. 안전교육 필수 이수
-
-안전한 봉사활동을 위해 협조 부탁드립니다.', true, 89);
-
-    -- 봉사활동 후기 게시글
-    INSERT INTO posts (board_id, user_id, title, content, views, likes) VALUES
-        (board_review_id, user1_id, '장애인 복지관 청소 봉사 후기', 
-         '오늘 처음으로 장애인 복지관 청소 봉사에 참여했습니다.
-
-생각보다 많은 일들이 있었지만, 함께 참여한 봉사자들과 협력해서 깨끗하게 정리할 수 있었어요. 
-특히 복지관을 이용하시는 분들이 고마워하시는 모습을 보니 정말 뿌듯했습니다.
-
-다음에도 꼭 참여하고 싶어요! 😊', 45, 12),
-        
-        (board_review_id, user2_id, '시각장애인 도서 낭독 봉사 경험담', 
-         '매주 토요일 시각장애인을 위한 도서 낭독 봉사를 하고 있습니다.
-
-처음에는 어떻게 읽어야 할지 몰라서 많이 긴장했는데, 
-이제는 자연스럽게 감정을 담아서 읽을 수 있게 되었어요.
-
-이용자분들이 책 내용에 대해 함께 이야기하실 때가 가장 보람찹니다.
-작은 나눔이지만 서로에게 의미있는 시간이 되고 있습니다.', 67, 18),
-        
-        (board_review_id, user3_id, '휠체어 이용자와 함께한 나들이', 
-         '휠체어를 이용하시는 분들과 함께 공원 나들이를 다녀왔습니다.
-
-평소에 생각하지 못했던 불편함들을 많이 느꼈어요.
-턱이 있는 곳, 경사가 있는 길, 좁은 통로 등...
-
-하지만 함께 웃고 이야기하며 즐거운 시간을 보낼 수 있어서 좋았습니다.
-앞으로도 이런 활동에 더 적극적으로 참여하고 싶어요.', 34, 8);
-
-    -- 자유게시판 게시글
-    INSERT INTO posts (board_id, user_id, title, content, views, likes) VALUES
-        (board_free_id, user1_id, '봉사활동 동기들과 점심 모임 후기', 
-         '지난주에 함께 봉사활동을 했던 분들과 점심을 먹었어요.
-
-봉사활동 이야기도 하고, 서로의 근황도 나누면서 
-정말 즐거운 시간을 보냈습니다.
-
-이렇게 좋은 사람들을 만날 수 있어서 봉사활동이 더욱 의미있게 느껴져요.', 23, 5),
-        
-        (board_free_id, user2_id, '여러분의 봉사활동 동기는 무엇인가요?', 
-         '안녕하세요! 봉사활동을 시작한지 3개월 정도 되었는데요.
-
-처음에는 단순히 도움이 되고 싶다는 마음으로 시작했지만,
-지금은 오히려 제가 더 많은 것을 배우고 받는 것 같아요.
-
-여러분들은 어떤 계기로 봉사활동을 시작하셨나요?
-궁금해서 질문드립니다! 😊', 41, 7);
-
-    -- 질문과 답변 게시글
-    INSERT INTO posts (board_id, user_id, title, content, views) VALUES
-        (board_qna_id, user3_id, '처음 봉사활동 참여 시 준비물은?', 
-         '다음주에 처음으로 봉사활동에 참여하게 되었습니다.
-
-특별히 준비해야 할 것들이 있을까요?
-복장이나 개인적으로 가져가면 좋은 물건들이 있다면 알려주세요!', 28),
-        
-        (board_qna_id, user1_id, '포인트는 어떻게 사용하나요?', 
-         '봉사활동을 하면서 포인트가 쌓였는데,
-이 포인트를 어떻게 사용할 수 있는지 궁금합니다.
-
-혹시 기부도 가능한가요?', 19);
-
-END $$;
-
--- 댓글 추가
-DO $$
-DECLARE
-    post_id_1 uuid;
-    post_id_2 uuid;
-    user1_id uuid;
-    user2_id uuid;
-    admin_id uuid;
-BEGIN
-    -- 필요한 ID들 가져오기
-    SELECT id INTO admin_id FROM users WHERE email = 'admin@example.com';
-    SELECT id INTO user1_id FROM users WHERE email = 'user1@example.com';
-    SELECT id INTO user2_id FROM users WHERE email = 'user2@example.com';
-    
-    -- 특정 게시글 ID 가져오기
-    SELECT id INTO post_id_1 FROM posts WHERE title = '장애인 복지관 청소 봉사 후기';
-    SELECT id INTO post_id_2 FROM posts WHERE title = '처음 봉사활동 참여 시 준비물은?';
-
-    -- 댓글 추가
-    INSERT INTO comments (post_id, user_id, content, likes) VALUES
-        (post_id_1, user2_id, '정말 수고하셨어요! 저도 다음번에 참여해보고 싶네요.', 3),
-        (post_id_1, admin_id, '첫 봉사활동 참여해주셔서 감사합니다. 앞으로도 많은 참여 부탁드려요!', 5),
-        (post_id_2, admin_id, '편한 복장과 개인 물병 정도면 충분합니다. 자세한 내용은 활동 전 안내해드릴게요!', 2),
-        (post_id_2, user1_id, '저도 처음에 많이 궁금했는데, 생각보다 특별한 준비물은 없어요. 마음의 준비만 하시면 됩니다! ^^', 4);
-
-END $$;
-
--- 포인트 거래 내역 추가
-INSERT INTO point_transactions (user_id, type, amount, reason, reference_type, reference_id) 
-SELECT 
-    u.id,
-    'earn',
-    10,
-    '게시글 작성',
-    'post',
-    p.id
-FROM users u
-JOIN posts p ON u.id = p.user_id
-WHERE u.email != 'admin@example.com'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO point_transactions (user_id, type, amount, reason, reference_type, reference_id) 
-SELECT 
-    u.id,
-    'earn',
-    5,
-    '댓글 작성',
-    'comment',
-    c.id
-FROM users u
-JOIN comments c ON u.id = c.user_id
-WHERE u.email != 'admin@example.com'
-ON CONFLICT DO NOTHING;
-
--- 좋아요 데이터 추가
-DO $$
-DECLARE
-    user_ids uuid[];
-    post_ids uuid[];
-    comment_ids uuid[];
-    i integer;
-    j integer;
-BEGIN
-    -- 사용자 ID 배열 생성
-    SELECT ARRAY_AGG(id) INTO user_ids FROM users WHERE email != 'admin@example.com';
-    SELECT ARRAY_AGG(id) INTO post_ids FROM posts;
-    SELECT ARRAY_AGG(id) INTO comment_ids FROM comments;
-
-    -- 랜덤하게 좋아요 추가 (게시글)
-    IF user_ids IS NOT NULL AND post_ids IS NOT NULL THEN
-        FOR i IN 1..array_length(user_ids, 1) LOOP
-            FOR j IN 1..array_length(post_ids, 1) LOOP
-                IF random() < 0.3 THEN -- 30% 확률로 좋아요
-                    INSERT INTO likes (user_id, entity_type, entity_id) 
-                    VALUES (user_ids[i], 'post', post_ids[j])
-                    ON CONFLICT DO NOTHING;
-                END IF;
-            END LOOP;
-        END LOOP;
-    END IF;
-
-    -- 랜덤하게 좋아요 추가 (댓글)
-    IF user_ids IS NOT NULL AND comment_ids IS NOT NULL THEN
-        FOR i IN 1..array_length(user_ids, 1) LOOP
-            FOR j IN 1..array_length(comment_ids, 1) LOOP
-                IF random() < 0.2 THEN -- 20% 확률로 좋아요
-                    INSERT INTO likes (user_id, entity_type, entity_id) 
-                    VALUES (user_ids[i], 'comment', comment_ids[j])
-                    ON CONFLICT DO NOTHING;
-                END IF;
-            END LOOP;
-        END LOOP;
-    END IF;
-
-    -- 게시글 좋아요 수 업데이트
-    UPDATE posts SET likes = (
-        SELECT COUNT(*) FROM likes 
-        WHERE entity_type = 'post' AND entity_id = posts.id
-    );
-
-    -- 댓글 좋아요 수 업데이트
-    UPDATE comments SET likes = (
-        SELECT COUNT(*) FROM likes 
-        WHERE entity_type = 'comment' AND entity_id = comments.id
-    );
-
-END $$;
-
--- 알림 샘플 데이터
-INSERT INTO notifications (user_id, type, title, message, entity_type, entity_id) 
-SELECT 
-    p.user_id,
-    'comment',
-    '새 댓글이 달렸습니다',
-    c.content,
-    'post',
-    p.id
-FROM posts p
-JOIN comments c ON p.id = c.post_id
-WHERE p.user_id != c.user_id
-ON CONFLICT DO NOTHING;
-
--- 임시저장 샘플 데이터
-DO $$
-DECLARE
-    board_free_id uuid;
-    user1_id uuid;
-BEGIN
-    SELECT id INTO board_free_id FROM boards WHERE name = '자유게시판';
-    SELECT id INTO user1_id FROM users WHERE email = 'user1@example.com';
-    
-    IF board_free_id IS NOT NULL AND user1_id IS NOT NULL THEN
-        INSERT INTO drafts (user_id, board_id, title, content, auto_save_count) VALUES
-            (user1_id, board_free_id, '작성 중인 글 제목', '이것은 임시저장된 글 내용입니다...', 3)
-        ON CONFLICT DO NOTHING;
-    END IF;
-END $$;
-
--- 뷰 생성: 인기 게시글
-CREATE OR REPLACE VIEW popular_posts AS
-SELECT 
-    p.id,
-    p.title,
-    p.content,
-    p.views,
-    p.likes,
-    p.created_at,
-    u.name as author_name,
-    b.name as board_name,
-    (p.views * 0.1 + p.likes * 1.0) as popularity_score
-FROM posts p
-JOIN users u ON p.user_id = u.id
-JOIN boards b ON p.board_id = b.id
-WHERE p.status = 'active'
-ORDER BY popularity_score DESC;
-
--- 뷰 생성: 사용자 활동 통계
-CREATE OR REPLACE VIEW user_activity_stats AS
-SELECT 
-    u.id,
-    u.name,
-    u.email,
-    u.points,
-    COUNT(DISTINCT p.id) as post_count,
-    COUNT(DISTINCT c.id) as comment_count,
-    COUNT(DISTINCT l.id) as like_given_count,
-    (SELECT COUNT(*) FROM likes WHERE entity_type = 'post' AND entity_id IN (SELECT id FROM posts WHERE user_id = u.id)) as likes_received_count
-FROM users u
-LEFT JOIN posts p ON u.id = p.user_id AND p.status = 'active'
-LEFT JOIN comments c ON u.id = c.user_id AND c.status = 'active'
-LEFT JOIN likes l ON u.id = l.user_id
-WHERE u.status = 'active'
-GROUP BY u.id, u.name, u.email, u.points;
-
--- 인덱스 추가 (성능 최적화)
-CREATE INDEX IF NOT EXISTS idx_posts_popularity ON posts((views * 0.1 + likes * 1.0) DESC);
-CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at);
-CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
--- 마지막 업데이트: 사용자 포인트 계산
-UPDATE users SET points = (
-    SELECT COALESCE(SUM(
-        CASE 
-            WHEN type = 'earn' THEN amount
-            WHEN type = 'use' THEN -amount
-            ELSE 0
-        END
-    ), 0)
-    FROM point_transactions 
-    WHERE user_id = users.id
-);
-
--- 완료 메시지
-DO $$
-BEGIN
-    RAISE NOTICE '=== 데이터베이스 초기화 완료 ===';
-    RAISE NOTICE '관리자 계정: admin@example.com / admin123';
-    RAISE NOTICE '테스트 계정: user1@example.com / admin123';
-    RAISE NOTICE '샘플 데이터가 성공적으로 생성되었습니다.';
-END $$;
-
--- 기본 메뉴 데이터 삽입
--- 데이터베이스 초기화 후 실행
-
--- 기존 메뉴 데이터 삭제 (초기화)
-DELETE FROM menus;
-
--- 기본 메뉴 데이터 삽입
-INSERT INTO menus (id, name, description, menu_type, target_id, url, display_order, is_active, parent_id, created_at, updated_at) VALUES
--- 1단 메뉴
-('550e8400-e29b-41d4-a716-446655440001', '민들레는요', '민들레장애인자립생활센터 소개', 'page', NULL, '/about', 1, true, NULL, NOW(), NOW()),
-('550e8400-e29b-41d4-a716-446655440002', '사업소개', '센터에서 진행하는 사업들', 'page', NULL, '/services', 2, true, NULL, NOW(), NOW()),
-('550e8400-e29b-41d4-a716-446655440003', '정보마당', '게시판 및 커뮤니티', 'board', NULL, '/community', 3, true, NULL, NOW(), NOW()),
-('550e8400-e29b-41d4-a716-446655440004', '일정', '센터 일정 및 행사', 'calendar', NULL, '/calendar', 4, true, NULL, NOW(), NOW()),
-('550e8400-e29b-41d4-a716-446655440005', '후원하기', '센터 후원 안내', 'page', NULL, '/donation', 5, true, NULL, NOW(), NOW());
-
--- 기본 게시판 데이터 삽입 (메뉴와 연결용)
-INSERT INTO boards (id, name, slug, description, category, display_order, is_public, allow_anonymous, allow_file_upload, max_files, max_file_size, allowed_file_types, allow_rich_text, require_category, allow_comments, allow_likes, created_at, updated_at) VALUES
-('660e8400-e29b-41d4-a716-446655440001', '공지사항', 'notice', '중요한 공지사항을 확인하세요', '공지', 1, true, false, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW()),
-('660e8400-e29b-41d4-a716-446655440002', '자유게시판', 'free', '자유롭게 소통하는 공간', '커뮤니티', 2, true, true, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW()),
-('660e8400-e29b-41d4-a716-446655440003', '봉사활동', 'volunteer', '봉사활동 관련 게시판', '봉사', 3, true, false, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW());
-
--- 기본 페이지 데이터 삽입 (메뉴와 연결용)
-INSERT INTO pages (id, title, slug, content, is_published, display_order, created_at, updated_at) VALUES
-('770e8400-e29b-41d4-a716-446655440001', '민들레는요', 'about', '<h1>민들레장애인자립생활센터</h1><p>장애인의 자립생활을 지원하는 센터입니다.</p>', true, 1, NOW(), NOW()),
-('770e8400-e29b-41d4-a716-446655440002', '사업소개', 'services', '<h1>사업소개</h1><p>센터에서 진행하는 다양한 사업들을 소개합니다.</p>', true, 2, NOW(), NOW()),
-('770e8400-e29b-41d4-a716-446655440003', '후원하기', 'donation', '<h1>후원하기</h1><p>센터 활동을 후원해주세요.</p>', true, 3, NOW(), NOW());
-
--- 메뉴와 게시판/페이지 연결 업데이트
-UPDATE menus SET target_id = '660e8400-e29b-41d4-a716-446655440001' WHERE name = '정보마당';
-UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440001' WHERE name = '민들레는요';
-UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440002' WHERE name = '사업소개';
-UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440003' WHERE name = '후원하기';
-
--- 기본 관리자 계정 생성 (비밀번호: admin123)
-INSERT INTO users (id, email, password_hash, name, phone, role, status, email_verified, created_at, updated_at) VALUES
-('880e8400-e29b-41d4-a716-446655440001', 'admin@mincenter.org', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/HS.iK2O', '관리자', '010-1234-5678', 'admin', 'active', true, NOW(), NOW())
-ON CONFLICT (email) DO NOTHING;
-
--- 기본 사이트 설정
-INSERT INTO site_settings (id, setting_key, setting_value, description, created_at, updated_at) VALUES
-('990e8400-e29b-41d4-a716-446655440001', 'site_name', '민들레장애인자립생활센터', '사이트 이름', NOW(), NOW()),
-('990e8400-e29b-41d4-a716-446655440002', 'site_description', '장애인의 자립생활을 지원하는 센터', '사이트 설명', NOW(), NOW()),
-('990e8400-e29b-41d4-a716-446655440003', 'contact_email', 'info@mincenter.org', '연락처 이메일', NOW(), NOW()),
-('990e8400-e29b-41d4-a716-446655440004', 'contact_phone', '02-1234-5678', '연락처 전화번호', NOW(), NOW())
+-- 14. 사이트 설정 데이터
+INSERT INTO site_settings (id, setting_key, setting_value, description, is_public, created_at, updated_at) VALUES
+(uuid_generate_v4(), 'site_title', '민들레장애인자립생활센터', '사이트 제목', true, NOW(), NOW()),
+(uuid_generate_v4(), 'site_description', '함께 만들어가는 따뜻한 세상', '사이트 설명', true, NOW(), NOW()),
+(uuid_generate_v4(), 'contact_email', 'mincenter08@daum.net', '연락처 이메일', true, NOW(), NOW()),
+(uuid_generate_v4(), 'contact_phone', '032-542-9294', '연락처 전화번호', true, NOW(), NOW()),
+(uuid_generate_v4(), 'facebook_url', '', '페이스북 URL', true, NOW(), NOW()),
+(uuid_generate_v4(), 'instagram_url', '', '인스타그램 URL', true, NOW(), NOW()),
+(uuid_generate_v4(), 'youtube_url', '', '유튜브 URL', true, NOW(), NOW()),
+(uuid_generate_v4(), 'registration_enabled', 'true', '회원가입 허용 여부', false, NOW(), NOW()),
+(uuid_generate_v4(), 'comment_approval_required', 'false', '댓글 승인 필요 여부', false, NOW(), NOW()),
+(uuid_generate_v4(), 'max_file_size', '10485760', '최대 파일 크기 (바이트)', false, NOW(), NOW())
 ON CONFLICT (setting_key) DO NOTHING;
+
+-- 15. FAQ 데이터
+INSERT INTO faqs (id, question, answer, category, display_order, is_active, created_at, updated_at) VALUES
+(uuid_generate_v4(), '센터 이용 시간은 어떻게 되나요?', '평일 오전 9시부터 오후 6시까지 이용 가능합니다. 공휴일은 휴무입니다.', 'general', 1, true, NOW(), NOW()),
+(uuid_generate_v4(), '서비스 신청은 어떻게 하나요?', '전화 또는 방문을 통해 상담 후 서비스 신청이 가능합니다.', 'service', 2, true, NOW(), NOW()),
+(uuid_generate_v4(), '후원 방법이 궁금합니다.', '정기후원과 일시후원이 가능하며, 계좌이체 또는 온라인 결제를 통해 후원하실 수 있습니다.', 'donation', 3, true, NOW(), NOW())
+ON CONFLICT (question) DO NOTHING;

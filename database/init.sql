@@ -665,4 +665,101 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_calendar_events_updated_at') THEN
         CREATE TRIGGER update_calendar_events_updated_at BEFORE UPDATE ON calendar_events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
+END $$;
+
+-- 권한 관리 테이블
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS permissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    resource VARCHAR(100) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(role_id, permission_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, role_id)
+);
+
+-- 사이트 정보 테이블
+CREATE TABLE IF NOT EXISTS site_info (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_name VARCHAR(255) DEFAULT '민센터 봉사단체' NOT NULL,
+    catchphrase TEXT,
+    address TEXT,
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    homepage VARCHAR(500),
+    fax VARCHAR(50),
+    representative_name VARCHAR(100),
+    business_number VARCHAR(20),
+    logo_image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- SNS 링크 테이블
+CREATE TABLE IF NOT EXISTS sns_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    icon VARCHAR(100) DEFAULT 'custom' NOT NULL,
+    icon_type VARCHAR(20) DEFAULT 'emoji' NOT NULL,
+    display_order INTEGER DEFAULT 0 NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
+CREATE INDEX IF NOT EXISTS idx_roles_active ON roles(is_active);
+CREATE INDEX IF NOT EXISTS idx_permissions_resource_action ON permissions(resource, action);
+CREATE INDEX IF NOT EXISTS idx_permissions_active ON permissions(is_active);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission_id ON role_permissions(permission_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_site_info_created_at ON site_info(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sns_links_active_order ON sns_links(is_active, display_order);
+CREATE INDEX IF NOT EXISTS idx_sns_links_created_at ON sns_links(created_at);
+
+-- 새로운 테이블들에 대한 트리거 추가
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_roles_updated_at') THEN
+        CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_permissions_updated_at') THEN
+        CREATE TRIGGER update_permissions_updated_at BEFORE UPDATE ON permissions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_site_info_updated_at') THEN
+        CREATE TRIGGER update_site_info_updated_at BEFORE UPDATE ON site_info FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_sns_links_updated_at') THEN
+        CREATE TRIGGER update_sns_links_updated_at BEFORE UPDATE ON sns_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 END $$; 

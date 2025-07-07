@@ -112,7 +112,7 @@ jobs:
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml ps"
         
         # 데이터베이스 연결 확인
-        DB_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-postgres pg_isready -U postgres" | grep -o "accepting connections" || echo "failed")
+        DB_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-postgres pg_isready -U mincenter" | grep -o "accepting connections" || echo "failed")
         echo "Database Status: $DB_STATUS"
         
         # Redis 연결 확인
