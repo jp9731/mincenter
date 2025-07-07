@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  site:
+    build:
+      context: ./frontends/site
+    container_name: mincenter_site
+    ports:
+      - "13000:3000"
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://api.mincenter.kr
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+    networks:
+      - mincenter
+    volumes:
+      - ./frontends/site/static:/app/static
+
+  admin:
+    build:
+      context: ./frontends/admin
+    container_name: mincenter_admin
+    ports:
+      - "13001:3000"
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://api.mincenter.kr
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+    networks:
+      - mincenter
+    volumes:
+      - ./frontends/admin/static:/app/static
+
+  postgres:
+    image: postgres:15
+    container_name: mincenter_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: mincenter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "15432:5432"
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    networks:
+      - mincenter
+
+  redis:
+    image: redis:7
+    container_name: mincenter_redis
+    command: ["redis-server", "--requirepass", "default_password"]
+    ports:
+      - "16379:6379"
+    volumes:
+      - ./database/redis:/data
+    restart: always
+    networks:
+      - mincenter
+
+  nginx:
+    image: nginx:1.25
+    container_name: mincenter_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/minshool-production.conf:/etc/nginx/nginx.conf:ro
+      - ./frontends/site/static:/var/www/site/static:ro
+      - ./frontends/admin/static:/var/www/admin/static:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - site
+      - admin
+    restart: always
+    networks:
+      - mincenter 

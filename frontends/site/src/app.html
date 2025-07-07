@@ -1,12 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko" %sveltekit.theme%>
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		%sveltekit.head%
+		<script>
+			// 런타임 환경변수 설정
+			window.ENV = {
+				API_URL: '%sveltekit.env.API_URL%' || 'http://localhost:18080',
+				DOMAIN: '%sveltekit.env.DOMAIN%' || 'localhost',
+				NODE_ENV: '%sveltekit.env.NODE_ENV%' || 'development'
+			};
+		</script>
 	</head>
 	<body data-sveltekit-preload-data="hover">
-		<div>%sveltekit.body%</div>
+		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

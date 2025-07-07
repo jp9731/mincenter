@@ -94,11 +94,6 @@ jobs:
             sudo yum install -y git
           fi
           
-          # Docker 권한 설정
-          echo "Docker 권한을 설정합니다..."
-          sudo usermod -aG docker ${{ secrets.DEPLOY_USER }}
-          sudo systemctl restart docker
-          
           # 프로젝트 디렉토리 확인 및 생성
           DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
           echo "배포 경로: $DEPLOY_PATH"
@@ -124,77 +119,91 @@ jobs:
           echo "서버 환경 설정 완료"
         EOF
         
+    - name: Check for CentOS 7 binary
+      id: check-binary
+      run: |
+        if [ -f "build/centos7/minshool-api" ]; then
+          echo "binary_exists=true" >> $GITHUB_OUTPUT
+          echo "✅ CentOS 7 바이너리 발견: $(ls -la build/centos7/minshool-api)"
+        else
+          echo "binary_exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ CentOS 7 바이너리가 없습니다. API 배포를 건너뜁니다."
+          echo "로컬에서 './scripts/build-centos7.sh'를 실행한 후 다시 푸시하세요."
+        fi
+        
     - name: Deploy to server
       run: |
         ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-          # Docker 그룹 변경사항 적용
           DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
           echo "배포 경로: $DEPLOY_PATH"
           cd "$DEPLOY_PATH"
           echo "현재 디렉토리: $(pwd)"
-          echo "디렉토리 내용:"
-          ls -la
           echo "Git 상태 확인..."
           git status
           echo "최신 코드 가져오기..."
           git pull origin main
-          
-          echo "배포 스크립트 실행..."
-          if [ -f "scripts/deploy.sh" ]; then
-            echo "배포 스크립트를 찾았습니다."
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
-          else
-            echo "배포 스크립트가 없습니다. 수동으로 배포를 진행합니다..."
-            
-            # 데이터베이스 마이그레이션 (납품 시 수동 처리)
-            echo "데이터베이스 마이그레이션은 수동으로 처리합니다..."
-            echo "납품 시에는 직접 DB에 접속하여 스키마 변경사항을 적용하세요."
-            
-            # Docker Compose 배포 (API 제외)
-            if [ -f "docker-compose.prod.yml" ]; then
-              echo "docker-compose.prod.yml 파일을 찾았습니다."
-              docker-compose -f docker-compose.prod.yml down
-              docker-compose -f docker-compose.prod.yml pull
-              docker-compose -f docker-compose.prod.yml build --no-cache
-              docker-compose -f docker-compose.prod.yml up -d
-            elif [ -f "docker-compose.yml" ]; then
-              echo "docker-compose.yml 파일을 찾았습니다."
-              docker-compose down
-              docker-compose pull
-              docker-compose build --no-cache
-              docker-compose up -d
-            else
-              echo "docker-compose 파일이 없습니다!"
-              exit 1
-            fi
-            
-            # API 서버 재시작 (수동 빌드)
-            echo "API 서버 재시작..."
-            cd backends/api
-            if [ -f "target/release/minshool-api" ]; then
-              echo "기존 API 프로세스 종료..."
-              pkill -f minshool-api || true
-              sleep 2
-              
-              echo "API 서버 재빌드..."
-              cargo build --release
-              
-              echo "API 서버 시작..."
-              nohup ./target/release/minshool-api > api.log 2>&1 &
-              echo "API 서버가 백그라운드에서 시작되었습니다."
-            else
-              echo "API 바이너리가 없습니다. 빌드 후 시작합니다..."
-              cargo build --release
-              nohup ./target/release/minshool-api > api.log 2>&1 &
-            fi
-            cd ../..
+
+          echo "=== 하이브리드 배포 시작 ==="
+
+          # 1. Docker 설치 확인 및 설치
+          if ! command -v docker &> /dev/null; then
+            echo "Docker 설치 중..."
+            sudo yum install -y yum-utils
+            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            sudo yum install -y docker-ce docker-ce-cli containerd.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG ${{ secrets.DEPLOY_USER }} docker
           fi
+
+          # Docker Compose 설치 확인 및 설치
+          if ! command -v docker-compose &> /dev/null; then
+            echo "Docker Compose 설치 중..."
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+
+          # 2. API 서버에서 직접 빌드 및 서비스 재시작
+          bash scripts/server-build-api.sh
+
+          # 3. Docker 서비스 재시작
+          docker-compose -f docker-compose.hybrid.yml up -d --build
         EOF
         
     - name: Health check
       run: |
         sleep 60
         echo "헬스체크 시작..."
-        curl -f http://${{ secrets.DEPLOY_HOST }}:13000/health || echo "사이트 헬스체크 실패"
-        curl -f http://${{ secrets.DEPLOY_HOST }}:13001/health || echo "관리자 페이지 헬스체크 실패" 
+        
+        # API 서버 상태 확인 (바이너리가 있는 경우)
+        if [ -f "build/centos7/minshool-api" ]; then
+          echo "API 서버 헬스체크..."
+          curl -f http://${{ secrets.DEPLOY_HOST }}:18080/health || echo "API 서버 헬스체크 실패"
+        fi
+        
+        # Docker 서비스 헬스체크
+        echo "Docker 서비스 헬스체크..."
+        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          echo "Docker 컨테이너 상태 확인..."
+          sudo docker-compose -f docker-compose.hybrid.yml ps
+          
+          echo "PostgreSQL 헬스체크..."
+          sudo docker exec ${APP_NAME:-mincenter}_postgres pg_isready -U postgres || echo "PostgreSQL 헬스체크 실패"
+          
+          echo "Redis 헬스체크..."
+          sudo docker exec ${APP_NAME:-mincenter}_redis redis-cli --raw incr ping || echo "Redis 헬스체크 실패"
+          
+          echo "Site 헬스체크..."
+          curl -f http://localhost:13000/ || echo "Site 헬스체크 실패"
+          
+          echo "Admin 헬스체크..."
+          curl -f http://localhost:13001/ || echo "Admin 헬스체크 실패"
+          
+          echo "Nginx 헬스체크..."
+          curl -f http://localhost/ || echo "Nginx 헬스체크 실패"
+          
+          echo "서브도메인 헬스체크..."
+          curl -f http://mincenter.kr/ || echo "메인 사이트 헬스체크 실패"
+          curl -f http://admin.mincenter.kr/ || echo "관리자 사이트 헬스체크 실패"
+          curl -f http://api.mincenter.kr/health || echo "API 서버 헬스체크 실패"
+        EOF 

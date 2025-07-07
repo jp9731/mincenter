@@ -1,30 +1,45 @@
-# site/Dockerfile - 메모리 최적화 버전
-FROM node:20-alpine as builder
+# SvelteKit Site Dockerfile
+FROM node:20-alpine AS builder
+
 WORKDIR /app
 
-# 메모리 제한 설정
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+# 패키지 파일 복사
+COPY package*.json ./
+COPY svelte.config.js ./
+COPY vite.config.js ./
+COPY tsconfig.json ./
+COPY tailwind.config.js ./
 
-# 패키지 파일 복사 및 의존성 설치
-COPY package.json package-lock.json ./
-RUN npm ci --include=dev --no-audit --no-fund
+# 의존성 설치
+RUN npm ci --silent
 
 # 소스 코드 복사
-COPY . .
+COPY src ./src
+COPY static ./static
 
-# 빌드 실행 (메모리 최적화)
-RUN npm run build || (echo "Build failed. Checking for errors..." && exit 1)
+# 빌드
+RUN npm run build
 
-FROM node:20-alpine
+# 프로덕션 이미지
+FROM node:20-alpine AS production
+
 WORKDIR /app
 
-# 빌드 결과물만 복사 (SvelteKit은 모든 의존성을 번들링하므로 node_modules 불필요)
+# 패키지 파일 복사
+COPY package*.json ./
+
+# 프로덕션 의존성만 설치
+RUN npm ci --only=production --silent
+
+# 빌드된 파일 복사
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/package.json ./
 
-# SvelteKit 애플리케이션은 빌드 시점에 모든 의존성을 번들링하므로
-# 프로덕션에서 추가 의존성 설치 불필요
+# 포트 노출
+EXPOSE 13000
 
+# 환경변수 설정
+ENV NODE_ENV=production
 ENV PORT=13000
-EXPOSE ${PORT}
-CMD ["node", "build"]
+
+# 애플리케이션 실행
+CMD ["node", "build/index.js", "--host", "0.0.0.0", "--port", "13000"]
