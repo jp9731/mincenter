@@ -36,7 +36,8 @@
 			children: [
 				{ title: '사이트 설정', href: '/site/settings' },
 				{ title: '관리자 설정', href: '/site/admins' },
-				{ title: '역할 및 권한', href: '/site/roles' }
+				{ title: '역할 및 권한', href: '/site/roles' },
+				{ title: '권한 관리', href: '/site/permissions' }
 			]
 		},
 		{ title: '메뉴 관리', href: '/menus', icon: MenuIcon },

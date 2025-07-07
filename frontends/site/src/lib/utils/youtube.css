@@ -1,0 +1,27 @@
+/* YouTube 임베드 영상 반응형 스타일 */
+.youtube-embed-container {
+	position: relative;
+	width: 100%;
+	padding-bottom: 56.25%; /* 16:9 비율 */
+	height: 0;
+	overflow: hidden;
+	max-width: 100%;
+}
+
+.youtube-iframe {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	border: none;
+	border-radius: 8px;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 다크 모드 지원 */
+@media (prefers-color-scheme: dark) {
+	.youtube-iframe {
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+	}
+} 

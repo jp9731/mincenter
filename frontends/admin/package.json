@@ -76,6 +76,7 @@
 		"@fullcalendar/daygrid": "^6.1.17",
 		"@fullcalendar/list": "^6.1.17",
 		"@fullcalendar/timegrid": "^6.1.17",
+		"@tadashi/svelte-editor-quill": "^4.0.0",
 		"lucide-svelte": "^0.518.0"
 	}
 }

@@ -21,7 +21,7 @@ module.exports = {
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         primary: {
-          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          DEFAULT: "oklch(0.53 0.14 132)",
           foreground: "hsl(var(--primary-foreground) / <alpha-value>)"
         },
         secondary: {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		Card,
 		CardContent,
@@ -76,6 +77,7 @@
 		if (text.length <= maxLength) return text;
 		return text.substring(0, maxLength) + '...';
 	}
+
 </script>
 
 <div class="space-y-6">
@@ -85,7 +87,7 @@
 			<h1 class="text-3xl font-bold text-gray-900">게시글 관리</h1>
 			<p class="mt-2 text-gray-600">시스템의 모든 게시글을 관리합니다.</p>
 		</div>
-		<Button>새 게시글 작성</Button>
+		<Button onclick={() => goto('/posts/create')}>새 게시글 작성</Button>
 	</div>
 
 	<!-- 검색 및 필터 -->
@@ -147,7 +149,7 @@
 	<Card>
 		<CardHeader>
 			<CardTitle>게시글 목록</CardTitle>
-			<CardDescription>총 {$postsPagination.total}개의 게시글이 있습니다.</CardDescription>
+			<CardDescription>총 {$postsPagination?.total ?? 0}개의 게시글이 있습니다.</CardDescription>
 		</CardHeader>
 		<CardContent>
 			<Table>
@@ -192,7 +194,7 @@
 							</TableCell>
 							<TableCell>
 								{@const statusBadge = getStatusBadge(post.status)}
-								<Badge variant={statusBadge.variant}>{statusBadge.text}</Badge>
+								<Badge variant={statusBadge.variant as any}>{statusBadge.text}</Badge>
 							</TableCell>
 							<TableCell>
 								{new Date(post.created_at).toLocaleDateString('ko-KR')}
@@ -208,8 +210,12 @@
 									{:else if post.status === 'hidden'}
 										<Button variant="outline" size="sm">공개</Button>
 									{/if}
-									<Button variant="outline" size="sm">상세보기</Button>
-									<Button variant="outline" size="sm">수정</Button>
+									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}`)}>
+										상세보기
+									</Button>
+									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}/edit`)}>
+										수정
+									</Button>
 								</div>
 							</TableCell>
 						</TableRow>
@@ -218,7 +224,7 @@
 			</Table>
 
 			<!-- 페이지네이션 -->
-			{#if $postsPagination.total_pages > 1}
+			{#if $postsPagination?.totalPages > 1}
 				<div class="mt-6 flex justify-center">
 					<div class="flex space-x-2">
 						{#if currentPage > 1}
@@ -227,7 +233,7 @@
 							</Button>
 						{/if}
 
-						{#each Array.from({ length: $postsPagination.total_pages }, (_, i) => i + 1) as pageNum}
+						{#each Array.from({ length: $postsPagination?.totalPages ?? 0 }, (_, i) => i + 1) as pageNum}
 							<Button
 								variant={currentPage === pageNum ? 'default' : 'outline'}
 								size="sm"
@@ -237,7 +243,7 @@
 							</Button>
 						{/each}
 
-						{#if currentPage < $postsPagination.total_pages}
+						{#if currentPage < ($postsPagination?.totalPages ?? 0)}
 							<Button variant="outline" size="sm" onclick={() => handlePageChange(currentPage + 1)}>
 								다음
 							</Button>

@@ -23,3 +23,5 @@ dotenv = "0.15"
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+image = { version = "0.24", features = ["jpeg", "png", "gif", "webp"] }
+ammonia = "3"

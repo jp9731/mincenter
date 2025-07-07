@@ -10,21 +10,125 @@
 		FileText,
 		Music,
 		Video,
-		Archive
+		Archive,
+		Zap
 	} from 'lucide-svelte';
 
 	export let files: File[] = [];
 	export let maxFiles = 5;
-	export let maxFileSize = 10 * 1024 * 1024; // 10MB
-	export let allowedTypes: string[] = ['*/*'];
+	export let maxFileSize = 20 * 1024 * 1024; // 20MB로 증가
+	export let allowedTypes: string[] | null = null;
 	export let onUpload: ((file: File) => Promise<string>) | null = null;
+	export let onUploadComplete: ((event: CustomEvent) => void) | null = null;
 	export let disabled = false;
+	export let enableImageCompression = true; // 이미지 압축 활성화 여부
 
 	const dispatch = createEventDispatcher();
 
 	let dragOver = false;
 	let uploadProgress: Record<string, number> = {};
 	let uploadedFiles: Record<string, string> = {};
+	let compressionProgress: Record<string, number> = {};
+	let compressedFiles: Record<string, CompressedImageInfo> = {};
+
+	interface CompressedImageInfo {
+		file: File;
+		originalSize: number;
+		compressedSize: number;
+		compressionRatio: number;
+	}
+
+	// allowedTypes가 null이거나 undefined일 때 기본값 사용
+	$: safeAllowedTypes = allowedTypes || ['*/*'];
+
+	// 이미지 압축 옵션
+	function getCompressionOptions(file: File) {
+		const sizeMB = file.size / (1024 * 1024);
+
+		if (sizeMB > 10) {
+			return { maxWidth: 1200, maxHeight: 800, quality: 0.6, format: 'webp' };
+		} else if (sizeMB > 5) {
+			return { maxWidth: 1600, maxHeight: 1000, quality: 0.7, format: 'webp' };
+		} else if (sizeMB > 2) {
+			return { maxWidth: 1920, maxHeight: 1080, quality: 0.8, format: 'webp' };
+		} else {
+			return { maxWidth: 1920, maxHeight: 1080, quality: 0.9, format: 'webp' };
+		}
+	}
+
+	// 이미지 압축 함수
+	async function compressImage(file: File): Promise<CompressedImageInfo> {
+		const options = getCompressionOptions(file);
+
+		return new Promise((resolve, reject) => {
+			const canvas = document.createElement('canvas');
+			const ctx = canvas.getContext('2d');
+			const img = new Image();
+
+			img.onload = () => {
+				const originalWidth = img.width;
+				const originalHeight = img.height;
+
+				// 비율을 유지하면서 크기 조정
+				const ratio = Math.min(options.maxWidth / originalWidth, options.maxHeight / originalHeight);
+				const width = originalWidth * ratio;
+				const height = originalHeight * ratio;
+
+				canvas.width = width;
+				canvas.height = height;
+
+				ctx?.drawImage(img, 0, 0, width, height);
+
+				canvas.toBlob(
+					(blob) => {
+						if (!blob) {
+							reject(new Error('이미지 압축에 실패했습니다.'));
+							return;
+						}
+
+						const originalName = file.name;
+						const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+						const newFileName = `${nameWithoutExt}_compressed.${options.format}`;
+
+						const compressedFile = new File([blob], newFileName, {
+							type: `image/${options.format}`,
+							lastModified: Date.now()
+						});
+
+						const originalSize = file.size;
+						const compressedSize = compressedFile.size;
+						const compressionRatio = ((originalSize - compressedSize) / originalSize) * 100;
+
+						resolve({
+							file: compressedFile,
+							originalSize,
+							compressedSize,
+							compressionRatio
+						});
+					},
+					`image/${options.format}`,
+					options.quality
+				);
+			};
+
+			img.onerror = () => {
+				reject(new Error('이미지를 로드할 수 없습니다.'));
+			};
+
+			img.src = URL.createObjectURL(file);
+		});
+	}
+
+	// 이미지 파일인지 확인
+	function isImageFile(file: File): boolean {
+		return file.type.startsWith('image/');
+	}
+
+	// 이미지 압축이 필요한지 확인
+	function needsCompression(file: File, thresholdMB: number = 2): boolean {
+		if (!isImageFile(file)) return false;
+		return file.size > thresholdMB * 1024 * 1024;
+	}
 
 	// 파일 타입별 아이콘
 	function getFileIcon(file: File) {
@@ -47,21 +151,22 @@
 
 	// 파일 유효성 검사
 	function validateFile(file: File): string | null {
-		// 파일 크기 검사
-		if (file.size > maxFileSize) {
+		// 파일 크기 검사 (압축 후 크기 고려)
+		const effectiveSize = compressedFiles[file.name]?.compressedSize || file.size;
+		if (effectiveSize > maxFileSize) {
 			return `파일 크기가 너무 큽니다. (최대 ${formatFileSize(maxFileSize)})`;
 		}
 
 		// 파일 타입 검사
-		if (allowedTypes.length > 0 && !allowedTypes.includes('*/*')) {
-			const isValidType = allowedTypes.some((type) => {
+		if (safeAllowedTypes.length > 0 && !safeAllowedTypes.includes('*/*')) {
+			const isValidType = safeAllowedTypes.some((type) => {
 				if (type.endsWith('/*')) {
 					return file.type.startsWith(type.replace('/*', ''));
 				}
 				return file.type === type;
 			});
 			if (!isValidType) {
-				return `지원하지 않는 파일 형식입니다. (${allowedTypes.join(', ')})`;
+				return `지원하지 않는 파일 형식입니다. (${safeAllowedTypes.join(', ')})`;
 			}
 		}
 
@@ -74,10 +179,28 @@
 	}
 
 	// 파일 추가
-	function addFiles(newFiles: FileList | File[]) {
+	async function addFiles(newFiles: FileList | File[]) {
 		const fileArray = Array.from(newFiles);
 
 		for (const file of fileArray) {
+			// 이미지 압축 처리
+			if (enableImageCompression && isImageFile(file) && needsCompression(file)) {
+				try {
+					compressionProgress[file.name] = 0;
+					compressionProgress = { ...compressionProgress };
+
+					const compressedInfo = await compressImage(file);
+					compressedFiles[file.name] = compressedInfo;
+					compressionProgress[file.name] = 100;
+					compressionProgress = { ...compressionProgress };
+
+					console.log(`이미지 압축 완료: ${file.name} (${formatFileSize(compressedInfo.originalSize)} → ${formatFileSize(compressedInfo.compressedSize)}, ${compressedInfo.compressionRatio.toFixed(1)}% 압축)`);
+				} catch (error) {
+					console.error('이미지 압축 실패:', error);
+					// 압축 실패 시 원본 파일 사용
+				}
+			}
+
 			const error = validateFile(file);
 			if (error) {
 				alert(error);
@@ -97,6 +220,8 @@
 		files = files.filter((_, i) => i !== index);
 		delete uploadProgress[file.name];
 		delete uploadedFiles[file.name];
+		delete compressionProgress[file.name];
+		delete compressedFiles[file.name];
 		dispatch('filesChange', { files });
 	}
 
@@ -130,7 +255,7 @@
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.multiple = true;
-		input.accept = allowedTypes.join(',');
+		input.accept = safeAllowedTypes.join(',');
 		input.onchange = (e) => {
 			const files = (e.target as HTMLInputElement).files;
 			if (files) {
@@ -140,7 +265,7 @@
 		input.click();
 	}
 
-	// 파일 업로드
+	// 파일 업로드 (압축된 파일 우선 사용)
 	async function uploadFile(file: File) {
 		if (!onUpload) return;
 
@@ -148,11 +273,18 @@
 		uploadProgress = { ...uploadProgress };
 
 		try {
-			const url = await onUpload(file);
+			// 압축된 파일이 있으면 사용, 없으면 원본 사용
+			const fileToUpload = compressedFiles[file.name]?.file || file;
+			const url = await onUpload(fileToUpload);
 			uploadedFiles[file.name] = url;
 			uploadProgress[file.name] = 100;
 			uploadProgress = { ...uploadProgress };
-			dispatch('uploadComplete', { file, url });
+			dispatch('uploadComplete', { file: fileToUpload, url });
+			
+			// onUploadComplete 콜백 호출
+			if (onUploadComplete) {
+				onUploadComplete(new CustomEvent('uploadComplete', { detail: { file: fileToUpload, url } }));
+			}
 		} catch (error) {
 			console.error('파일 업로드 실패:', error);
 			delete uploadProgress[file.name];
@@ -175,9 +307,19 @@
 	// 파일 미리보기 URL 생성
 	function getFilePreview(file: File): string | null {
 		if (file.type.startsWith('image/')) {
-			return URL.createObjectURL(file);
+			// 압축된 파일이 있으면 압축된 파일로 미리보기
+			const previewFile = compressedFiles[file.name]?.file || file;
+			return URL.createObjectURL(previewFile);
 		}
 		return null;
+	}
+
+	// 압축 정보 표시
+	function getCompressionInfo(file: File): string | null {
+		const compressed = compressedFiles[file.name];
+		if (!compressed) return null;
+		
+		return `${formatFileSize(compressed.originalSize)} → ${formatFileSize(compressed.compressedSize)} (${compressed.compressionRatio.toFixed(1)}% 압축)`;
 	}
 </script>
 
@@ -201,9 +343,14 @@
 		<div class="text-sm text-gray-500">
 			최대 {maxFiles}개 파일, 각 파일 최대 {formatFileSize(maxFileSize)}
 		</div>
-		{#if allowedTypes.length > 0 && !allowedTypes.includes('*/*')}
+		{#if enableImageCompression}
+			<div class="mt-1 text-sm text-green-600">
+				✓ 이미지 자동 압축 활성화 (WebP 변환)
+			</div>
+		{/if}
+		{#if safeAllowedTypes.length > 0 && !safeAllowedTypes.includes('*/*')}
 			<div class="mt-1 text-sm text-gray-500">
-				지원 형식: {allowedTypes.join(', ')}
+				지원 형식: {safeAllowedTypes.join(', ')}
 			</div>
 		{/if}
 	</div>
@@ -227,7 +374,25 @@
 							<svelte:component this={getFileIcon(file)} class="h-8 w-8 text-gray-500" />
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-medium text-gray-900">{file.name}</p>
-								<p class="text-sm text-gray-500">{formatFileSize(file.size)}</p>
+								<p class="text-sm text-gray-500">
+									{#if compressedFiles[file.name]}
+										<span class="text-green-600">{getCompressionInfo(file)}</span>
+									{:else}
+										{formatFileSize(file.size)}
+									{/if}
+								</p>
+								{#if compressionProgress[file.name] !== undefined && compressionProgress[file.name] < 100}
+									<div class="mt-1 flex items-center space-x-2">
+										<Zap class="h-3 w-3 text-blue-500" />
+										<div class="h-2 flex-1 rounded-full bg-gray-200">
+											<div
+												class="h-2 rounded-full bg-blue-600 transition-all duration-300"
+												style="width: {compressionProgress[file.name]}%"
+											></div>
+										</div>
+										<span class="text-xs text-gray-500">압축 중...</span>
+									</div>
+								{/if}
 								{#if uploadProgress[file.name] !== undefined}
 									<div class="mt-1 h-2 w-full rounded-full bg-gray-200">
 										<div

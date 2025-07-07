@@ -22,10 +22,9 @@ export const error = writable<string | null>(null);
 
 // 로그인 상태 초기화
 export async function initializeAuth() {
-  if (!browser) return;
-
   try {
     const token = getToken();
+    
     if (!token) {
       isAuthenticated.set(false);
       user.set(null);
@@ -33,7 +32,6 @@ export async function initializeAuth() {
     }
 
     if (isTokenExpired(token)) {
-      // 토큰이 만료되었으면 리프레시 시도
       const refreshed = await refreshAuthToken();
       if (!refreshed) {
         isAuthenticated.set(false);
@@ -45,7 +43,6 @@ export async function initializeAuth() {
     // 서버에서 사용자 정보 가져오기
     await fetchUserProfile();
   } catch (e) {
-    console.error('Failed to initialize auth:', e);
     isAuthenticated.set(false);
     user.set(null);
   }
@@ -60,6 +57,7 @@ async function fetchUserProfile() {
 
     if (response.ok) {
       const apiResponse = await response.json();
+      
       if (apiResponse.success) {
         user.set(apiResponse.data);
         isAuthenticated.set(true);
@@ -70,7 +68,6 @@ async function fetchUserProfile() {
       throw new Error('Failed to fetch user profile');
     }
   } catch (e) {
-    console.error('Failed to fetch user profile:', e);
     await logout();
   }
 }
@@ -118,7 +115,6 @@ export async function login(email: string, password: string) {
 // 로그아웃
 export async function logout() {
   try {
-    console.log('logout');
     const refreshToken = getRefreshToken();
     if (refreshToken) {
       // 서버에 로그아웃 요청
@@ -132,7 +128,7 @@ export async function logout() {
       });
     }
   } catch (e) {
-    console.error('Logout request failed:', e);
+    // 로그아웃 요청 실패
   } finally {
     // 클라이언트 상태 정리
     removeTokens();

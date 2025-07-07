@@ -4,6 +4,18 @@ import type {
 } from '$lib/types/admin';
 import { authenticatedAdminFetch } from '$lib/stores/admin';
 
+// 배열 ↔ 콤마 문자열 변환 유틸 함수
+function parseCsvOption(val: string[] | string | undefined | null): string[] {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') return val.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+}
+
+function convertArrayToCsv(arr: string[] | undefined | null): string | undefined {
+  if (!arr || arr.length === 0) return undefined;
+  return arr.join(',');
+}
+
 // 관리자 로그인
 export async function adminLogin(email: string, password: string): Promise<{
   access_token: string;
@@ -102,12 +114,102 @@ export async function getBoards(fetchFn?: typeof fetch): Promise<any[]> {
   const res = await authenticatedAdminFetch('/api/admin/boards', {}, fetchFn);
   const json: ApiResponse<any[]> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
-  return json.data;
+  
+  // allowed_file_types, allowed_iframe_domains를 배열로 변환
+  return json.data.map(board => ({
+    ...board,
+    allowed_file_types: parseCsvOption(board.allowed_file_types),
+    allowed_iframe_domains: parseCsvOption(board.allowed_iframe_domains),
+  }));
 }
 
 // 게시판 생성
 export async function createBoard(data: any): Promise<any> {
+  // 배열을 그대로 전송 (변환하지 않음)
+  const payload = {
+    ...data,
+    allowed_file_types: data.allowed_file_types,
+    allowed_iframe_domains: data.allowed_iframe_domains,
+  };
+  
   const res = await authenticatedAdminFetch('/api/admin/boards', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  
+  // 응답에서도 배열로 변환
+  return {
+    ...json.data,
+    allowed_file_types: parseCsvOption(json.data.allowed_file_types),
+    allowed_iframe_domains: parseCsvOption(json.data.allowed_iframe_domains),
+  };
+}
+
+// 게시판 수정
+export async function updateBoard(id: string, data: any): Promise<any> {
+  // 배열을 그대로 전송 (변환하지 않음)
+  const payload = {
+    ...data,
+    allowed_file_types: data.allowed_file_types,
+    allowed_iframe_domains: data.allowed_iframe_domains,
+  };
+  
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  
+  // 응답에서도 배열로 변환
+  return {
+    ...json.data,
+    allowed_file_types: parseCsvOption(json.data.allowed_file_types),
+    allowed_iframe_domains: parseCsvOption(json.data.allowed_iframe_domains),
+  };
+}
+
+// 게시판 삭제
+export async function deleteBoard(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
+}
+
+// 게시판 상세 조회
+export async function getBoard(id: string, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {}, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  
+  // allowed_file_types, allowed_iframe_domains를 배열로 변환
+  return {
+    ...json.data,
+    allowed_file_types: parseCsvOption(json.data.allowed_file_types),
+    allowed_iframe_domains: parseCsvOption(json.data.allowed_iframe_domains),
+  };
+}
+
+// 카테고리 목록 조회
+export async function getBoardCategories(boardId: string, fetchFn?: typeof fetch): Promise<any[]> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${boardId}/categories`, {}, fetchFn);
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 카테고리 생성
+export async function createCategory(boardId: string, data: {
+  name: string;
+  description?: string;
+  display_order?: number;
+  is_active?: boolean;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${boardId}/categories`, {
     method: 'POST',
     body: JSON.stringify(data)
   });
@@ -116,9 +218,14 @@ export async function createBoard(data: any): Promise<any> {
   return json.data;
 }
 
-// 게시판 수정
-export async function updateBoard(id: string, data: any): Promise<any> {
-  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
+// 카테고리 수정
+export async function updateCategory(boardId: string, categoryId: string, data: {
+  name?: string;
+  description?: string;
+  display_order?: number;
+  is_active?: boolean;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${boardId}/categories/${categoryId}`, {
     method: 'PUT',
     body: JSON.stringify(data)
   });
@@ -127,9 +234,9 @@ export async function updateBoard(id: string, data: any): Promise<any> {
   return json.data;
 }
 
-// 게시판 삭제
-export async function deleteBoard(id: string): Promise<void> {
-  const res = await authenticatedAdminFetch(`/api/admin/boards/${id}`, {
+// 카테고리 삭제
+export async function deleteCategory(boardId: string, categoryId: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/boards/${boardId}/categories/${categoryId}`, {
     method: 'DELETE'
   });
   const json: ApiResponse<null> = await res.json();
@@ -151,7 +258,20 @@ export async function getPosts(params?: {
   if (params?.page) searchParams.set('page', params.page.toString());
   if (params?.limit) searchParams.set('limit', params.limit.toString());
   const res = await authenticatedAdminFetch(`/api/admin/posts?${searchParams}`, {}, fetchFn);
-  const json: ApiResponse<{ posts: any[]; pagination: any }> = await res.json();
+  const json: ApiResponse<any[]> & { pagination: any } = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  
+  // API 응답 구조: { success: true, data: [...posts], pagination: {...} }
+  return {
+    posts: json.data,
+    pagination: json.pagination
+  };
+}
+
+// 단일 게시글 조회
+export async function getPost(id: string, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/posts/${id}`, {}, fetchFn);
+  const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   return json.data;
 }
@@ -229,9 +349,11 @@ export async function updateUserRole(id: string, role: string): Promise<any> {
   return json.data;
 }
 
-// 사이트 설정 가져오기
+// 사이트 설정 조회
 export async function getSiteSettings(): Promise<any> {
-  const res = await authenticatedAdminFetch('/api/admin/site/settings');
+  const res = await authenticatedAdminFetch('/api/admin/site/settings', {
+    method: 'GET'
+  });
   const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   return json.data;
@@ -399,4 +521,266 @@ export async function deleteCalendarEvent(id: string): Promise<void> {
   });
   const json: ApiResponse<null> = await res.json();
   if (!json.success) throw new Error(json.message);
+}
+
+// 게시글 생성
+export async function createPost(data: {
+  title: string;
+  content: string;
+  board_id: string;
+  is_notice?: boolean;
+  category_id?: string;
+}, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/posts', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 게시글 수정
+export async function updatePost(id: string, data: {
+  title?: string;
+  content?: string;
+  board_id?: string;
+  is_notice?: boolean;
+  category_id?: string;
+  status?: string;
+}, fetchFn?: typeof fetch): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/posts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }, fetchFn);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// adminApi 객체로 모든 함수들을 export
+export const adminApi = {
+  adminLogin,
+  getAdminProfile,
+  getAdminMe,
+  getDashboardStats,
+  getUsers,
+  getUser,
+  updateUser,
+  getBoards,
+  createBoard,
+  updateBoard,
+  deleteBoard,
+  getBoard,
+  getBoardCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getPosts,
+  getPost,
+  togglePostVisibility,
+  getComments,
+  toggleCommentVisibility,
+  deleteComment,
+  updateUserStatus,
+  updateUserRole,
+  getSiteSettings,
+  saveSiteSettings,
+  getMenus,
+  saveMenus,
+  getPages,
+  getPage,
+  createPage,
+  updatePage,
+  updatePageStatus,
+  deletePage,
+  createNotification,
+  sendNotification,
+  getCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  createPost,
+  updatePost
+}; 
+
+// 파일 업로드 (사이트 파일)
+export async function uploadSiteFile(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const res = await authenticatedAdminFetch('/api/upload/site', {
+    method: 'POST',
+    body: formData,
+    headers: {} // FormData를 사용할 때는 Content-Type을 설정하지 않음
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 파일 업로드 (게시글 파일)
+export async function uploadPostFile(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const res = await authenticatedAdminFetch('/api/upload/posts', {
+    method: 'POST',
+    body: formData,
+    headers: {} // FormData를 사용할 때는 Content-Type을 설정하지 않음
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 파일 업로드 (프로필 파일)
+export async function uploadProfileFile(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const res = await authenticatedAdminFetch('/api/upload/profiles', {
+    method: 'POST',
+    body: formData,
+    headers: {} // FormData를 사용할 때는 Content-Type을 설정하지 않음
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+} 
+
+// RBAC - 역할 목록 조회
+export async function getRoles(): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/roles');
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 역할 상세 조회
+export async function getRole(id: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/roles/${id}`);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 역할 생성
+export async function createRole(data: {
+  name: string;
+  description?: string;
+  permissions: string[];
+}): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/roles', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 역할 수정
+export async function updateRole(id: string, data: {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+  permissions?: string[];
+}): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/roles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 역할 삭제
+export async function deleteRole(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/roles/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
+}
+
+// RBAC - 권한 목록 조회
+export async function getPermissions(): Promise<any[]> {
+  const res = await authenticatedAdminFetch('/api/admin/permissions');
+  const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 권한 생성
+export async function createPermission(data: {
+  name: string;
+  description?: string;
+  resource: string;
+  action: string;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/permissions', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 권한 수정
+export async function updatePermission(id: string, data: {
+  name?: string;
+  description?: string;
+  resource?: string;
+  action?: string;
+  is_active?: boolean;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/permissions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 권한 삭제
+export async function deletePermission(id: string): Promise<void> {
+  const res = await authenticatedAdminFetch(`/api/admin/permissions/${id}`, {
+    method: 'DELETE'
+  });
+  const json: ApiResponse<null> = await res.json();
+  if (!json.success) throw new Error(json.message);
+}
+
+// RBAC - 사용자 권한 조회
+export async function getUserPermissions(userId: string): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${userId}/permissions`);
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 사용자 역할 할당
+export async function assignUserRoles(userId: string, roleIds: string[]): Promise<any> {
+  const res = await authenticatedAdminFetch(`/api/admin/users/${userId}/roles`, {
+    method: 'PUT',
+    body: JSON.stringify({ user_id: userId, role_ids: roleIds })
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// RBAC - 권한 체크
+export async function checkPermission(userId: string, resource: string, action: string): Promise<boolean> {
+  const res = await authenticatedAdminFetch('/api/admin/check-permission', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, resource, action })
+  });
+  const json: ApiResponse<boolean> = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json.data || false;
 } 

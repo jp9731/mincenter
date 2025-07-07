@@ -1,13 +1,15 @@
-pub mod user;
-pub mod response;
-pub mod community;
-pub mod menu;
-pub mod page;
+pub mod admin;
 pub mod calendar;
+pub mod file;
+pub mod response;
+pub mod rbac;
+pub mod site;
+pub mod user;
 
-pub use user::*;
-pub use response::*;
-pub use community::*;
-pub use menu::*;
-pub use page::*;
+pub use admin::*;
 pub use calendar::*;
+pub use file::*;
+pub use response::*;
+pub use rbac::*;
+pub use site::*;
+pub use user::*;

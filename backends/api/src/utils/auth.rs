@@ -20,6 +20,7 @@ use tracing::{info, debug};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: Uuid,
+    pub role: String,
     pub exp: i64,
     pub iat: i64,
 }
@@ -50,12 +51,13 @@ pub fn create_token(claims: &Claims, secret: &str) -> Result<String, jsonwebtoke
     )
 }
 
-pub fn generate_tokens(config: &Config, user_id: Uuid) -> Result<(String, String), jsonwebtoken::errors::Error> {
+pub fn generate_tokens(config: &Config, user_id: Uuid, role: String) -> Result<(String, String), jsonwebtoken::errors::Error> {
     let now = Utc::now();
     
     // Access token claims
     let access_claims = Claims {
         sub: user_id,
+        role: role.clone(),
         exp: (now + Duration::minutes(config.access_token_expiry)).timestamp(),
         iat: now.timestamp(),
     };
@@ -63,6 +65,7 @@ pub fn generate_tokens(config: &Config, user_id: Uuid) -> Result<(String, String
     // Refresh token claims
     let refresh_claims = Claims {
         sub: user_id,
+        role,
         exp: (now + Duration::days(config.refresh_token_expiry)).timestamp(),
         iat: now.timestamp(),
     };

@@ -4,7 +4,7 @@
 		regularDonation: {
 			title: '정기후원',
 			description: '카드후원, 계좌출금 후원 가능',
-			link: 'https://webcm30.webcm.co.kr/system/member_signup/join_option_select_03.html?id=pspdpspd&gid=mincenter12',
+			link: 'https://webcm.co.kr/system/platform/page1-1.html?id=pspdpspd&gid=mincenter12',
 			note: '링크로 작성이 어려울 경우 아래 신청서 작성하여 메일로 보내주거나 담당자에게 문의해주세요.'
 		},
 		oneTimeDonation: {
@@ -39,8 +39,8 @@
 
 <div class="min-h-screen bg-gray-50">
 	<!-- 히어로 섹션 -->
-	<section class="bg-gradient-to-r from-green-600 to-green-800 py-16 text-white">
-		<div class="container mx-auto px-4 text-center">
+	<section class="bg-gradient-to-r from-lime-600 to-lime-800 py-16 text-white">
+		<div class="text-center">
 			<h1 class="mb-6 text-4xl font-bold md:text-6xl">후원안내</h1>
 			<p class="text-xl opacity-90 md:text-2xl">
 				여러분의 따뜻한 마음이 장애인의 자립생활을 지원합니다
@@ -48,12 +48,12 @@
 		</div>
 	</section>
 
-	<div class="container mx-auto px-4 py-12">
+	<div class="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 		<!-- 후원 이미지 -->
 		<section class="mb-12">
 			<div class="overflow-hidden rounded-lg bg-white shadow-md">
 				<img
-					src="https://modo-phinf.pstatic.net/20211001_128/1633066074322r376X_JPEG/mosajlewsm.jpeg?type=w1100"
+					src="/images/huwon.jpeg"
 					alt="후원 안내"
 					class="h-auto w-full object-contain"
 				/>
@@ -63,7 +63,7 @@
 		<!-- 후원신청서 링크 -->
 		<section class="mb-12">
 			<div class="rounded-lg bg-white p-8 text-center shadow-md">
-				<h2 class="mb-4 text-2xl font-bold text-green-700">정기후원 신청</h2>
+				<h2 class="mb-4 text-2xl font-bold text-lime-700">정기후원 신청</h2>
 				<p class="mb-6 text-gray-600">
 					정기후원을 원하시는 경우 아래 링크를 이용하여 신청해 주시기 바랍니다.
 				</p>
@@ -72,7 +72,7 @@
 						href={donationInfo.regularDonation.link}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="inline-flex items-center justify-center rounded-lg bg-green-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-green-700"
+						class="inline-flex items-center justify-center rounded-lg bg-lime-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-lime-700"
 					>
 						<span>후원신청서 링크</span>
 						<svg class="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +86,7 @@
 					</a>
 					<button
 						onclick={downloadApplication}
-						class="inline-flex items-center justify-center rounded-lg border border-green-600 px-8 py-3 font-semibold text-green-600 transition-colors hover:bg-green-50"
+						class="inline-flex items-center justify-center rounded-lg border border-lime-600 px-8 py-3 font-semibold text-lime-600 transition-colors hover:bg-lime-50"
 					>
 						<span>신청서 다운로드</span>
 						<svg class="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,10 +112,10 @@
 				<div class="rounded-lg bg-white p-6 shadow-md">
 					<div class="mb-4 text-center">
 						<div
-							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-lime-100"
 						>
 							<svg
-								class="h-8 w-8 text-green-600"
+								class="h-8 w-8 text-lime-600"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -128,7 +128,7 @@
 								/>
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold text-green-700">{donationInfo.regularDonation.title}</h3>
+						<h3 class="text-xl font-bold text-lime-700">{donationInfo.regularDonation.title}</h3>
 					</div>
 					<div class="space-y-2 text-gray-700">
 						<p class="font-medium">{donationInfo.regularDonation.description}</p>
@@ -140,10 +140,10 @@
 				<div class="rounded-lg bg-white p-6 shadow-md">
 					<div class="mb-4 text-center">
 						<div
-							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-lime-100"
 						>
 							<svg
-								class="h-8 w-8 text-green-600"
+								class="h-8 w-8 text-lime-600"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -156,7 +156,7 @@
 								/>
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold text-green-700">{donationInfo.oneTimeDonation.title}</h3>
+						<h3 class="text-xl font-bold text-lime-700">{donationInfo.oneTimeDonation.title}</h3>
 					</div>
 					<div class="space-y-2 text-gray-700">
 						<p class="font-medium">{donationInfo.oneTimeDonation.description}</p>
@@ -171,10 +171,10 @@
 				<div class="rounded-lg bg-white p-6 shadow-md">
 					<div class="mb-4 text-center">
 						<div
-							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100"
+							class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-lime-100"
 						>
 							<svg
-								class="h-8 w-8 text-green-600"
+								class="h-8 w-8 text-lime-600"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -187,7 +187,7 @@
 								/>
 							</svg>
 						</div>
-						<h3 class="text-xl font-bold text-green-700">{donationInfo.materialDonation.title}</h3>
+						<h3 class="text-xl font-bold text-lime-700">{donationInfo.materialDonation.title}</h3>
 					</div>
 					<div class="space-y-2 text-gray-700">
 						<p class="font-medium">{donationInfo.materialDonation.description}</p>
@@ -199,24 +199,24 @@
 
 		<!-- 연락처 정보 -->
 		<section class="mb-12">
-			<div class="rounded-lg border border-green-200 bg-green-50 p-8">
-				<h3 class="mb-6 text-center text-2xl font-bold text-green-700">문의사항</h3>
+			<div class="rounded-lg border border-lime-200 bg-lime-50 p-8">
+				<h3 class="mb-6 text-center text-2xl font-bold text-lime-700">문의사항</h3>
 				<div class="grid gap-6 md:grid-cols-2">
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">📞</span>
 						</div>
 						<div>
 							<div class="font-medium">전화</div>
 							<div class="text-sm text-gray-600">
-								<a href="tel:{donationInfo.contact.phone}" class="underline hover:text-green-600">
+								<a href="tel:{donationInfo.contact.phone}" class="underline hover:text-lime-600">
 									{donationInfo.contact.phone} ({donationInfo.contact.person})
 								</a>
 							</div>
 						</div>
 					</div>
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">✉️</span>
 						</div>
 						<div>
@@ -224,7 +224,7 @@
 							<div class="text-sm text-gray-600">
 								<a
 									href="mailto:{donationInfo.contact.email}"
-									class="underline hover:text-green-600"
+									class="underline hover:text-lime-600"
 								>
 									{donationInfo.contact.email}
 								</a>
@@ -237,7 +237,7 @@
 
 		<!-- 후원 참여 CTA -->
 		<section class="text-center">
-			<div class="rounded-lg bg-gradient-to-r from-green-600 to-green-800 p-12 text-white">
+			<div class="rounded-lg bg-gradient-to-r from-lime-600 to-lime-800 p-12 text-white">
 				<h2 class="mb-4 text-3xl font-bold">함께 후원에 참여해보세요</h2>
 				<p class="mb-8 text-xl opacity-90">작은 후원이 큰 변화를 만들어갑니다.</p>
 				<div class="flex flex-col justify-center gap-4 sm:flex-row">
@@ -245,13 +245,13 @@
 						href={donationInfo.regularDonation.link}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="inline-block rounded-lg bg-white px-8 py-3 font-semibold text-green-600 transition-colors hover:bg-gray-100"
+						class="inline-block rounded-lg bg-white px-8 py-3 font-semibold text-lime-600 transition-colors hover:bg-gray-100"
 					>
 						정기후원 신청하기
 					</a>
 					<a
 						href="tel:{donationInfo.contact.phone}"
-						class="inline-block rounded-lg border-2 border-white px-8 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-green-600"
+						class="inline-block rounded-lg border-2 border-white px-8 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-lime-600"
 					>
 						문의하기
 					</a>

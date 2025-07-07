@@ -54,7 +54,6 @@ export function decodeToken(token: string) {
     );
     return JSON.parse(jsonPayload);
   } catch (error) {
-    console.error('Token decode error:', error);
     return null;
   }
 }
@@ -120,7 +119,7 @@ export async function refreshAuthToken(): Promise<boolean> {
       }
     }
   } catch (error) {
-    console.error('Token refresh failed:', error);
+    // 토큰 갱신 실패
   }
 
   // 리프레시 실패시 로그아웃

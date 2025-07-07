@@ -20,9 +20,13 @@
 		PlusIcon,
 		TrashIcon,
 		ChevronUpIcon,
-		ChevronDownIcon
+		ChevronDownIcon,
+		FanIcon,
+		UserIcon,
+		BuildingIcon,
+		ImageIcon
 	} from 'lucide-svelte';
-	import { getSiteSettings, saveSiteSettings } from '$lib/api/admin';
+	import { getSiteSettings, saveSiteSettings, uploadSiteFile } from '$lib/api/admin';
 
 	interface SiteInfo {
 		siteName: string;
@@ -30,6 +34,11 @@
 		address: string;
 		phone: string;
 		email: string;
+		homepage: string;
+		fax: string;
+		representativeName: string;
+		businessNumber: string;
+		logoImageUrl: string;
 	}
 
 	interface SnsLink {
@@ -46,13 +55,20 @@
 		catchphrase: '',
 		address: '',
 		phone: '',
-		email: ''
+		email: '',
+		homepage: '',
+		fax: '',
+		representativeName: '',
+		businessNumber: '',
+		logoImageUrl: ''
 	};
 
 	let snsLinks: SnsLink[] = [];
 	let loading = true;
 	let saving = false;
 	let errorMessage: string | null = null;
+	let logoUploading = false;
+	let logoFile: File | null = null;
 
 	const snsIconOptions = [
 		{ value: 'facebook', label: 'Facebook', icon: '📘' },
@@ -76,11 +92,31 @@
 			const data = await getSiteSettings();
 
 			// API 응답 구조에 따라 데이터 설정
-			if (data.siteInfo) {
-				siteInfo = data.siteInfo;
+			if (data.site_info) {
+				// 백엔드 snake_case를 프론트엔드 camelCase로 변환
+				siteInfo = {
+					siteName: data.site_info.site_name || '',
+					catchphrase: data.site_info.catchphrase || '',
+					address: data.site_info.address || '',
+					phone: data.site_info.phone || '',
+					email: data.site_info.email || '',
+					homepage: data.site_info.homepage || '',
+					fax: data.site_info.fax || '',
+					representativeName: data.site_info.representative_name || '',
+					businessNumber: data.site_info.business_number || '',
+					logoImageUrl: data.site_info.logo_image_url || ''
+				};
 			}
-			if (data.snsLinks) {
-				snsLinks = data.snsLinks;
+			if (data.sns_links) {
+				// SNS 링크도 변환
+				snsLinks = data.sns_links.map((link: any) => ({
+					id: link.id || Date.now().toString(),
+					name: link.name || '',
+					url: link.url || '',
+					icon: link.icon || 'custom',
+					iconType: link.icon_type || 'svg',
+					order: link.display_order || 1
+				}));
 			}
 		} catch (error) {
 			console.error('설정 로드 실패:', error);
@@ -92,7 +128,12 @@
 				catchphrase: '함께 만들어가는 따뜻한 세상',
 				address: '서울특별시 강남구 테헤란로 123',
 				phone: '02-1234-5678',
-				email: 'info@mincenter.org'
+				email: 'info@mincenter.org',
+				homepage: 'https://example.com',
+				fax: '',
+				representativeName: '',
+				businessNumber: '',
+				logoImageUrl: ''
 			};
 			snsLinks = [];
 		} finally {
@@ -105,10 +146,31 @@
 		saving = true;
 		try {
 			errorMessage = null;
+			
+			// 프론트엔드 데이터를 백엔드 형식으로 변환
 			const settingsData = {
-				siteInfo,
-				snsLinks
+				siteInfo: {
+					site_name: siteInfo.siteName,
+					catchphrase: siteInfo.catchphrase,
+					address: siteInfo.address,
+					phone: siteInfo.phone,
+					email: siteInfo.email,
+					homepage: siteInfo.homepage,
+					fax: siteInfo.fax,
+					representative_name: siteInfo.representativeName,
+					business_number: siteInfo.businessNumber,
+					logo_image_url: siteInfo.logoImageUrl
+				},
+				snsLinks: snsLinks.map(link => ({
+					name: link.name,
+					url: link.url,
+					icon: link.icon,
+					icon_type: link.iconType,
+					display_order: link.order,
+					is_active: true
+				}))
 			};
+			
 			await saveSiteSettings(settingsData);
 
 			// 성공 메시지 표시
@@ -163,6 +225,46 @@
 	function getIconDisplay(icon: string, iconType: string) {
 		const option = snsIconOptions.find((opt) => opt.value === icon);
 		return option ? option.icon : '🔗';
+	}
+
+	async function handleLogoUpload(event: Event) {
+		const target = event.target as HTMLInputElement;
+		if (!target.files || target.files.length === 0) return;
+
+		const file = target.files[0];
+		
+		// 파일 타입 검증 (이미지만 허용)
+		if (!file.type.startsWith('image/')) {
+			alert('이미지 파일만 업로드 가능합니다.');
+			return;
+		}
+
+		// 파일 크기 검증 (5MB 제한)
+		if (file.size > 5 * 1024 * 1024) {
+			alert('파일 크기는 5MB 이하여야 합니다.');
+			return;
+		}
+
+		logoFile = file;
+		logoUploading = true;
+
+		try {
+			const result = await uploadSiteFile(file);
+			siteInfo.logoImageUrl = result.url;
+			alert('로고 이미지가 업로드되었습니다.');
+		} catch (error) {
+			console.error('로고 업로드 실패:', error);
+			alert('로고 업로드에 실패했습니다.');
+		} finally {
+			logoUploading = false;
+			// 파일 입력 초기화
+			target.value = '';
+		}
+	}
+
+	function removeLogo() {
+		siteInfo.logoImageUrl = '';
+		logoFile = null;
 	}
 </script>
 
@@ -221,6 +323,18 @@
 					</div>
 
 					<div>
+						<label for="homepage" class="mb-1 block text-sm font-medium text-gray-700">
+							홈페이지 주소
+						</label>
+						<Input
+							id="homepage"
+							bind:value={siteInfo.homepage}
+							placeholder="https://example.com"
+							type="url"
+						/>
+					</div>
+
+					<div>
 						<label for="address" class="mb-1 block text-sm font-medium text-gray-700"> 주소 </label>
 						<div class="flex items-center gap-2">
 							<MapPinIcon class="h-4 w-4 text-gray-400" />
@@ -251,6 +365,92 @@
 									placeholder="이메일을 입력하세요"
 								/>
 							</div>
+						</div>
+					</div>
+
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div>
+							<label for="fax" class="mb-1 block text-sm font-medium text-gray-700">
+								팩스
+							</label>
+							<div class="flex items-center gap-2">
+								<FanIcon class="h-4 w-4 text-gray-400" />
+								<Input id="fax" bind:value={siteInfo.fax} placeholder="팩스번호를 입력하세요" />
+							</div>
+						</div>
+						<div>
+							<label for="representativeName" class="mb-1 block text-sm font-medium text-gray-700">
+								대표자명
+							</label>
+							<div class="flex items-center gap-2">
+								<UserIcon class="h-4 w-4 text-gray-400" />
+								<Input
+									id="representativeName"
+									bind:value={siteInfo.representativeName}
+									placeholder="대표자명을 입력하세요"
+								/>
+							</div>
+						</div>
+					</div>
+
+					<div>
+						<label for="businessNumber" class="mb-1 block text-sm font-medium text-gray-700">
+							사업자번호
+						</label>
+						<div class="flex items-center gap-2">
+							<BuildingIcon class="h-4 w-4 text-gray-400" />
+							<Input
+								id="businessNumber"
+								bind:value={siteInfo.businessNumber}
+								placeholder="사업자등록번호를 입력하세요 (예: 123-45-67890)"
+							/>
+						</div>
+					</div>
+
+					<div>
+						<label for="logoImageUrl" class="mb-1 block text-sm font-medium text-gray-700">
+							로고 이미지
+						</label>
+						<div class="space-y-3">
+							{#if siteInfo.logoImageUrl}
+								<div class="flex items-center gap-3">
+									<img
+										src={siteInfo.logoImageUrl}
+										alt="로고 미리보기"
+										class="h-16 w-auto rounded border"
+										onerror={(e) => {
+											const target = e.target as HTMLImageElement;
+											if (target) target.style.display = 'none';
+										}}
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onclick={removeLogo}
+										class="text-red-600"
+									>
+										삭제
+									</Button>
+								</div>
+							{/if}
+							
+							<div class="flex items-center gap-2">
+								<ImageIcon class="h-4 w-4 text-gray-400" />
+								<Input
+									id="logoImageUrl"
+									type="file"
+									accept="image/*"
+									onchange={handleLogoUpload}
+									disabled={logoUploading}
+								/>
+								{#if logoUploading}
+									<div class="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
+								{/if}
+							</div>
+							<p class="text-xs text-gray-500">
+								이미지 파일만 업로드 가능합니다. (최대 5MB)
+							</p>
 						</div>
 					</div>
 				</CardContent>

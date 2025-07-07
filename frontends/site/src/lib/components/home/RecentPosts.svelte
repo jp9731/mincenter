@@ -1,31 +1,97 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Card } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import { getRecentPosts } from '$lib/api/community';
+	import type { PostDetail } from '$lib/types/community';
 
-	// 임시 데이터 (실제로는 API에서 가져올 예정)
-	const posts = [
-		{
-			id: 1,
-			title: '2024년 봄맞이 봉사활동 모집',
-			category: '공지사항',
-			date: '2024-03-15',
-			image: '/images/posts/volunteer-spring.jpg'
-		},
-		{
-			id: 2,
-			title: '자립생활지원사 양성교육 안내',
-			category: '교육',
-			date: '2024-03-10',
-			image: '/images/posts/training.jpg'
-		},
-		{
-			id: 3,
-			title: '장애인 문화예술 축제 개최',
-			category: '행사',
-			date: '2024-03-05',
-			image: '/images/posts/festival.jpg'
+	// Props
+	const { slugs = 'notice,volunteer-review', limit = 3 } = $props<{
+		slugs?: string;
+		limit?: number;
+	}>();
+
+	// 상태
+	let posts: PostDetail[] = [];
+	let loading = $state(true);
+	let error: string | null = $state(null);
+
+	// 첫 번째 이미지 URL 추출 함수
+	function getFirstImageUrl(post: PostDetail): string | null {
+		// 썸네일 URL이 있으면 우선 사용
+		if (post.thumbnail_urls) {
+			if (post.thumbnail_urls.card) {
+				return post.thumbnail_urls.card;
+			} else if (post.thumbnail_urls.thumb) {
+				return post.thumbnail_urls.thumb;
+			} else if (post.thumbnail_urls.large) {
+				return post.thumbnail_urls.large;
+			}
 		}
-	];
+
+		// 썸네일이 없으면 첨부파일에서 이미지 찾기
+		if (post.attached_files && post.attached_files.length > 0) {
+			for (const fileUrl of post.attached_files) {
+				if (isImageFile(fileUrl)) {
+					return fileUrl;
+				}
+			}
+		}
+		
+		// 콘텐츠에서 img 태그 찾기 (HTML 콘텐츠가 있는 경우)
+		if (post.content) {
+			const imgMatch = post.content.match(/<img[^>]+src="([^"]+)"/);
+			if (imgMatch && imgMatch[1]) {
+				return imgMatch[1];
+			}
+		}
+		
+		return null;
+	}
+
+	// 이미지 파일 여부 확인
+	function isImageFile(fileUrl: string): boolean {
+		const extension = fileUrl.split('.').pop()?.toLowerCase();
+		return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(extension || '');
+	}
+
+	// 완전한 파일 URL 생성
+	function getFullFileUrl(fileUrl: string): string {
+		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+			return fileUrl;
+		}
+		const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+	}
+
+	// 텍스트에서 HTML 태그 제거
+	function stripHtml(html: string | null | undefined): string {
+		if (!html) return '';
+		return html.replace(/<[^>]*>/g, '').trim();
+	}
+
+	// 날짜 포맷팅
+	function formatDate(dateString: string): string {
+		return new Date(dateString).toLocaleDateString('ko-KR');
+	}
+
+	// 최근 게시글 로드
+	async function loadRecentPosts() {
+		try {
+			loading = true;
+			error = null;
+			posts = await getRecentPosts({ slugs, limit });
+		} catch (err) {
+			console.error('최근 게시글 로드 실패:', err);
+			error = err instanceof Error ? err.message : '최근 게시글을 불러오는데 실패했습니다.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	onMount(() => {
+		loadRecentPosts();
+	});
 </script>
 
 <section class="py-16 md:py-24">
@@ -37,32 +103,84 @@
 			</p>
 		</div>
 
-		<div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-			{#each posts as post}
-				<Card class="overflow-hidden transition-shadow hover:shadow-lg">
-					<div class="aspect-w-16 aspect-h-9">
-						<img src={post.image} alt={post.title} class="h-full w-full object-cover" />
-					</div>
-					<div class="p-6">
-						<div class="mb-2 flex items-center gap-2">
-							<span class="text-primary-600 text-sm font-medium">
-								{post.category}
-							</span>
-							<span class="text-sm text-gray-500">
-								{post.date}
-							</span>
+		{#if loading}
+			<div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+				{#each Array(limit) as _}
+					<Card class="overflow-hidden">
+						<div class="aspect-w-16 aspect-h-9 bg-gray-200 animate-pulse"></div>
+						<div class="p-6">
+							<div class="mb-2 flex items-center gap-2">
+								<div class="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+								<div class="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+							</div>
+							<div class="mb-2 h-6 bg-gray-200 rounded animate-pulse"></div>
+							<div class="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
 						</div>
-						<h3 class="mb-2 text-xl font-semibold text-gray-900">
-							{post.title}
-						</h3>
-						<Button variant="ghost" href={`/community/posts/${post.id}`}>자세히 보기</Button>
-					</div>
-				</Card>
-			{/each}
-		</div>
+					</Card>
+				{/each}
+			</div>
+		{:else if error}
+			<div class="text-center py-8">
+				<p class="text-red-600">{error}</p>
+				<Button onclick={loadRecentPosts} class="mt-4">다시 시도</Button>
+			</div>
+		{:else if posts.length === 0}
+			<div class="text-center py-8">
+				<p class="text-gray-600">등록된 게시글이 없습니다.</p>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+				{#each posts as post}
+					{@const imageUrl = getFirstImageUrl(post)}
+					<Card class="overflow-hidden transition-shadow hover:shadow-lg">
+						{#if imageUrl}
+							<div class="aspect-w-16 aspect-h-9">
+								<img 
+									src={getFullFileUrl(imageUrl)} 
+									alt={post.title} 
+									class="h-full w-full object-cover"
+									loading="lazy"
+								/>
+							</div>
+						{:else}
+							<div class="aspect-w-16 aspect-h-9 bg-gray-100 flex items-center justify-center">
+								<img src="/images/min_logo.png" alt="기본 이미지" class=" object-contain opacity-40" />
+							</div>
+						{/if}
+						<div class="p-6">
+							<div class="mb-2 flex items-center gap-2">
+								<span class="text-primary-600 text-sm font-medium">
+									{post.category_name || post.board_name}
+								</span>
+								<span class="text-sm text-gray-500">
+									{formatDate(post.created_at)}
+								</span>
+							</div>
+							<h3 class="mb-2 text-xl font-semibold text-gray-900 line-clamp-2">
+								{post.title}
+							</h3>
+							{#if post.content}
+								<p class="mb-4 text-sm text-gray-600 line-clamp-3">
+									{stripHtml(post.content)}
+								</p>
+							{/if}
+							<div class="flex items-center justify-between">
+								<Button variant="ghost" asChild>
+									<a href="/community/{post.board_slug}/{post.id}">자세히 보기</a>
+								</Button>
+								<div class="flex items-center gap-4 text-xs text-gray-500">
+									<span>조회 {post.views || 0}</span>
+									<span>댓글 {post.comment_count || 0}</span>
+								</div>
+							</div>
+						</div>
+					</Card>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="mt-12 text-center">
-			<Button href="/community" variant="outline">더 많은 소식 보기</Button>
+			<Button href="/community/notice" variant="outline">더 많은 소식 보기</Button>
 		</div>
 	</div>
 </section>

@@ -69,25 +69,25 @@
 			title: 'IL사업',
 			description: '동료상담, 권익옹호활동, 정보제공, 자조모임 등 다양한 사업기획 및 지원',
 			image:
-				'https://modo-phinf.pstatic.net/20210520_298/1621483194116xW8tG_JPEG/mosa98dr3Z.jpeg?type=f130_130'
+				'./images/about/mosa98dr3Z.jpeg'
 		},
 		{
 			title: '자립지원사업',
 			description: '탈시설 및 탈재가장애인의 자립생활전환으로 거주공간을 마련, 자립생활기술 습득',
 			image:
-				'https://modo-phinf.pstatic.net/20210520_135/1621483858102BR9iJ_JPEG/mosaL1e4NQ.jpeg?type=f130_130'
+				'./images/about/mosaL1e4NQ.jpeg'
 		},
 		{
 			title: '활동지원사업',
 			description: '장애인이 지역사회에서 사회구성원으로 동등하게 살아갈 수 있도록 활동지원사 파견',
 			image:
-				'https://modo-phinf.pstatic.net/20210520_138/1621484654953epyLJ_JPEG/mosaZxU8EE.jpeg?type=f130_130'
+				'./images/about/mosaZxU8EE.jpeg'
 		},
 		{
 			title: '기타',
 			description: '차별상담전화, 보장구수리 및 점검, 회원교육, 명절행사, 투쟁활동참여',
 			image:
-				'https://modo-phinf.pstatic.net/20210520_182/1621479716822OpKnN_JPEG/mosa7psFmt.jpeg?type=f130_130'
+				'./images/about/mosa7psFmt.jpeg'
 		}
 	];
 
@@ -97,23 +97,55 @@
 			title: '유튜브(Youtube)',
 			description: "'민들레장애인자립생활센터'를 검색해주세요.",
 			image:
-				'https://modo-phinf.pstatic.net/20220426_12/1650940740975Ne55X_PNG/mosa7xtBCY.png?type=f130_130'
+				'./images/about/mosa7xtBCY.png'
 		},
 		{
 			title: '카카오톡플러스친구',
 			description: "카카오톡 친구추가에서 '민들레장애인자립생활센터'를 검색해주세요.",
 			image:
-				'https://modo-phinf.pstatic.net/20220426_124/1650940741540azgyP_PNG/mosa2p4VoB.png?type=f130_130'
+				'./images/about/mosa2p4VoB.png'
 		}
 	];
 
-	// 지도 정보
-	const mapInfo = {
-		lat: 37.5388052,
-		lng: 126.7358312,
-		level: 13,
-		companyName: '민들레장애인자립생활센터'
-	};
+	import MapEmbed from '$lib/components/about/MapEmbed.svelte';
+	import { onMount } from 'svelte';
+	let mapContainer: HTMLDivElement | null = null;
+
+	function loadKakaoMap() {
+		const width = mapContainer?.offsetWidth || 640;
+		const height = Math.round(width * 9 / 16);
+		// 기존 roughmap이 있으면 제거(중복 방지)
+		const oldMap = document.getElementById('daumRoughmapContainer1751856074840');
+		if (oldMap) oldMap.innerHTML = '';
+		// 스크립트가 이미 있으면 실행만, 없으면 삽입
+		if (!window['daum'] || !window['daum'].roughmap) {
+			const script = document.createElement('script');
+			script.src = 'https://ssl.daumcdn.net/dmaps/map_js_init/roughmapLoader.js';
+			script.charset = 'UTF-8';
+			script.onload = () => {
+				new window['daum'].roughmap.Lander({
+					"timestamp": "1751856074840",
+					"key": "58zax7beg8c",
+					"mapWidth": width,
+					"mapHeight": height
+				}).render();
+			};
+			document.body.appendChild(script);
+		} else {
+			new window['daum'].roughmap.Lander({
+				"timestamp": "1751856074840",
+				"key": "58zax7beg8c",
+				"mapWidth": width,
+				"mapHeight": height
+			}).render();
+		}
+	}
+
+	onMount(() => {
+		loadKakaoMap();
+		window.addEventListener('resize', loadKakaoMap);
+		return () => window.removeEventListener('resize', loadKakaoMap);
+	});
 </script>
 
 <svelte:head>
@@ -123,8 +155,8 @@
 
 <div class="min-h-screen bg-gray-50">
 	<!-- 히어로 섹션 -->
-	<section class="relative bg-gradient-to-r from-green-600 to-green-800 py-20 text-white">
-		<div class="container mx-auto px-4">
+	<section class="relative bg-gradient-to-r from-lime-600 to-lime-800 py-20 text-white">
+		<div>
 			<div class="mx-auto max-w-4xl text-center">
 				<h1 class="mb-6 text-4xl font-bold md:text-6xl">민들레는요</h1>
 				<p class="mb-8 text-xl opacity-90 md:text-2xl">
@@ -148,12 +180,12 @@
 		</div>
 	</section>
 
-	<div class="container mx-auto px-4 py-12">
+	<div class="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 		<!-- 메인 이미지 -->
 		<section class="mb-16">
 			<div class="overflow-hidden rounded-lg bg-white shadow-md">
 				<img
-					src="https://modo-phinf.pstatic.net/20250107_214/1736237960310Mj4Or_JPEG/mosaReI7ye.jpeg?type=w1100"
+					src="./images/about/hero_bg.jpeg"
 					alt="민들레장애인자립생활센터"
 					class="h-64 w-full object-cover md:h-96"
 				/>
@@ -163,16 +195,16 @@
 		<!-- 연혁 -->
 		<section class="mb-16">
 			<div class="mb-12 text-center">
-				<h2 class="mb-4 text-3xl font-bold text-green-700">연혁</h2>
+				<h2 class="mb-4 text-3xl font-bold text-lime-700">연혁</h2>
 				<p class="mx-auto max-w-2xl text-gray-600">
 					2008년 설립 이후 지속적인 성장과 발전을 이어가고 있습니다.
 				</p>
 			</div>
 			<div class="rounded-lg bg-white p-8 shadow-md">
-				<div class="max-h-96 space-y-4 overflow-y-auto">
+				<div class="space-y-4 ">
 					{#each history as item}
 						<div class="flex items-start gap-4 rounded-lg p-3 transition-colors hover:bg-gray-50">
-							<div class="w-24 flex-shrink-0 text-sm font-semibold text-green-600">
+							<div class="w-24 flex-shrink-0 text-sm font-semibold text-lime-600">
 								{item.year}
 							</div>
 							<div class="flex-1">
@@ -190,7 +222,7 @@
 		<!-- 주요사업 -->
 		<section class="mb-16">
 			<div class="mb-12 text-center">
-				<h2 class="mb-4 text-3xl font-bold text-green-700">주요사업</h2>
+				<h2 class="mb-4 text-3xl font-bold text-lime-700">주요사업</h2>
 				<p class="mx-auto max-w-2xl text-gray-600">
 					장애인의 자립생활을 위한 다양한 사업을 운영하고 있습니다.
 				</p>
@@ -210,7 +242,7 @@
 								</div>
 								<div class="flex items-center p-6 md:w-2/3">
 									<div>
-										<h3 class="mb-3 text-2xl font-bold text-green-700">{service.title}</h3>
+										<h3 class="mb-3 text-2xl font-bold text-lime-700">{service.title}</h3>
 										<p class="leading-relaxed text-gray-700">{service.description}</p>
 									</div>
 								</div>
@@ -218,7 +250,7 @@
 								<!-- 이미지가 오른쪽 -->
 								<div class="flex items-center p-6 md:w-2/3">
 									<div>
-										<h3 class="mb-3 text-2xl font-bold text-green-700">{service.title}</h3>
+										<h3 class="mb-3 text-2xl font-bold text-lime-700">{service.title}</h3>
 										<p class="leading-relaxed text-gray-700">{service.description}</p>
 									</div>
 								</div>
@@ -239,38 +271,16 @@
 		<!-- 위치 -->
 		<section class="mb-16">
 			<div class="mb-12 text-center">
-				<h2 class="mb-4 text-3xl font-bold text-green-700">위치</h2>
+				<h2 class="mb-4 text-3xl font-bold text-lime-700">위치</h2>
 				<p class="mx-auto max-w-2xl text-gray-600">민들레장애인자립생활센터의 위치를 확인하세요.</p>
 			</div>
-			<div class="overflow-hidden rounded-lg bg-white shadow-md">
-				<div class="flex h-96 items-center justify-center bg-gray-200">
-					<div class="text-center">
-						<div class="mb-4 text-6xl">📍</div>
-						<h3 class="mb-2 text-xl font-bold text-gray-900">{mapInfo.companyName}</h3>
-						<p class="text-gray-600">{organizationInfo.address}</p>
-						<div class="mt-4 space-x-4">
-							<a
-								href="#"
-								class="inline-block rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
-							>
-								지도보기
-							</a>
-							<a
-								href="#"
-								class="inline-block rounded-lg border border-green-600 px-4 py-2 text-green-600 transition-colors hover:bg-green-50"
-							>
-								길찾기
-							</a>
-						</div>
-					</div>
-				</div>
-			</div>
+			<MapEmbed />
 		</section>
 
 		<!-- SNS 안내 -->
 		<section class="mb-16">
 			<div class="mb-12 text-center">
-				<h2 class="mb-4 text-3xl font-bold text-green-700">SNS 안내</h2>
+				<h2 class="mb-4 text-3xl font-bold text-lime-700">SNS 안내</h2>
 				<p class="mx-auto max-w-2xl text-gray-600">
 					다양한 소셜미디어를 통해 민들레의 소식을 받아보세요.
 				</p>
@@ -283,7 +293,7 @@
 								<img src={sns.image} alt={sns.title} class="h-20 w-20 rounded-lg object-cover" />
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-xl font-bold text-green-700">{sns.title}</h3>
+								<h3 class="mb-2 text-xl font-bold text-lime-700">{sns.title}</h3>
 								<p class="text-gray-700">{sns.description}</p>
 							</div>
 						</div>
@@ -294,12 +304,12 @@
 
 		<!-- 연락처 정보 -->
 		<section class="mb-16">
-			<div class="rounded-lg border border-green-200 bg-green-50 p-8">
-				<h3 class="mb-6 text-2xl font-bold text-green-700">연락처 정보</h3>
+			<div class="rounded-lg border border-lime-200 bg-lime-50 p-8">
+				<h3 class="mb-6 text-2xl font-bold text-lime-700">연락처 정보</h3>
 				<p class="mb-6 text-gray-600">궁금한 점이 있으시면 언제든 연락주세요.</p>
 				<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">📍</span>
 						</div>
 						<div>
@@ -308,7 +318,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">📞</span>
 						</div>
 						<div>
@@ -317,7 +327,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">✉️</span>
 						</div>
 						<div>
@@ -326,7 +336,7 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-3">
-						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
+						<div class="flex h-5 w-5 items-center justify-center rounded-full bg-lime-600">
 							<span class="text-xs text-white">🌐</span>
 						</div>
 						<div>
@@ -339,25 +349,25 @@
 		</section>
 
 		<!-- 봉사 참여 CTA -->
-		<section class="text-center">
-			<div class="rounded-lg bg-gradient-to-r from-green-600 to-green-800 p-12 text-white">
+		<!-- <section class="text-center">
+			<div class="rounded-lg bg-gradient-to-r from-lime-600 to-lime-800 p-12 text-white">
 				<h2 class="mb-4 text-3xl font-bold">함께 봉사에 참여해보세요</h2>
 				<p class="mb-8 text-xl opacity-90">작은 관심과 참여가 큰 변화를 만들어갑니다.</p>
 				<div class="flex flex-col justify-center gap-4 sm:flex-row">
 					<a
 						href="/volunteer"
-						class="inline-block rounded-lg bg-white px-8 py-3 font-semibold text-green-600 transition-colors hover:bg-gray-100"
+						class="inline-block rounded-lg bg-white px-8 py-3 font-semibold text-lime-600 transition-colors hover:bg-gray-100"
 					>
 						봉사 신청하기
 					</a>
 					<a
 						href="/contact"
-						class="inline-block rounded-lg border-2 border-white px-8 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-green-600"
+						class="inline-block rounded-lg border-2 border-white px-8 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-lime-600"
 					>
 						문의하기
 					</a>
 				</div>
 			</div>
-		</section>
+		</section> -->
 	</div>
 </div>

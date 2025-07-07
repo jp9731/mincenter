@@ -402,3 +402,49 @@ BEGIN
     RAISE NOTICE '테스트 계정: user1@example.com / admin123';
     RAISE NOTICE '샘플 데이터가 성공적으로 생성되었습니다.';
 END $$;
+
+-- 기본 메뉴 데이터 삽입
+-- 데이터베이스 초기화 후 실행
+
+-- 기존 메뉴 데이터 삭제 (초기화)
+DELETE FROM menus;
+
+-- 기본 메뉴 데이터 삽입
+INSERT INTO menus (id, name, description, menu_type, target_id, url, display_order, is_active, parent_id, created_at, updated_at) VALUES
+-- 1단 메뉴
+('550e8400-e29b-41d4-a716-446655440001', '민들레는요', '민들레장애인자립생활센터 소개', 'page', NULL, '/about', 1, true, NULL, NOW(), NOW()),
+('550e8400-e29b-41d4-a716-446655440002', '사업소개', '센터에서 진행하는 사업들', 'page', NULL, '/services', 2, true, NULL, NOW(), NOW()),
+('550e8400-e29b-41d4-a716-446655440003', '정보마당', '게시판 및 커뮤니티', 'board', NULL, '/community', 3, true, NULL, NOW(), NOW()),
+('550e8400-e29b-41d4-a716-446655440004', '일정', '센터 일정 및 행사', 'calendar', NULL, '/calendar', 4, true, NULL, NOW(), NOW()),
+('550e8400-e29b-41d4-a716-446655440005', '후원하기', '센터 후원 안내', 'page', NULL, '/donation', 5, true, NULL, NOW(), NOW());
+
+-- 기본 게시판 데이터 삽입 (메뉴와 연결용)
+INSERT INTO boards (id, name, slug, description, category, display_order, is_public, allow_anonymous, allow_file_upload, max_files, max_file_size, allowed_file_types, allow_rich_text, require_category, allow_comments, allow_likes, created_at, updated_at) VALUES
+('660e8400-e29b-41d4-a716-446655440001', '공지사항', 'notice', '중요한 공지사항을 확인하세요', '공지', 1, true, false, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW()),
+('660e8400-e29b-41d4-a716-446655440002', '자유게시판', 'free', '자유롭게 소통하는 공간', '커뮤니티', 2, true, true, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW()),
+('660e8400-e29b-41d4-a716-446655440003', '봉사활동', 'volunteer', '봉사활동 관련 게시판', '봉사', 3, true, false, true, 5, 10485760, ARRAY['image/*', 'application/pdf'], true, false, true, true, NOW(), NOW());
+
+-- 기본 페이지 데이터 삽입 (메뉴와 연결용)
+INSERT INTO pages (id, title, slug, content, is_published, display_order, created_at, updated_at) VALUES
+('770e8400-e29b-41d4-a716-446655440001', '민들레는요', 'about', '<h1>민들레장애인자립생활센터</h1><p>장애인의 자립생활을 지원하는 센터입니다.</p>', true, 1, NOW(), NOW()),
+('770e8400-e29b-41d4-a716-446655440002', '사업소개', 'services', '<h1>사업소개</h1><p>센터에서 진행하는 다양한 사업들을 소개합니다.</p>', true, 2, NOW(), NOW()),
+('770e8400-e29b-41d4-a716-446655440003', '후원하기', 'donation', '<h1>후원하기</h1><p>센터 활동을 후원해주세요.</p>', true, 3, NOW(), NOW());
+
+-- 메뉴와 게시판/페이지 연결 업데이트
+UPDATE menus SET target_id = '660e8400-e29b-41d4-a716-446655440001' WHERE name = '정보마당';
+UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440001' WHERE name = '민들레는요';
+UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440002' WHERE name = '사업소개';
+UPDATE menus SET target_id = '770e8400-e29b-41d4-a716-446655440003' WHERE name = '후원하기';
+
+-- 기본 관리자 계정 생성 (비밀번호: admin123)
+INSERT INTO users (id, email, password_hash, name, phone, role, status, email_verified, created_at, updated_at) VALUES
+('880e8400-e29b-41d4-a716-446655440001', 'admin@mincenter.org', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/HS.iK2O', '관리자', '010-1234-5678', 'admin', 'active', true, NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
+
+-- 기본 사이트 설정
+INSERT INTO site_settings (id, setting_key, setting_value, description, created_at, updated_at) VALUES
+('990e8400-e29b-41d4-a716-446655440001', 'site_name', '민들레장애인자립생활센터', '사이트 이름', NOW(), NOW()),
+('990e8400-e29b-41d4-a716-446655440002', 'site_description', '장애인의 자립생활을 지원하는 센터', '사이트 설명', NOW(), NOW()),
+('990e8400-e29b-41d4-a716-446655440003', 'contact_email', 'info@mincenter.org', '연락처 이메일', NOW(), NOW()),
+('990e8400-e29b-41d4-a716-446655440004', 'contact_phone', '02-1234-5678', '연락처 전화번호', NOW(), NOW())
+ON CONFLICT (setting_key) DO NOTHING;

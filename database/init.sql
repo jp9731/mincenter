@@ -18,7 +18,7 @@ BEGIN
         CREATE TYPE post_status AS ENUM ('active', 'hidden', 'deleted');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_type') THEN
-        CREATE TYPE file_type AS ENUM ('image', 'document', 'video', 'audio');
+        CREATE TYPE file_type AS ENUM ('image', 'video', 'audio', 'document', 'archive', 'other');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_status') THEN
         CREATE TYPE file_status AS ENUM ('draft', 'published', 'orphaned', 'processing');
@@ -30,7 +30,7 @@ BEGIN
         CREATE TYPE entity_type AS ENUM ('post', 'gallery', 'user_profile', 'comment', 'draft');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_purpose') THEN
-        CREATE TYPE file_purpose AS ENUM ('main', 'attachment', 'thumbnail');
+        CREATE TYPE file_purpose AS ENUM ('attachment', 'thumbnail', 'content', 'avatar', 'editorimage');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_type') THEN
         CREATE TYPE notification_type AS ENUM ('comment', 'like', 'system', 'announcement');
@@ -106,6 +106,38 @@ CREATE TABLE IF NOT EXISTS boards (
     require_category BOOLEAN DEFAULT FALSE,
     allow_comments BOOLEAN DEFAULT TRUE,
     allow_likes BOOLEAN DEFAULT TRUE,
+    -- 새로운 설정 필드들
+    -- 권한 설정
+    write_permission VARCHAR(50) DEFAULT 'member', -- guest, member, admin
+    list_permission VARCHAR(50) DEFAULT 'guest', -- guest, member, admin
+    read_permission VARCHAR(50) DEFAULT 'guest', -- guest, member, admin
+    reply_permission VARCHAR(50) DEFAULT 'member', -- guest, member, admin
+    comment_permission VARCHAR(50) DEFAULT 'member', -- guest, member, admin
+    download_permission VARCHAR(50) DEFAULT 'member', -- guest, member, admin
+    -- 게시글 설정
+    hide_list BOOLEAN DEFAULT FALSE, -- 글 목록을 비밀글로 할지 여부
+    editor_type VARCHAR(50) DEFAULT 'rich', -- rich, simple, markdown
+    allow_search BOOLEAN DEFAULT TRUE, -- 게시글 전체 검색 여부
+    -- 추천/비추천 설정
+    allow_recommend BOOLEAN DEFAULT TRUE, -- 추천 사용 여부
+    allow_disrecommend BOOLEAN DEFAULT FALSE, -- 비추천 사용 여부
+    -- 표시 설정
+    show_author_name BOOLEAN DEFAULT TRUE, -- 이름 사용 여부
+    show_ip BOOLEAN DEFAULT FALSE, -- IP 보이기 사용 여부
+    -- 수정/삭제 제한
+    edit_comment_limit INTEGER DEFAULT 0, -- 댓글 몇개 이상 달리면 원글 수정 불가
+    delete_comment_limit INTEGER DEFAULT 0, -- 댓글 몇개 이상 달리면 원글 삭제 불가
+    -- 추가 기능
+    use_sns BOOLEAN DEFAULT FALSE, -- sns 사용
+    use_captcha BOOLEAN DEFAULT FALSE, -- 캡챠 사용
+    -- 제한 설정
+    title_length INTEGER DEFAULT 200, -- 제목길이
+    posts_per_page INTEGER DEFAULT 20, -- 페이지당 목록수
+    -- 포인트 설정
+    read_point INTEGER DEFAULT 0, -- 글읽기 차감 포인트
+    write_point INTEGER DEFAULT 0, -- 글쓰기 차감 포인트
+    comment_point INTEGER DEFAULT 0, -- 댓글쓰기 차감 포인트
+    download_point INTEGER DEFAULT 0, -- 다운로드 차감 포인트
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

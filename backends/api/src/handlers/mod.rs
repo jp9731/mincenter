@@ -1,20 +1,18 @@
 use axum::response::IntoResponse;
 
+pub mod site;
 pub mod admin;
-pub mod auth;
-pub mod community;
-pub mod menu;
-pub mod page;
-pub mod upload;
-pub mod calendar;
 
-pub use admin::*;
-pub use auth::*;
-pub use community::*;
-pub use menu::*;
-pub use page::*;
-pub use upload::*;
-pub use calendar::*;
+// Site handlers
+pub use site::auth;
+pub use site::community;
+pub use site::menu;
+pub use site::page;
+pub use site::upload;
+pub use site::calendar;
+
+// Admin handlers
+pub use admin::board;
 
 pub async fn health_check() -> impl IntoResponse {
     "OK"

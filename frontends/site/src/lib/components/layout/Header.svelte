@@ -5,70 +5,38 @@
 	import { Icon, Bars3, XMark, User, ArrowRightOnRectangle } from 'svelte-hero-icons';
 	import { user, isAuthenticated, logout } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
-	import { getSiteMenus, type MenuTree } from '$lib/api/site.js';
-	import { User as UserIcon } from 'lucide-svelte';
+	import { getSiteMenus, type MenuTree, DEFAULT_MENUS } from '$lib/api/site.js';
+	import { User as UserIcon, LogOut, CreditCard, Settings } from 'lucide-svelte';
+	import {
+		DropdownMenu,
+		DropdownMenuContent,
+		DropdownMenuItem,
+		DropdownMenuSeparator,
+		DropdownMenuTrigger
+	} from '$lib/components/ui/dropdown-menu';
 
 	let mobileMenuOpen = false;
 	let menus: MenuTree[] = [];
 	let loading = true;
+	let error: string | null = null;
 
 	onMount(async () => {
 		try {
 			const response = await getSiteMenus();
 			if (response.success && response.data) {
 				menus = response.data.menus;
-				
+				console.log('메뉴 로드 성공:', menus.length, '개 메뉴');
+			} else {
+				console.warn('API 응답이 성공이지만 데이터가 없습니다. 기본 메뉴를 사용합니다.');
+				menus = DEFAULT_MENUS;
 			}
 		} catch (error) {
 			console.error('메뉴 로드 실패:', error);
-			// 폴백 메뉴
-			menus = [
-				{
-					id: '1',
-					name: '민들레는요',
-					url: '/about',
-					menu_type: 'page',
-					display_order: 1,
-					is_active: true,
-					children: []
-				},
-				{
-					id: '2',
-					name: '사업소개',
-					url: '/services',
-					menu_type: 'page',
-					display_order: 2,
-					is_active: true,
-					children: []
-				},
-				{
-					id: '3',
-					name: '정보마당',
-					url: '/community',
-					menu_type: 'board',
-					display_order: 3,
-					is_active: true,
-					children: []
-				},
-				{
-					id: '4',
-					name: '일정',
-					url: '/calendar',
-					menu_type: 'page',
-					display_order: 4,
-					is_active: true,
-					children: []
-				},
-				{
-					id: '5',
-					name: '후원하기',
-					url: '/donation',
-					menu_type: 'page',
-					display_order: 5,
-					is_active: true,
-					children: []
-				}
-			];
+			error = error instanceof Error ? error.message : '알 수 없는 오류';
+			
+			// 오류가 발생해도 기본 메뉴를 사용하여 사이트가 정상 작동하도록 함
+			menus = DEFAULT_MENUS;
+			console.log('기본 메뉴를 사용합니다:', menus.length, '개 메뉴');
 		} finally {
 			loading = false;
 		}
@@ -76,7 +44,7 @@
 
 	// 로그아웃 처리
 	async function handleLogout() {
-		console.log('handleLogout');
+		// console.log('handleLogout');
 		await logout();
 		goto('/');
 	}
@@ -155,29 +123,45 @@
 				<div class="flex items-center">
 					{#if $isAuthenticated && $user}
 						<!-- 로그인 상태: PC 드롭다운/모바일 기존 방식 -->
-						<details class="hidden md:block relative group">
-							<summary class="flex items-center gap-2 cursor-pointer select-none outline-none">
-								{#if $user.profile_image}
-									<img src="{$user.profile_image}" alt="프로필 이미지" class="w-8 h-8 rounded-full object-cover border" />
-								{:else}
-									<UserIcon class="w-6 h-6" />
-								{/if}
-								<span>{$user.name} 님</span>
-							</summary>
-							<div class="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded z-50 border">
-								<div class="px-4 py-2 text-sm">포인트: {($user.points ?? 0).toLocaleString()}</div>
-								<a href="/my" class="block px-4 py-2 text-sm hover:bg-gray-100">마이페이지</a>
-								<form method="POST" action="/logout">
-									<button type="submit" class="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">로그아웃</button>
-								</form>
-							</div>
-						</details>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<button class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none">
+									{#if $user.profile_image}
+										<img src="{$user.profile_image}" alt="프로필 이미지" class="w-8 h-8 rounded-full object-cover border" />
+									{:else}
+										<UserIcon class="w-6 h-6" />
+									{/if}
+									<span>{$user.name} 님</span>
+								</button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent class="w-56">
+								<div class="px-2 py-1.5 text-sm text-gray-600">
+									포인트: {($user.points ?? 0).toLocaleString()}
+								</div>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem asChild>
+									<a href="/my" class="flex items-center gap-2">
+										<Settings class="h-4 w-4" />
+										마이페이지
+									</a>
+								</DropdownMenuItem>
+								<DropdownMenuItem onclick={handleLogout} class="flex items-center gap-2 text-red-600 focus:text-red-600">
+									<LogOut class="h-4 w-4" />
+									로그아웃
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 						<div class="flex md:hidden items-center gap-2">
-							<span>안녕하세요, {user.name}님</span>
-							<a href="/my">마이페이지</a>
-							<form method="POST" action="/logout">
-								<button type="submit">로그아웃</button>
-							</form>
+							<span>안녕하세요, {$user.name}님</span>
+							<div class="text-sm text-gray-600">포인트: {($user.points ?? 0).toLocaleString()}</div>
+							<a href="/my" class="flex items-center gap-1">
+								<Settings class="h-4 w-4" />
+								마이페이지
+							</a>
+							<button type="button" onclick={handleLogout} class="flex items-center gap-1">
+								<LogOut class="h-4 w-4" />
+								로그아웃
+							</button>
 						</div>
 					{:else}
 						<!-- 비로그인 상태: 로그인/회원가입 버튼 -->
@@ -247,16 +231,26 @@
 						<div class="px-5 py-3">
 							<div class="mb-3 text-sm text-gray-700">안녕하세요, {$user.name}님</div>
 							<div class="space-y-2">
+								<!-- 포인트 정보 -->
+								<div class="px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-md">
+									<div class="flex items-center justify-between">
+										<span class="flex items-center gap-2">
+											<CreditCard class="h-4 w-4" />
+											포인트
+										</span>
+										<span class="font-semibold text-primary-600">{$user.points || 0}P</span>
+									</div>
+								</div>
 								<Button variant="ghost" href="/my" class="w-full justify-start">
 									{#if $user.profile_image}
 										<img src="{$user.profile_image}" alt="프로필 이미지" class="w-6 h-6 rounded-full object-cover border mr-2" />
 									{:else}
-										<Icon src={UserIcon} class="mr-2 h-4 w-4" />
+										<Settings class="mr-2 h-4 w-4" />
 									{/if}
 									마이페이지
 								</Button>
-								<Button variant="outline" onclick={handleLogout} class="w-full justify-start">
-									<Icon src={ArrowRightOnRectangle} class="mr-2 h-4 w-4" />
+								<Button variant="outline" onclick={handleLogout} class="w-full justify-start text-red-600 hover:text-red-600">
+									<LogOut class="mr-2 h-4 w-4" />
 									로그아웃
 								</Button>
 							</div>

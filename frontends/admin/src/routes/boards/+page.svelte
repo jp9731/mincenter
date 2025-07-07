@@ -6,6 +6,7 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Badge } from '$lib/components/ui/badge';
+	import { goto } from '$app/navigation';
 	import {
 		Card,
 		CardContent,
@@ -103,7 +104,10 @@
 	}
 
 	function openEditModal(board: any) {
-		selectedBoard = { ...board };
+		selectedBoard = { 
+			...board,
+			allowed_file_types: board.allowed_file_types || []
+		};
 		selectedBoardMaxFileSizeMB = Math.round(board.max_file_size / (1024 * 1024));
 		showEditModal = true;
 	}
@@ -181,19 +185,19 @@
 
 	function handleFileTypeChange(value: string) {
 		if (selectedBoard) {
-			if (selectedBoard.allowed_file_types.includes(value)) {
-				selectedBoard.allowed_file_types = selectedBoard.allowed_file_types.filter(
-					(type) => type !== value
-				);
+			const fileTypes = selectedBoard.allowed_file_types || [];
+			if (fileTypes.includes(value)) {
+				selectedBoard.allowed_file_types = fileTypes.filter((type) => type !== value);
 			} else {
-				selectedBoard.allowed_file_types = [...selectedBoard.allowed_file_types, value];
+				selectedBoard.allowed_file_types = [...fileTypes, value];
 			}
 			selectedBoard = { ...selectedBoard };
 		} else {
-			if (newBoard.allowed_file_types.includes(value)) {
-				newBoard.allowed_file_types = newBoard.allowed_file_types.filter((type) => type !== value);
+			const fileTypes = newBoard.allowed_file_types || [];
+			if (fileTypes.includes(value)) {
+				newBoard.allowed_file_types = fileTypes.filter((type) => type !== value);
 			} else {
-				newBoard.allowed_file_types = [...newBoard.allowed_file_types, value];
+				newBoard.allowed_file_types = [...fileTypes, value];
 			}
 			newBoard = { ...newBoard };
 		}
@@ -268,7 +272,7 @@
 							</TableCell>
 							<TableCell>
 								<div class="flex space-x-2">
-									<Button variant="outline" size="sm" onclick={() => openEditModal(board)}>
+									<Button variant="outline" size="sm" onclick={() => goto(`/boards/${board.id}`)}>
 										<Edit class="h-4 w-4" />
 									</Button>
 									<Button variant="outline" size="sm" onclick={() => deleteBoard(board.id)}>
@@ -283,7 +287,6 @@
 		</CardContent>
 	</Card>
 </div>
-
 <!-- 새 게시판 모달 -->
 {#if showCreateModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
@@ -333,7 +336,7 @@
 									<label class="flex items-center space-x-2">
 										<input
 											type="checkbox"
-											checked={newBoard.allowed_file_types.includes(option.value)}
+											checked={(newBoard.allowed_file_types || []).includes(option.value)}
 											onchange={() => handleFileTypeChange(option.value)}
 										/>
 										<span class="text-sm">{option.label}</span>
@@ -414,7 +417,7 @@
 									<label class="flex items-center space-x-2">
 										<input
 											type="checkbox"
-											checked={selectedBoard.allowed_file_types.includes(option.value)}
+											checked={(selectedBoard.allowed_file_types || []).includes(option.value)}
 											onchange={() => handleFileTypeChange(option.value)}
 										/>
 										<span class="text-sm">{option.label}</span>
@@ -445,3 +448,4 @@
 		</div>
 	</div>
 {/if}
+

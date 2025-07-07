@@ -12,7 +12,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { ImageIcon, TypeIcon, LayoutIcon } from 'lucide-svelte';
 
-	let heroTitle = '장애인 봉사단체에 오신 것을 환영합니다';
+	let heroTitle = '저희 사이트에 오신 것을 환영합니다';
 	let heroSubtitle = '함께 만들어가는 따뜻한 세상';
 	let heroBackground = '/images/hero-bg.jpg';
 	let recentPostsCount = 6;

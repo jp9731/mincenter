@@ -14,6 +14,14 @@ export const boards = writable<Board[]>([]);
 export const isLoading = writable(false);
 export const error = writable<string | null>(null);
 
+// 페이지네이션 정보
+export const pagination = writable<{
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+} | null>(null);
+
 // 게시글 필터
 export const postFilter = writable<PostFilter>({
   search: '',
@@ -42,8 +50,20 @@ export async function fetchPosts(filter?: PostFilter) {
       limit: currentFilter.limit
     };
 
-    const data = await api.fetchPosts(params);
-    posts.set(data);
+    const response = await api.fetchPosts(params);
+    posts.set(response.data || []);
+    
+    // 페이지네이션 정보 저장
+    if (response.pagination) {
+      pagination.set({
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        total: response.pagination.total,
+        total_pages: response.pagination.total_pages
+      });
+    } else {
+      pagination.set(null);
+    }
   } catch (e: any) {
     error.set(e.message || '게시글을 불러오는데 실패했습니다.');
   } finally {
@@ -52,7 +72,7 @@ export async function fetchPosts(filter?: PostFilter) {
 }
 
 // slug 기반 게시글 목록 조회
-export async function fetchPostsBySlug(slug: string, filter?: PostFilter) {
+export async function fetchPostsBySlug(slug: string, filter?: PostFilter, append: boolean = false) {
   isLoading.set(true);
   error.set(null);
 
@@ -68,8 +88,23 @@ export async function fetchPostsBySlug(slug: string, filter?: PostFilter) {
       limit: currentFilter.limit
     };
 
-    const data = await api.fetchPostsBySlug(slug, params);
-    posts.set(data);
+    const response = await api.fetchPostsBySlug(slug, params);
+    if (append) {
+      posts.update(prev => [...prev, ...(response.data || [])]);
+    } else {
+      posts.set(response.data || []);
+    }
+    // 페이지네이션 정보 저장
+    if (response.pagination) {
+      pagination.set({
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        total: response.pagination.total,
+        total_pages: response.pagination.total_pages
+      });
+    } else {
+      pagination.set(null);
+    }
   } catch (e: any) {
     error.set(e.message || '게시글을 불러오는데 실패했습니다.');
   } finally {
@@ -253,27 +288,83 @@ export async function deleteComment(commentId: string, postId: string) {
   }
 }
 
-// 게시글 좋아요
-export async function likePost(postId: string) {
+// 게시글 좋아요 토글
+export async function togglePostLike(postId: string) {
   try {
-    // 좋아요 API 호출 (백엔드에서 구현 필요)
-    // const response = await api.likePost(postId);
-
-    // 로컬 상태 업데이트
+    const response = await api.togglePostLike(postId);
+    
+    // 좋아요 상태에 따라 카운트 업데이트
+    const isLiked = response.data?.liked;
+    
     posts.update(currentPosts =>
       currentPosts.map(post =>
-        post.id === postId ? { ...post, likes: (post.likes || 0) + 1 } : post
+        post.id === postId ? { 
+          ...post, 
+          likes: isLiked ? (post.likes || 0) + 1 : Math.max(0, (post.likes || 0) - 1) 
+        } : post
       )
     );
 
     currentPost.update(post => {
       if (post && post.id === postId) {
-        return { ...post, likes: (post.likes || 0) + 1 };
+        return { 
+          ...post, 
+          likes: isLiked ? (post.likes || 0) + 1 : Math.max(0, (post.likes || 0) - 1) 
+        };
       }
       return post;
     });
+
+    return response.data;
   } catch (e: any) {
     error.set(e.message || '좋아요 처리에 실패했습니다.');
+    throw e;
+  }
+}
+
+// 게시글 좋아요 상태 확인
+export async function getPostLikeStatus(postId: string) {
+  try {
+    const response = await api.getPostLikeStatus(postId);
+    return response.data?.liked || false;
+  } catch (e: any) {
+    error.set(e.message || '좋아요 상태 확인에 실패했습니다.');
+    return false;
+  }
+}
+
+// 댓글 좋아요 토글
+export async function toggleCommentLike(commentId: string) {
+  try {
+    const response = await api.toggleCommentLike(commentId);
+    
+    // 좋아요 상태에 따라 카운트 업데이트
+    const isLiked = response.data?.liked;
+    
+    comments.update(currentComments =>
+      currentComments.map(comment =>
+        comment.id === commentId ? { 
+          ...comment, 
+          likes: isLiked ? (comment.likes || 0) + 1 : Math.max(0, (comment.likes || 0) - 1) 
+        } : comment
+      )
+    );
+
+    return response.data;
+  } catch (e: any) {
+    error.set(e.message || '댓글 좋아요 처리에 실패했습니다.');
+    throw e;
+  }
+}
+
+// 댓글 좋아요 상태 확인
+export async function getCommentLikeStatus(commentId: string) {
+  try {
+    const response = await api.getCommentLikeStatus(commentId);
+    return response.data?.liked || false;
+  } catch (e: any) {
+    error.set(e.message || '댓글 좋아요 상태 확인에 실패했습니다.');
+    return false;
   }
 }
 
@@ -319,4 +410,15 @@ export async function fetchCategories() {
 export async function fetchTags() {
   // 태그 기능은 현재 구현되지 않음
   tags.set([]);
+}
+
+// 파일 업로드
+export async function uploadFile(file: File, type: 'posts' | 'profiles' | 'site' = 'posts'): Promise<string> {
+  try {
+    const url = await api.uploadFile(file, type);
+    return url;
+  } catch (e: any) {
+    error.set(e.message || '파일 업로드에 실패했습니다.');
+    throw e;
+  }
 }

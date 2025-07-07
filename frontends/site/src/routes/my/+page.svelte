@@ -105,15 +105,15 @@
 			<CardContent>
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 					<div>
-						<label class="text-sm font-medium text-gray-500">이름</label>
+						<div class="text-sm font-medium text-gray-500">이름</div>
 						<p class="text-lg font-semibold text-gray-900">{$user.name}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium text-gray-500">이메일</label>
+						<div class="text-sm font-medium text-gray-500">이메일</div>
 						<p class="text-lg font-semibold text-gray-900">{$user.email}</p>
 					</div>
 					<div>
-						<label class="text-sm font-medium text-gray-500">가입일</label>
+						<div class="text-sm font-medium text-gray-500">가입일</div>
 						<p class="text-lg font-semibold text-gray-900">
 							{new Date($user.created_at).toLocaleDateString('ko-KR')}
 						</p>

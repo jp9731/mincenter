@@ -271,10 +271,23 @@ export async function loadPosts(params: {
 }) {
   try {
     const data = await getPosts(params);
-    posts.set(data.posts);
-    postsPagination.set(data.pagination);
+    posts.set(data.posts || []);
+    postsPagination.set({
+      page: data.pagination?.page || 1,
+      limit: data.pagination?.limit || 20,
+      total: data.pagination?.total || 0,
+      totalPages: data.pagination?.total_pages || data.pagination?.totalPages || 0
+    });
   } catch (error) {
     console.error('Failed to load posts:', error);
+    // 에러 시 기본값으로 설정
+    posts.set([]);
+    postsPagination.set({
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0
+    });
     throw error;
   }
 }

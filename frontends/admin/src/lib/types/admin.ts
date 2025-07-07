@@ -61,12 +61,58 @@ export interface Post {
 export interface Board {
   id: string;
   name: string;
-  description: string;
-  category: string;
-  post_count: number;
+  slug: string;
+  description?: string;
+  category?: string;
+  display_order: number;
+  is_public: boolean;
+  allow_anonymous: boolean;
+  allow_file_upload: boolean;
+  max_files: number;
+  max_file_size: number;
+  allowed_file_types?: string[];
+  allow_rich_text: boolean;
+  require_category: boolean;
+  allow_comments: boolean;
+  allow_likes: boolean;
+  write_permission: string;
+  list_permission: string;
+  read_permission: string;
+  reply_permission: string;
+  comment_permission: string;
+  download_permission: string;
+  hide_list: boolean;
+  editor_type: string;
+  allow_search: boolean;
+  allow_recommend: boolean;
+  allow_disrecommend: boolean;
+  show_author_name: boolean;
+  show_ip: boolean;
+  edit_comment_limit: number;
+  delete_comment_limit: number;
+  use_sns: boolean;
+  use_captcha: boolean;
+  title_length: number;
+  posts_per_page: number;
+  read_point: number;
+  write_point: number;
+  comment_point: number;
+  download_point: number;
+  allowed_iframe_domains?: string[];
   created_at: string;
+  updated_at: string;
+}
+
+// 카테고리 타입
+export interface Category {
+  id: string;
+  board_id: string;
+  name: string;
+  description?: string;
+  display_order: number;
   is_active: boolean;
-  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // 댓글 관리 타입

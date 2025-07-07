@@ -5,26 +5,26 @@
 
 	const services = [
 		{
-			title: '자립생활지원',
-			description: '장애인의 자립생활을 위한 맞춤형 지원 서비스를 제공합니다.',
+			title: 'IL사업',
+			description: '동료상담, 권익옹호활동, 정보제공, 자조모임 등 다양한 사업기획 및 지원',
 			icon: UserGroup,
 			href: '/services/support'
 		},
 		{
-			title: '활동지원서비스',
-			description: '일상생활과 사회활동 참여를 위한 활동지원 서비스를 제공합니다.',
+			title: '자립지원사업',
+			description: '탈시설 및 탈재가장애인의 자립생활전환으로 거주공간을 마련, 자립생활기술 습득',
 			icon: Heart,
 			href: '/services/activity'
 		},
 		{
-			title: '이동지원서비스',
-			description: '장애인의 이동권 보장을 위한 이동지원 서비스를 제공합니다.',
+			title: '활동지원사업',
+			description: '장애인이 지역사회에서 사회구성원으로 동등하게 살아갈 수 있도록 활동지원사 파견',
 			icon: Truck,
 			href: '/services/mobility'
 		},
 		{
-			title: '권익옹호활동',
-			description: '장애인의 권리와 이익을 보호하고 옹호하는 활동을 합니다.',
+			title: '기타',
+			description: '차별상담전화, 보장구수리 및 점검, 회원교육, 명절행사, 투쟁활동참여',
 			icon: ShieldCheck,
 			href: '/services/advocacy'
 		}
@@ -36,7 +36,7 @@
 		<div class="mb-16 text-center">
 			<h2 class="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">우리의 서비스</h2>
 			<p class="mx-auto max-w-3xl text-lg text-gray-600">
-				민들레장애인자립생활센터는 장애인의 자립생활을 위한 다양한 서비스를 제공합니다.
+				민들레장애인자립생활센터는 장애인의 자립생활을 위한 다양한 사업을 진행하고 있습니다.
 			</p>
 		</div>
 
