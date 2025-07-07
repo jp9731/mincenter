@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
 
 env:
-  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-  REMOTE_USER: ${{ secrets.REMOTE_USER }}
-  REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+  DEPLOY_PORT: 22000
 
 jobs:
   deploy-api:
@@ -19,26 +20,26 @@ jobs:
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
         
     - name: Add server to known hosts
       run: |
         mkdir -p ~/.ssh
-        ssh-keyscan -H -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_HOST }} >> ~/.ssh/known_hosts || true
+        ssh-keyscan -H -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts || true
 
     - name: Deploy Rust API Source
       run: |
         echo "=== Deploying Rust API Source ==="
         
         # 서버에 디렉토리 생성 및 권한 설정
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "
-          sudo mkdir -p /opt/mincenter/backends/api /opt/mincenter-api
-          sudo chown -R ${{ env.REMOTE_USER }}:${{ env.REMOTE_USER }} /opt/mincenter/backends/api /opt/mincenter-api
-          sudo chmod -R 755 /opt/mincenter/backends/api /opt/mincenter-api
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
+          sudo mkdir -p ${{ env.DEPLOY_PATH }}/backends/api /opt/mincenter-api
+          sudo chown -R ${{ env.DEPLOY_USER }}:${{ env.DEPLOY_USER }} ${{ env.DEPLOY_PATH }}/backends/api /opt/mincenter-api
+          sudo chmod -R 755 ${{ env.DEPLOY_PATH }}/backends/api /opt/mincenter-api
         "
         
         # Rust API 소스 코드 업로드
-        rsync -avz -e "ssh -p ${{ env.REMOTE_PORT }}" --delete backends/api/ ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/backends/api/
+        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
         
         echo "Rust API source deployed successfully!"
 
@@ -47,8 +48,8 @@ jobs:
         echo "=== Building and Deploying Rust API on Server ==="
         
         # 서버에서 Rust API 빌드
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "
-          cd /opt/mincenter/backends/api
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
+          cd ${{ env.DEPLOY_PATH }}/backends/api
           
           # Rust 설치 확인
           if ! command -v cargo &> /dev/null; then
@@ -67,7 +68,7 @@ jobs:
         "
         
         # systemd 서비스 파일 생성
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "sudo tee /etc/systemd/system/mincenter-api.service > /dev/null << 'EOF'
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "sudo tee /etc/systemd/system/mincenter-api.service > /dev/null << 'EOF'
         [Unit]
         Description=MinCenter API Server
         After=network.target

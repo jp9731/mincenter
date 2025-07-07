@@ -61,44 +61,44 @@ jobs:
     - name: Debug Secrets
       run: |
         echo "Checking if secrets are set..."
-        echo "REMOTE_HOST: ${{ secrets.REMOTE_HOST != '' && 'SET' || 'NOT SET' }}"
-        echo "REMOTE_USER: ${{ secrets.REMOTE_USER != '' && 'SET' || 'NOT SET' }}"
-        echo "REMOTE_PORT: ${{ secrets.REMOTE_PORT != '' && 'SET' || 'NOT SET' }}"
-        echo "SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY != '' && 'SET' || 'NOT SET' }}"
+        echo "DEPLOY_HOST: ${{ secrets.DEPLOY_HOST != '' && 'SET' || 'NOT SET' }}"
+        echo "DEPLOY_USER: ${{ secrets.DEPLOY_USER != '' && 'SET' || 'NOT SET' }}"
+        echo "DEPLOY_PATH: ${{ secrets.DEPLOY_PATH != '' && 'SET' || 'NOT SET' }}"
+        echo "DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' && 'SET' || 'NOT SET' }}"
         echo "JWT_SECRET: ${{ secrets.JWT_SECRET != '' && 'SET' || 'NOT SET' }}"
         
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
         
     - name: Add server to known hosts
       run: |
         mkdir -p ~/.ssh
-        ssh-keyscan -H -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_HOST }} >> ~/.ssh/known_hosts || true
+        ssh-keyscan -H -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts || true
 
     - name: Deploy Frontend Services  
       run: |
         echo "=== Deploying Frontend Services ==="
         
         # 서버에 디렉토리 생성 및 권한 설정
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "
-          sudo mkdir -p /opt/mincenter/database /opt/mincenter/frontends/site /opt/mincenter/frontends/admin
-          sudo chown -R ${{ env.REMOTE_USER }}:${{ env.REMOTE_USER }} /opt/mincenter
-          sudo chmod -R 755 /opt/mincenter
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
+          sudo mkdir -p ${{ env.DEPLOY_PATH }}/database ${{ env.DEPLOY_PATH }}/frontends/site ${{ env.DEPLOY_PATH }}/frontends/admin
+          sudo chown -R ${{ env.DEPLOY_USER }}:${{ env.DEPLOY_USER }} ${{ env.DEPLOY_PATH }}
+          sudo chmod -R 755 ${{ env.DEPLOY_PATH }}
         "
         
         # 배포용 docker-compose 파일 업로드 (프론트엔드용으로 수정)
-        scp -P ${{ env.REMOTE_PORT }} docker-compose.deploy.yml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/
-        scp -P ${{ env.REMOTE_PORT }} database/init.sql ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/database/
-        scp -P ${{ env.REMOTE_PORT }} database/seed.sql ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/database/
+        scp -P ${{ env.DEPLOY_PORT }} docker-compose.deploy.yml ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+        scp -P ${{ env.DEPLOY_PORT }} database/init.sql ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/database/
+        scp -P ${{ env.DEPLOY_PORT }} database/seed.sql ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/database/
         
         # 프론트엔드 소스 코드 업로드
-        rsync -avz -e "ssh -p ${{ env.REMOTE_PORT }}" --delete frontends/site/ ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/frontends/site/
-        rsync -avz -e "ssh -p ${{ env.REMOTE_PORT }}" --delete frontends/admin/ ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter/frontends/admin/
+        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/site/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/site/
+        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
         
         # Docker Compose 프론트엔드 서비스만 시작
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "cd /opt/mincenter && docker-compose -f docker-compose.deploy.yml up -d --build postgres redis site admin"
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml up -d --build postgres redis site admin"
         
         echo "Frontend services deployed successfully!"
         
@@ -110,19 +110,19 @@ jobs:
         sleep 30
         
         # Docker 서비스 상태 확인
-        ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "cd /opt/mincenter && docker-compose -f docker-compose.deploy.yml ps"
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml ps"
         
         # 데이터베이스 연결 확인
-        DB_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "docker exec mincenter-postgres pg_isready -U postgres" | grep -o "accepting connections" || echo "failed")
+        DB_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-postgres pg_isready -U postgres" | grep -o "accepting connections" || echo "failed")
         echo "Database Status: $DB_STATUS"
         
         # Redis 연결 확인
-        REDIS_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "docker exec mincenter-redis redis-cli -a default_password ping" | grep -o "PONG" || echo "failed")
+        REDIS_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-redis redis-cli -a default_password ping" | grep -o "PONG" || echo "failed")
         echo "Redis Status: $REDIS_STATUS"
         
         # 프론트엔드 서비스 상태 확인
-        SITE_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo '000'")
-        ADMIN_STATUS=$(ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3001 || echo '000'")
+        SITE_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 || echo '000'")
+        ADMIN_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:3001 || echo '000'")
         
         echo "Site Frontend Status: $SITE_STATUS"
         echo "Admin Frontend Status: $ADMIN_STATUS"
