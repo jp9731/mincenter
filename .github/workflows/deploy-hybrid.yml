@@ -23,6 +23,22 @@ jobs:
       with:
         node-version: '20'
         
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          frontends/site/node_modules
+          frontends/admin/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('frontends/site/package-lock.json', 'frontends/admin/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+        
+    - name: Clean Node.js cache (if needed)
+      run: |
+        # npm 캐시 검증 및 정리
+        npm cache verify || npm cache clean --force
+        
     - name: Install dependencies (Site)
       working-directory: ./frontends/site
       run: npm ci
@@ -45,9 +61,30 @@ jobs:
         toolchain: stable
         override: true
         
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          backends/api/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('backends/api/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+        
+    - name: Clean Rust cache (if needed)
+      working-directory: ./backends/api
+      run: |
+        # 캐시 미스매치 시 정리
+        if [ ! -f "target/release/minshool-api" ]; then
+          echo "Cleaning Rust cache due to build issues..."
+          cargo clean
+        fi
+        
     - name: Build Rust API
       working-directory: ./backends/api
-      run: cargo build --release
+      run: |
+        cargo build --release --quiet
       
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
