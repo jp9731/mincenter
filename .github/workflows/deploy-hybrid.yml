@@ -56,35 +56,29 @@ jobs:
       run: npm run build
       
     - name: Setup Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        override: true
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev libpq-dev build-essential
         
     - name: Cache Rust dependencies
-      uses: actions/cache@v4
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          backends/api/target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('backends/api/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-        
-    - name: Clean Rust cache (if needed)
-      working-directory: ./backends/api
-      run: |
-        # 캐시 미스매치 시 정리
-        if [ ! -f "target/release/minshool-api" ]; then
-          echo "Cleaning Rust cache due to build issues..."
-          cargo clean
-        fi
+        workspaces: backends/api
         
     - name: Build Rust API
       working-directory: ./backends/api
       run: |
-        cargo build --release --quiet
+        echo "=== Environment Info ==="
+        rustc --version
+        cargo --version
+        
+        echo "=== Building release ==="
+        RUST_BACKTRACE=1 cargo build --release
       
     - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
@@ -124,7 +118,15 @@ jobs:
         # 서버에 API 디렉토리 생성
         ssh -p ${{ env.REMOTE_PORT }} ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} "mkdir -p /opt/mincenter-api"
         
-        # 빌드된 바이너리 업로드
+        # 빌드된 바이너리 확인 및 업로드
+        echo "=== Verifying binary exists ==="
+        ls -la backends/api/target/release/
+        if [ ! -f "backends/api/target/release/minshool-api" ]; then
+          echo "ERROR: Binary not found!"
+          exit 1
+        fi
+        
+        # 바이너리 업로드
         scp -P ${{ env.REMOTE_PORT }} backends/api/target/release/minshool-api ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:/opt/mincenter-api/
         
         # 실행 권한 설정
