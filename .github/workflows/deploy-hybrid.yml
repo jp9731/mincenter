@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-  REMOTE_USER: ${{ secrets.REMOTE_USER }}
-  REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+  DEPLOY_PORT: 22000  # 기본 SSH 포트 또는 필요시 secrets로 설정
 
 jobs:
   deploy:
