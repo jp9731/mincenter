@@ -116,7 +116,7 @@ jobs:
         echo "Database Status: $DB_STATUS"
         
         # Redis 연결 확인
-        REDIS_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-redis redis-cli -a default_password ping" | grep -o "PONG" || echo "failed")
+        REDIS_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-redis redis-cli -a tnekwoddl ping" | grep -o "PONG" || echo "failed")
         echo "Redis Status: $REDIS_STATUS"
         
         # 프론트엔드 서비스 상태 확인
