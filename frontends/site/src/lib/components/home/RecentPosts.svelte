@@ -60,7 +60,7 @@
 		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
 			return fileUrl;
 		}
-		const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+		const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18080';
 		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
 	}
 
