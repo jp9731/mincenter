@@ -183,24 +183,7 @@ async fn main() {
         .merge(admin_protected_routes)
         // 정적 파일 서빙
         .nest_service("/uploads", ServeDir::new("static/uploads"))
-        .layer(
-            CorsLayer::new()
-                .allow_origin([
-                    "http://mincenter.kr".parse().unwrap(),
-                    "https://mincenter.kr".parse().unwrap(),
-                    "http://www.mincenter.kr".parse().unwrap(),
-                    "https://www.mincenter.kr".parse().unwrap(),
-                    "http://admin.mincenter.kr".parse().unwrap(),
-                    "https://admin.mincenter.kr".parse().unwrap(),
-                    "http://localhost:3000".parse().unwrap(),
-                    "http://localhost:3001".parse().unwrap(),
-                    "http://localhost:13000".parse().unwrap(),
-                    "http://localhost:13001".parse().unwrap(),
-                ])
-                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
-                .allow_credentials(true)
-        )
+        .layer(axum::middleware::from_fn(middleware::custom_cors_middleware))
         .with_state(state);
 
     info!("Server starting on port {}", port);

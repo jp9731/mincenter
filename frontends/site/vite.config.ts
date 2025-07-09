@@ -1,9 +1,8 @@
-import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
+	plugins: [sveltekit()],
 	optimizeDeps: {
 		exclude: ['svelte-fullcalendar']
 	},
@@ -14,10 +13,17 @@ export default defineConfig({
 	},
 	server: {
 		proxy: {
-			'/api': {
-				target: 'http://localhost:8080',
+			'/api/site': {
+				target: 'http://localhost:18080',
 				changeOrigin: true,
-				secure: false
+				secure: false,
+				rewrite: (path) => path.replace(/^\/api\/site/, '/api/site')
+			},
+			'/api/admin': {
+				target: 'http://localhost:18080',
+				changeOrigin: true,
+				secure: false,
+				rewrite: (path) => path.replace(/^\/api\/admin/, '/api/admin')
 			}
 		}
 	},

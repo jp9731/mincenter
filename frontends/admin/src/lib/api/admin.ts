@@ -19,7 +19,7 @@ function convertArrayToCsv(arr: string[] | undefined | null): string | undefined
 // 런타임 환경변수에서 API URL 가져오기
 const API_BASE = (typeof window !== 'undefined' && (window as any).ENV?.API_URL) || 
                  import.meta.env.VITE_API_URL || 
-                 'http://api.mincenter.kr';
+                 'http://localhost:18080';
 
 // 관리자 로그인
 export async function adminLogin(email: string, password: string): Promise<{

@@ -13,8 +13,10 @@ use axum::extract::State;
 use tracing::{info, error, debug};
 
 pub mod rbac;
+pub mod cors;
 
 pub use rbac::*;
+pub use cors::*;
 
 pub fn cors() -> CorsLayer {
     CorsLayer::permissive()
