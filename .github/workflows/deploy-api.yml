@@ -110,14 +110,19 @@ jobs:
       run: |
         echo "=== Verifying API Deployment ==="
         
-        # 잠시 대기
-        sleep 10
+        # 잠시 대기 (API 서버가 완전히 뜰 시간 확보)
+        sleep 20
+        
+        # 의존성 서비스 확인
+        echo "Checking dependency services..."
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker ps --format 'table {{.Names}}\t{{.Status}}'" || true
         
         # Rust API 서버 상태 확인  
         echo "Checking Rust API status..."
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "systemctl status mincenter-api --no-pager" || true
         
-        sleep 5
+        # 추가 대기
+        sleep 10
         
         API_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/api/health || echo '000'")
         echo "Rust API Status: $API_STATUS"
@@ -126,7 +131,10 @@ jobs:
           echo "✅ Rust API deployment successful!"
         else
           echo "❌ Rust API deployment may have issues"
+          echo "API Status Code: $API_STATUS"
           echo "Service logs:"
           ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "sudo journalctl -u mincenter-api --lines=20 --no-pager" || true
+          echo "Port usage:"
+          ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "netstat -tlnp | grep :18080" || true
           exit 1
         fi

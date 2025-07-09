@@ -110,12 +110,19 @@ jobs:
           sleep 2
           # Rust 빌드
           cargo build --release
+          # 환경변수 설정
+          export DATABASE_URL=postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter
+          export REDIS_URL=redis://:tnekwoddl@localhost:16379
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
+          export API_PORT=18080
+          export RUST_LOG=info
+          export CORS_ORIGIN=*
           # 백그라운드에서 실행
           nohup ./target/release/mincenter-api > api.log 2>&1 &
           # PID 저장
           echo \$! > api.pid
-          # 시작 대기
-          sleep 5
+          # 시작 대기 (더 오래)
+          sleep 15
         "
         
         echo "Frontend services deployed successfully!"
@@ -138,7 +145,13 @@ jobs:
         REDIS_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-redis redis-cli -a tnekwoddl ping" | grep -o "PONG" || echo "failed")
         echo "Redis Status: $REDIS_STATUS"
         
-        # Rust API 상태 확인
+        # Rust API 상태 확인 (더 자세한 정보)
+        echo "Checking Rust API process..."
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "ps aux | grep mincenter-api | grep -v grep" || true
+        
+        echo "Checking Rust API logs..."
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }}/backends/api && tail -20 api.log" || true
+        
         API_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/api/health || echo '000'")
         
         # 프론트엔드 서비스 상태 확인
