@@ -102,9 +102,9 @@ services:
   redis:
     image: redis:6-alpine
     container_name: ${APP_NAME}_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-DvzOYmv1V/fe/dEspn/1/HNSVQ39X7D/nOnSLtalqhU=}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-tnekwoddl}
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-DvzOYmv1V/fe/dEspn/1/HNSVQ39X7D/nOnSLtalqhU=}
+              REDIS_PASSWORD: ${REDIS_PASSWORD:-tnekwoddl}
     volumes:
       - redis_data:/data
     ports:
