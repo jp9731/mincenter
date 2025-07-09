@@ -12,6 +12,7 @@ pub enum PostStatus {
     Active,
     Hidden,
     Deleted,
+    Published,
 }
 
 impl FromStr for PostStatus {
@@ -21,6 +22,7 @@ impl FromStr for PostStatus {
             "active" => Ok(PostStatus::Active),
             "hidden" => Ok(PostStatus::Hidden),
             "deleted" => Ok(PostStatus::Deleted),
+            "published" => Ok(PostStatus::Published),
             _ => Err(()),
         }
     }

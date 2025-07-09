@@ -893,7 +893,7 @@ pub async fn get_post(
     
     // 먼저 기본 게시글 정보만 조회해서 테스트 (status를 text로 캐스팅)
     let post_basic = sqlx::query!(
-        "SELECT id, board_id, category_id, user_id, title, content, views, likes, is_notice, status::text as status, created_at, updated_at FROM posts WHERE id = $1",
+        "SELECT id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status::text as status, created_at, updated_at FROM posts WHERE id = $1",
         post_id
     )
     .fetch_optional(&state.pool)
@@ -1027,7 +1027,7 @@ pub async fn get_post(
         content: post_basic.content,
         views: post_basic.views,
         likes: post_basic.likes,
-        dislikes: None, // 기본값
+        dislikes: post_basic.dislikes,
         is_notice: post_basic.is_notice,
         status: post_basic.status.and_then(|s| s.parse::<PostStatus>().ok()),
         created_at: post_basic.created_at,
@@ -1057,9 +1057,6 @@ pub async fn create_post(
     Extension(claims): Extension<crate::utils::auth::Claims>,
     Json(payload): Json<CreatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
-    println!("[DEBUG] Creating post with payload: {:?}", payload);
-    println!("[DEBUG] User ID from claims: {:?}", claims.sub);
-    
     // 게시판 정보 조회 (권한 체크용)
     let board_raw = sqlx::query_as::<_, BoardRaw>(
         r#"
@@ -1085,8 +1082,9 @@ pub async fn create_post(
     let post = sqlx::query_as::<_, PostDetail>(
         "INSERT INTO posts (board_id, category_id, user_id, title, content, is_notice)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, board_id, category_id, user_id, title, content, views, likes, is_notice, status, created_at, updated_at,
+         RETURNING id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status, created_at, updated_at,
          (SELECT name FROM users WHERE id = $3) as user_name,
+         (SELECT email FROM users WHERE id = $3) as user_email,
          (SELECT name FROM boards WHERE id = $1) as board_name,
          (SELECT slug FROM boards WHERE id = $1) as board_slug,
          (SELECT name FROM categories WHERE id = $2) as category_name,
@@ -1104,8 +1102,6 @@ pub async fn create_post(
         eprintln!("Create post error: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-
-    println!("[DEBUG] Post created successfully: {:?}", post.id);
 
     // 첨부된 파일들을 file_entities 테이블에 연결하고 상태를 published로 변경
     if let Some(attached_files) = payload.attached_files {
@@ -1128,12 +1124,7 @@ pub async fn create_post(
                 file_url.to_string()
             };
             
-            println!("[DEBUG] Processing file URL: {}", file_url);
-            println!("[DEBUG] Extracted file name: {}", file_name);
-            
             // files 테이블에서 해당 파일 조회 (stored_name으로 검색)
-            println!("[DEBUG] Searching for file with stored_name: '{}'", file_name);
-            
             // 먼저 파일이 존재하는지 확인 (상태 무관)
             let file_exists = sqlx::query!(
                 "SELECT id, status::text FROM files WHERE stored_name = $1",
@@ -1145,7 +1136,6 @@ pub async fn create_post(
             match file_exists {
                 Ok(Some(file_info)) => {
                     let status = file_info.status.as_deref().unwrap_or("unknown");
-                    println!("[DEBUG] File found with status: {}", status);
                     if status == "draft" {
                         // draft 상태인 경우 처리
                         let file_id = file_info.id;
@@ -1176,17 +1166,13 @@ pub async fn create_post(
                             eprintln!("File entity creation error: {:?}", e);
                             StatusCode::INTERNAL_SERVER_ERROR
                         })?;
-
-                        println!("[DEBUG] File connected to post: file_id={}, post_id={}", file_id, post.id);
-                    } else {
-                        println!("[DEBUG] File found but not in draft status: {}", status);
                     }
                 },
                 Ok(None) => {
-                    println!("[DEBUG] File not found in database: {}", file_name);
+                    // 파일이 데이터베이스에 없는 경우 무시
                 },
                 Err(e) => {
-                    println!("[DEBUG] Error querying file: {:?}", e);
+                    eprintln!("Error querying file: {:?}", e);
                 }
             }
         }
@@ -1262,7 +1248,7 @@ pub async fn update_post(
 
     param_count += 1;
     let sql = format!(
-        "UPDATE posts SET {} WHERE id = ${} RETURNING id, board_id, category_id, user_id, title, content, views, likes, is_notice, status, created_at, updated_at,
+        "UPDATE posts SET {} WHERE id = ${} RETURNING id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status, created_at, updated_at,
          (SELECT name FROM users WHERE id = user_id) as user_name,
          (SELECT name FROM boards WHERE id = board_id) as board_name,
          (SELECT slug FROM boards WHERE id = board_id) as board_slug,

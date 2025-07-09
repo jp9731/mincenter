@@ -132,7 +132,7 @@ async fn main() {
         .route("/api/admin/posts/:id", get(handlers::admin::get_post))
         .route("/api/admin/posts/:id", put(handlers::admin::update_post))
         // 게시판 관리
-        .route("/api/admin/boards", get(handlers::board::get_boards))
+        .route("/api/admin/boards", get(handlers::board::list_boards))
         .route("/api/admin/boards", post(handlers::board::create_board))
         .route("/api/admin/boards/:id", get(handlers::board::get_board))
         .route("/api/admin/boards/:id", put(handlers::board::update_board))

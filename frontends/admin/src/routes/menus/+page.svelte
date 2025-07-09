@@ -39,7 +39,7 @@
 		id: string;
 		name: string;
 		description?: string;
-		menu_type: 'page' | 'board' | 'url' | 'calendar';
+		menu_type: 'page' | 'board' | 'url' | 'calendar' | 'Page' | 'Board' | 'Url' | 'Calendar';
 		target_id?: string;
 		url?: string;
 		display_order: number;
@@ -88,8 +88,15 @@
 	let selectedTargetId = '';
 
 	// 메뉴 타입 변경 시 처리
-	$: if (selectedMenuType === 'calendar') {
-		formData.url = '/calendar';
+	$: {
+		const normalizedType = selectedMenuType?.toLowerCase();
+		if (normalizedType === 'calendar') {
+			formData.url = '/calendar';
+		}
+		// 타입이 변경되면 기존 target_id 초기화
+		if (normalizedType !== 'page' && normalizedType !== 'board') {
+			selectedTargetId = '';
+		}
 	}
 
 	onMount(async () => {
@@ -149,17 +156,18 @@
 
 	function editMenu(menu: Menu) {
 		editingMenu = menu;
+		const normalizedMenuType = menu.menu_type.toLowerCase() as 'page' | 'board' | 'url' | 'calendar';
 		formData = {
 			name: menu.name,
 			description: menu.description || '',
-			menu_type: menu.menu_type,
+			menu_type: normalizedMenuType,
 			target_id: menu.target_id || '',
 			url: menu.url || '',
 			display_order: menu.display_order,
 			is_active: menu.is_active,
 			parent_id: menu.parent_id || ''
 		};
-		selectedMenuType = menu.menu_type;
+		selectedMenuType = normalizedMenuType;
 		selectedParentId = menu.parent_id || '';
 		selectedTargetId = menu.target_id || '';
 		showCreateForm = true;
@@ -227,7 +235,8 @@
 	}
 
 	function getTypeLabel(type: string) {
-		switch (type) {
+		const normalizedType = type.toLowerCase();
+		switch (normalizedType) {
 			case 'page':
 				return '안내페이지';
 			case 'board':
@@ -241,19 +250,68 @@
 		}
 	}
 
-	function getTargetName(menu: Menu) {
-		if (menu.menu_type === 'board' && menu.target_id) {
-			const board = boards.find((b) => b.id === menu.target_id);
-			return board?.name || '알 수 없음';
-		} else if (menu.menu_type === 'page' && menu.target_id) {
-			const page = pages.find((p) => p.id === menu.target_id);
-			return page?.title || '알 수 없음';
-		}
-		return menu.url || '-';
+	function getMenuTypeLabel(type: string) {
+		return getTypeLabel(type);
 	}
+
+	function getSelectedParentName(parentId: string) {
+		if (!parentId) return '1단 메뉴 선택 (2단 메뉴인 경우)';
+		if (parentId === '') return '1단 메뉴';
+		const parent = menus.find(m => m.id === parentId);
+		return parent?.name || '알 수 없음';
+	}
+
+	function getSelectedTargetName(targetId: string, menuType: string) {
+		if (!targetId) return '';
+		
+		if (menuType === 'page') {
+			const page = pages.find(p => p.id === targetId);
+			return page?.title || '알 수 없음';
+		} else if (menuType === 'board') {
+			const board = boards.find(b => b.id === targetId);
+			return board?.name || '알 수 없음';
+		}
+		
+		return '';
+	}
+
+	// 반응형 함수로 변경 - boards와 pages가 변경되면 자동으로 재계산
+	$: getTargetName = (menu: Menu) => {
+		const normalizedType = menu.menu_type.toLowerCase();
+		
+		if (normalizedType === 'board' && menu.target_id) {
+			if (boards.length === 0) {
+				return '로딩 중...';
+			}
+			
+			const board = boards.find((b) => b.id === menu.target_id);
+			if (board) {
+				return board.name;
+			} else {
+				return '게시판 (알 수 없음)';
+			}
+		} else if (normalizedType === 'page' && menu.target_id) {
+			if (pages.length === 0) {
+				return '로딩 중...';
+			}
+			
+			const page = pages.find((p) => p.id === menu.target_id);
+			if (page) {
+				return page.title;
+			} else {
+				return '페이지 (알 수 없음)';
+			}
+		} else if (normalizedType === 'calendar') {
+			return '/calendar';
+		} else if (normalizedType === 'url' && menu.url) {
+			return menu.url;
+		}
+		return '-';
+	};
 
 	// 1단 메뉴만 필터링
 	$: rootMenus = menus.filter((menu) => !menu.parent_id);
+	
 </script>
 
 <div class="space-y-6">
@@ -304,8 +362,13 @@
 					</div>
 					<div class="space-y-2">
 						<Label for="menu_type">메뉴 타입 *</Label>
-						<Select type="single" bind:value={selectedMenuType}>
-							<SelectTrigger>메뉴 타입을 선택하세요</SelectTrigger>
+						<Select 
+							type="single" 
+							bind:value={selectedMenuType}
+						>
+							<SelectTrigger>
+								{selectedMenuType ? getMenuTypeLabel(selectedMenuType) : '메뉴 타입을 선택하세요'}
+							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="page">안내페이지</SelectItem>
 								<SelectItem value="board">게시판</SelectItem>
@@ -316,8 +379,13 @@
 					</div>
 					<div class="space-y-2">
 						<Label for="parent_id">상위 메뉴</Label>
-						<Select type="single" bind:value={selectedParentId}>
-							<SelectTrigger>1단 메뉴 선택 (2단 메뉴인 경우)</SelectTrigger>
+						<Select 
+							type="single" 
+							bind:value={selectedParentId}
+						>
+							<SelectTrigger>
+								{getSelectedParentName(selectedParentId)}
+							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="">1단 메뉴</SelectItem>
 								{#each rootMenus as menu}
@@ -340,11 +408,16 @@
 				</div>
 
 				<!-- 타입별 추가 필드 -->
-				{#if selectedMenuType === 'page'}
+				{#if selectedMenuType?.toLowerCase() === 'page'}
 					<div class="space-y-2">
 						<Label for="target_id">페이지 선택</Label>
-						<Select type="single" bind:value={selectedTargetId}>
-							<SelectTrigger>페이지를 선택하세요</SelectTrigger>
+						<Select 
+							type="single" 
+							bind:value={selectedTargetId}
+						>
+							<SelectTrigger>
+								{selectedTargetId ? getSelectedTargetName(selectedTargetId, 'page') : '페이지를 선택하세요'}
+							</SelectTrigger>
 							<SelectContent>
 								{#each pages as page}
 									<SelectItem value={page.id}>{page.title}</SelectItem>
@@ -352,11 +425,16 @@
 							</SelectContent>
 						</Select>
 					</div>
-				{:else if selectedMenuType === 'board'}
+				{:else if selectedMenuType?.toLowerCase() === 'board'}
 					<div class="space-y-2">
 						<Label for="target_id">게시판 선택</Label>
-						<Select type="single" bind:value={selectedTargetId}>
-							<SelectTrigger>게시판을 선택하세요</SelectTrigger>
+						<Select 
+							type="single" 
+							bind:value={selectedTargetId}
+						>
+							<SelectTrigger>
+								{selectedTargetId ? getSelectedTargetName(selectedTargetId, 'board') : '게시판을 선택하세요'}
+							</SelectTrigger>
 							<SelectContent>
 								{#each boards as board}
 									<SelectItem value={board.id}>{board.name}</SelectItem>
@@ -364,12 +442,12 @@
 							</SelectContent>
 						</Select>
 					</div>
-				{:else if selectedMenuType === 'url'}
+				{:else if selectedMenuType?.toLowerCase() === 'url'}
 					<div class="space-y-2">
 						<Label for="url">외부 URL</Label>
 						<Input id="url" bind:value={formData.url} placeholder="https://example.com" />
 					</div>
-				{:else if selectedMenuType === 'calendar'}
+				{:else if selectedMenuType?.toLowerCase() === 'calendar'}
 					<div class="space-y-2">
 						<Label for="url">일정 페이지 URL</Label>
 						<Input id="url" bind:value={formData.url} placeholder="/calendar" readonly />

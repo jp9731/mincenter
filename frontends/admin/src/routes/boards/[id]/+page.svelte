@@ -65,8 +65,21 @@
 		allowed_iframe_domains: ''
 	};
 
+	// UI용 문자열 변수
+	let allowedIframeDomainsStr = '';
+
 	// 카테고리 관리
 	let newCategory = {
+		name: '',
+		description: '',
+		display_order: 0,
+		is_active: true
+	};
+
+	// 카테고리 수정 관련
+	let editingCategory: Category | null = null;
+	let showEditModal = false;
+	let editCategoryData = {
 		name: '',
 		description: '',
 		display_order: 0,
@@ -168,9 +181,7 @@
 			is_public: board.is_public,
 			allow_anonymous: board.allow_anonymous,
 			category: board.category || '',
-			allowed_iframe_domains: Array.isArray(board.allowed_iframe_domains) 
-				? board.allowed_iframe_domains.join(', ') 
-				: (typeof board.allowed_iframe_domains === 'string' ? board.allowed_iframe_domains : '')
+			allowed_iframe_domains: board.allowed_iframe_domains || ''
 		};
 	}
 
@@ -183,7 +194,11 @@
 		}
 	}
 
-	async function saveBoard() {
+	async function saveBoard(event?: Event) {
+		if (event) {
+			event.preventDefault();
+		}
+		
 		saving = true;
 		error = '';
 		success = '';
@@ -261,6 +276,29 @@
 		}
 	}
 
+	async function updateCategory() {
+		if (!board || !editingCategory) return;
+		
+		try {
+			await adminApi.updateCategory(board.id, editingCategory.id, editCategoryData);
+			await loadCategories();
+			closeEditModal();
+		} catch (err: any) {
+			error = err.message || '카테고리 수정에 실패했습니다.';
+		}
+	}
+
+	function closeEditModal() {
+		showEditModal = false;
+		editingCategory = null;
+		editCategoryData = {
+			name: '',
+			description: '',
+			display_order: 0,
+			is_active: true
+		};
+	}
+
 	function formatFileSize(bytes: number): string {
 		if (bytes === 0) return '0 Bytes';
 		const k = 1024;
@@ -309,7 +347,7 @@
 			</div>
 		</div>
 	{:else}
-		<form on:submit|preventDefault={saveBoard} class="space-y-6">
+		<form onsubmit={saveBoard} class="space-y-6">
 			<Tabs value="basic" class="w-full">
 				<TabsList class="grid w-full grid-cols-6">
 					<TabsTrigger value="basic">기본 정보</TabsTrigger>
@@ -785,6 +823,18 @@
 													<Badge variant="outline">순서: {category.display_order}</Badge>
 													<Button
 														type="button"
+														variant="outline"
+														size="sm"
+														onclick={() => {
+															editingCategory = category;
+															editCategoryData = { ...category };
+															showEditModal = true;
+														}}
+													>
+														수정
+													</Button>
+													<Button
+														type="button"
 														variant="destructive"
 														size="sm"
 														onclick={() => deleteCategory(category.id)}
@@ -813,5 +863,58 @@
 				</Button>
 			</div>
 		</form>
+	{/if}
+
+	<!-- 카테고리 수정 모달 -->
+	{#if showEditModal && editingCategory}
+		<div class="fixed inset-0 z-50 flex items-center justify-center">
+			<div class="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm" onclick={closeEditModal}></div>
+			<div class="relative mx-4 w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
+				<div class="flex items-center justify-between border-b px-6 py-4">
+					<h3 class="text-lg font-semibold">카테고리 수정</h3>
+					<Button variant="ghost" size="sm" onclick={closeEditModal}>×</Button>
+				</div>
+				<div class="space-y-4 px-6 py-4">
+					<div class="space-y-2">
+						<Label for="edit-category-name">카테고리명 *</Label>
+						<Input
+							id="edit-category-name"
+							bind:value={editCategoryData.name}
+							placeholder="카테고리명을 입력하세요"
+							required
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-category-description">설명</Label>
+						<Input
+							id="edit-category-description"
+							bind:value={editCategoryData.description}
+							placeholder="카테고리 설명을 입력하세요"
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-category-order">표시 순서</Label>
+						<Input
+							id="edit-category-order"
+							type="number"
+							bind:value={editCategoryData.display_order}
+							min="0"
+						/>
+					</div>
+					<div class="flex items-center space-x-2">
+						<Switch id="edit-category-active" bind:checked={editCategoryData.is_active} />
+						<Label for="edit-category-active">활성 상태</Label>
+					</div>
+				</div>
+				<div class="flex justify-end gap-2 border-t px-6 py-4">
+					<Button variant="outline" onclick={closeEditModal}>
+						취소
+					</Button>
+					<Button onclick={updateCategory}>
+						수정
+					</Button>
+				</div>
+			</div>
+		</div>
 	{/if}
 </div> 

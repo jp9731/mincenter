@@ -65,7 +65,7 @@ pub struct Board {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateBoardRequest {
     pub name: String,
-    pub slug: String,
+    pub slug: String, // 다시 필수로 변경
     pub description: Option<String>,
     pub category: Option<String>,
     pub display_order: Option<i32>,

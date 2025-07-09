@@ -29,7 +29,7 @@ struct BoardRaw {
     pub allow_file_upload: bool,
     pub max_files: i32,
     pub max_file_size: i64,
-    pub allowed_file_types: Option<String>, // DB에서는 문자열
+    pub allowed_file_types: Option<String>, // 다시 문자열로 변경
     pub allow_rich_text: bool,
     pub require_category: bool,
     pub allow_comments: bool,
@@ -57,7 +57,7 @@ struct BoardRaw {
     pub write_point: i32,
     pub comment_point: i32,
     pub download_point: i32,
-    pub allowed_iframe_domains: Option<String>, // DB에서는 문자열
+    pub allowed_iframe_domains: Option<String>, // 다시 문자열로 변경
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -210,17 +210,17 @@ pub async fn create_board(
         INSERT INTO boards (
             name, slug, description, category, display_order, is_public, allow_anonymous,
             allow_file_upload, max_files, max_file_size, allowed_file_types, allow_rich_text,
-            require_category, allow_comments, allow_likes, write_permission, list_permission,
-            read_permission, reply_permission, comment_permission, download_permission,
+            require_category, allow_comments, allow_likes, created_at, updated_at,
+            write_permission, list_permission, read_permission, reply_permission, comment_permission, download_permission,
             hide_list, editor_type, allow_search, allow_recommend, allow_disrecommend,
             show_author_name, show_ip, edit_comment_limit, delete_comment_limit,
             use_sns, use_captcha, title_length, posts_per_page, read_point, write_point,
             comment_point, download_point, allowed_iframe_domains
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
-            $33, $34, $35, $36, $37, $38, $39
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(),
+            $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+            $31, $32, $33, $34, $35, $36, $37, $38, $39
         )
         RETURNING *
         "#,
@@ -235,7 +235,7 @@ pub async fn create_board(
     .bind(board_data.allow_file_upload.unwrap_or(true))
     .bind(board_data.max_files.unwrap_or(5))
     .bind(board_data.max_file_size.unwrap_or(10485760))
-    .bind(&allowed_file_types_str)
+    .bind(allowed_file_types_str.as_deref())
     .bind(board_data.allow_rich_text.unwrap_or(true))
     .bind(board_data.require_category.unwrap_or(false))
     .bind(board_data.allow_comments.unwrap_or(true))
@@ -263,7 +263,7 @@ pub async fn create_board(
     .bind(board_data.write_point.unwrap_or(0))
     .bind(board_data.comment_point.unwrap_or(0))
     .bind(board_data.download_point.unwrap_or(0))
-    .bind(&allowed_iframe_domains_str)
+    .bind(allowed_iframe_domains_str.as_deref())
     .fetch_one(&state.pool)
     .await?;
 
@@ -543,16 +543,3 @@ pub async fn delete_category(
     Ok(Json(ApiResponse::success((), "카테고리가 성공적으로 삭제되었습니다.")))
 }
 
-// 게시판 관리
-pub async fn get_boards(
-    State(state): State<AppState>,
-) -> Result<Json<ApiResponse<Vec<Board>>>, StatusCode> {
-    let boards_raw = sqlx::query_as::<_, BoardRaw>("SELECT * FROM boards ORDER BY display_order, created_at")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let boards: Vec<Board> = boards_raw.into_iter().map(convert_board_raw_to_board).collect();
-
-    Ok(Json(ApiResponse::success(boards, "게시판 목록")))
-}

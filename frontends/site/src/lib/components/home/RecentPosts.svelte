@@ -5,8 +5,8 @@
 	import { getRecentPosts } from '$lib/api/community';
 	import type { PostDetail } from '$lib/types/community';
 
-	// Props
-	const { slugs = 'notice,volunteer-review', limit = 3 } = $props<{
+	// Props - 임시로 모든 게시판에서 조회하도록 수정
+	const { slugs = '', limit = 3 } = $props<{
 		slugs?: string;
 		limit?: number;
 	}>();
@@ -80,7 +80,9 @@
 		try {
 			loading = true;
 			error = null;
+			console.log('Loading recent posts with params:', { slugs, limit });
 			posts = await getRecentPosts({ slugs, limit });
+			console.log('Successfully loaded posts:', posts);
 		} catch (err) {
 			console.error('최근 게시글 로드 실패:', err);
 			error = err instanceof Error ? err.message : '최근 게시글을 불러오는데 실패했습니다.';

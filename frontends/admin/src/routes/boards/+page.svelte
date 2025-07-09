@@ -41,6 +41,7 @@
 	// 새 게시판 폼
 	let newBoard = {
 		name: '',
+		slug: '',
 		description: '',
 		allow_file_upload: true,
 		max_files: 5,
@@ -53,6 +54,42 @@
 	// 파일 크기 MB 단위 변수 (UI용)
 	let newBoardMaxFileSizeMB = 10;
 	let selectedBoardMaxFileSizeMB = 10;
+
+	// 유효성 검사 상태
+	let nameError = '';
+	let slugError = '';
+
+	// slug 생성 함수 (자동완성용)
+	function generateSlug(name: string): string {
+		return name
+			.toLowerCase()
+			.replace(/[^a-z0-9가-힣]/g, '-')
+			.replace(/-+/g, '-')
+			.replace(/^-|-$/g, '');
+	}
+
+	// 유효성 검사 함수
+	function validateForm() {
+		nameError = '';
+		slugError = '';
+
+		if (!newBoard.name.trim()) {
+			nameError = '게시판명을 입력해주세요.';
+			return false;
+		}
+
+		if (!newBoard.slug.trim()) {
+			slugError = '슬러그를 입력해주세요.';
+			return false;
+		}
+
+		if (!/^[a-z0-9-]+$/.test(newBoard.slug)) {
+			slugError = '슬러그는 영문 소문자, 숫자, 하이픈(-)만 사용 가능합니다.';
+			return false;
+		}
+
+		return true;
+	}
 
 	// 파일 타입 옵션
 	const fileTypeOptions = [
@@ -92,6 +129,7 @@
 		showCreateModal = true;
 		newBoard = {
 			name: '',
+			slug: '',
 			description: '',
 			allow_file_upload: true,
 			max_files: 5,
@@ -101,6 +139,8 @@
 			require_category: false
 		};
 		newBoardMaxFileSizeMB = 10;
+		nameError = '';
+		slugError = '';
 	}
 
 	function openEditModal(board: any) {
@@ -140,6 +180,10 @@
 	});
 
 	async function createBoard() {
+		if (!validateForm()) {
+			return;
+		}
+
 		loading = true;
 		try {
 			const boardData = {
@@ -290,7 +334,7 @@
 <!-- 새 게시판 모달 -->
 {#if showCreateModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
-		<div class="fixed inset-0 bg-black bg-opacity-50" onclick={closeModals}></div>
+		<div class="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm" onclick={closeModals}></div>
 		<div
 			class="relative mx-4 max-h-screen w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl"
 		>
@@ -302,6 +346,29 @@
 				<div>
 					<label class="mb-1 block text-sm font-medium text-gray-700">게시판명</label>
 					<Input bind:value={newBoard.name} placeholder="게시판명을 입력하세요" />
+					{#if nameError}
+						<p class="mt-1 text-sm text-red-500">{nameError}</p>
+					{/if}
+				</div>
+
+				<div>
+					<label class="mb-1 block text-sm font-medium text-gray-700">슬러그</label>
+					<div class="flex space-x-2">
+						<Input bind:value={newBoard.slug} placeholder="슬러그를 입력하세요" />
+						<Button 
+							type="button" 
+							variant="outline" 
+							size="sm" 
+							onclick={() => newBoard.slug = generateSlug(newBoard.name)}
+							disabled={!newBoard.name.trim()}
+						>
+							자동생성
+						</Button>
+					</div>
+					{#if slugError}
+						<p class="mt-1 text-sm text-red-500">{slugError}</p>
+					{/if}
+					<p class="mt-1 text-xs text-gray-500">영문 소문자, 숫자, 하이픈(-)만 사용 가능합니다.</p>
 				</div>
 
 				<div>
@@ -371,7 +438,7 @@
 <!-- 게시판 수정 모달 -->
 {#if showEditModal && selectedBoard}
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
-		<div class="fixed inset-0 bg-black bg-opacity-50" onclick={closeModals}></div>
+		<div class="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm" onclick={closeModals}></div>
 		<div
 			class="relative mx-4 max-h-screen w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl"
 		>
@@ -383,6 +450,12 @@
 				<div>
 					<label class="mb-1 block text-sm font-medium text-gray-700">게시판명</label>
 					<Input bind:value={selectedBoard.name} placeholder="게시판명을 입력하세요" />
+				</div>
+
+				<div>
+					<label class="mb-1 block text-sm font-medium text-gray-700">슬러그</label>
+					<Input bind:value={selectedBoard.slug} placeholder="슬러그를 입력하세요" />
+					<p class="mt-1 text-xs text-gray-500">영문 소문자, 숫자, 하이픈(-)만 사용 가능합니다.</p>
 				</div>
 
 				<div>

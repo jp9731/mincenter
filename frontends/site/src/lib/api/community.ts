@@ -308,10 +308,15 @@ export async function getRecentPosts(params?: {
     searchParams.append('limit', params.limit.toString());
   }
   
-  const url = `/api/community/posts/recent${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  const url = `${API_BASE}/api/community/posts/recent${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  
+  console.log('getRecentPosts URL:', url);
   
   const res = await fetch(url);
+  console.log('getRecentPosts response status:', res.status);
+  
   const json: ApiResponse<PostDetail[]> = await res.json();
+  console.log('getRecentPosts response data:', json);
   
   if (!json.success || !json.data) {
     throw new Error(json.message || '최근 게시글을 불러오는데 실패했습니다.');

@@ -117,11 +117,14 @@ export async function updateUser(id: string, data: {
 // 게시판 목록
 export async function getBoards(fetchFn?: typeof fetch): Promise<any[]> {
   const res = await authenticatedAdminFetch('/api/admin/boards', {}, fetchFn);
-  const json: ApiResponse<any[]> = await res.json();
+  const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   
+  // API 응답에서 boards 배열 추출
+  const boards = json.data.boards || [];
+  
   // allowed_file_types, allowed_iframe_domains를 배열로 변환
-  return json.data.map(board => ({
+  return boards.map(board => ({
     ...board,
     allowed_file_types: parseCsvOption(board.allowed_file_types),
     allowed_iframe_domains: parseCsvOption(board.allowed_iframe_domains),
