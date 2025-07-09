@@ -136,7 +136,7 @@ start_docker_services() {
     fi
     
     # Redis 헬스체크
-    if docker exec ${APP_NAME}_redis redis-cli --raw incr ping > /dev/null 2>&1; then
+    if docker exec ${APP_NAME}_redis redis-cli -a tnekwoddl --raw incr ping > /dev/null 2>&1; then
         log_success "Redis 시작 완료"
     else
         log_error "Redis 시작 실패"
