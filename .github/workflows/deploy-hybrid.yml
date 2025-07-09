@@ -96,8 +96,27 @@ jobs:
         rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/site/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/site/
         rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
         
-        # Docker Compose 프론트엔드 서비스만 시작
+        # Rust API 소스 코드 업로드
+        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
+        
+        # Docker Compose 서비스 시작 (Rust API 제외)
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml up -d --build postgres redis site admin"
+        
+        # Rust API 빌드 및 시작 (Docker 없이 직접 실행)
+        ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
+          cd ${{ env.DEPLOY_PATH }}/backends/api
+          # 기존 프로세스 종료
+          pkill -f minshool-api || true
+          sleep 2
+          # Rust 빌드
+          cargo build --release
+          # 백그라운드에서 실행
+          nohup ./target/release/minshool-api > api.log 2>&1 &
+          # PID 저장
+          echo \$! > api.pid
+          # 시작 대기
+          sleep 5
+        "
         
         echo "Frontend services deployed successfully!"
         
@@ -119,24 +138,28 @@ jobs:
         REDIS_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker exec mincenter-redis redis-cli -a tnekwoddl ping" | grep -o "PONG" || echo "failed")
         echo "Redis Status: $REDIS_STATUS"
         
+        # Rust API 상태 확인
+        API_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/api/health || echo '000'")
+        
         # 프론트엔드 서비스 상태 확인
         SITE_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:13000 || echo '000'")
         ADMIN_STATUS=$(ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "curl -s -o /dev/null -w '%{http_code}' http://localhost:13001 || echo '000'")
         
+        echo "Rust API Status: $API_STATUS"
         echo "Site Frontend Status: $SITE_STATUS"
         echo "Admin Frontend Status: $ADMIN_STATUS"
         
         # 결과 요약
-        echo "=== Frontend Deployment Summary ==="
+        echo "=== Deployment Summary ==="
         echo "PostgreSQL: $DB_STATUS"
         echo "Redis: $REDIS_STATUS"
+        echo "Rust API: $API_STATUS"
         echo "Site Frontend: $SITE_STATUS"
         echo "Admin Frontend: $ADMIN_STATUS"
         
-        if [ "$DB_STATUS" = "accepting connections" ] && [ "$REDIS_STATUS" = "PONG" ] && [ "$SITE_STATUS" = "200" ] && [ "$ADMIN_STATUS" = "200" ]; then
-          echo "✅ Frontend services deployment successful!"
-          echo "💡 You can now manually deploy the Rust API if needed"
+        if [ "$DB_STATUS" = "accepting connections" ] && [ "$REDIS_STATUS" = "PONG" ] && [ "$API_STATUS" = "200" ] && [ "$SITE_STATUS" = "200" ] && [ "$ADMIN_STATUS" = "200" ]; then
+          echo "✅ All services deployment successful!"
         else
-          echo "❌ Some frontend services may have issues"
+          echo "❌ Some services may have issues"
           exit 1
         fi 

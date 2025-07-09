@@ -91,6 +91,14 @@ cleanup_services() {
 start_api_server() {
     log_info "API 서버 시작 중..."
     
+    # 기존 프로세스 종료
+    pkill -f minshool-api || true
+    sleep 2
+    
+    # Rust 빌드
+    log_info "Rust API 빌드 중..."
+    cargo build --release
+    
     # 바이너리 권한 설정
     chmod +x "$API_BINARY"
     
@@ -105,7 +113,7 @@ start_api_server() {
     sleep 5
     
     # 헬스체크
-    if curl -f http://localhost:18080/health > /dev/null 2>&1; then
+    if curl -f http://localhost:18080/api/health > /dev/null 2>&1; then
         log_success "API 서버 시작 완료 (PID: $API_PID)"
     else
         log_error "API 서버 시작 실패"
