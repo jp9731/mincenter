@@ -51,7 +51,7 @@ services:
       - "13000:3000"
     environment:
       - NODE_ENV=production
-      - PUBLIC_API_URL=http://localhost:18080
+      - PUBLIC_API_URL=http://api.mincenter.kr
       - PUBLIC_DOMAIN=localhost
       - PUBLIC_NODE_ENV=production
     healthcheck:
@@ -75,7 +75,7 @@ services:
       - "13001:3000"
     environment:
       - NODE_ENV=production
-      - PUBLIC_API_URL=http://localhost:18080
+      - PUBLIC_API_URL=http://api.mincenter.kr
       - PUBLIC_DOMAIN=localhost
       - PUBLIC_NODE_ENV=production
     healthcheck:

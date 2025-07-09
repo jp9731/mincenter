@@ -42,7 +42,7 @@ async fn main() {
     
     // 설정 로드
     let config = Config::from_env();
-    
+    // env에서 포트 변경 적용
     let port = config.api_port;
     
     // 데이터베이스 연결
