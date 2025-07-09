@@ -12,8 +12,17 @@ export default defineConfig({
 			output: {
 				manualChunks: {
 					vendor: ['svelte', '@sveltejs/kit'],
-					ui: ['lucide-svelte', 'bits-ui']
+					ui: ['bits-ui']
 				}
+			}
+		},
+		// Tree shaking 최적화
+		target: 'esnext',
+		minify: 'terser',
+		terserOptions: {
+			compress: {
+				drop_console: true,
+				drop_debugger: true
 			}
 		}
 	}
