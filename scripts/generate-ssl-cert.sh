@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # OpenSSL 자체 서명 SSL 인증서 생성 스크립트
-# MinSchool 서브도메인용
+# MinCenter 서브도메인용
 
 set -e
 
@@ -31,7 +31,7 @@ CERT_FILE="$SSL_DIR/mincenter.crt"
 KEY_FILE="$SSL_DIR/mincenter.key"
 CONFIG_FILE="$SSL_DIR/openssl.conf"
 
-print_info "MinSchool SSL 인증서 생성 시작"
+print_info "MinCenter SSL 인증서 생성 시작"
 print_info "도메인: $DOMAIN"
 print_info "인증서 위치: $CERT_FILE"
 print_info "키 위치: $KEY_FILE"

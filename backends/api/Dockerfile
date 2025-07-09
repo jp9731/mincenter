@@ -24,7 +24,7 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/minshool-api /usr/local/bin/api
+COPY --from=builder /app/target/release/mincenter-api /usr/local/bin/api
 
 ENV PORT=18080
 EXPOSE ${PORT}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MinSchool CentOS 7 API 빌드 스크립트
+# MinCenter CentOS 7 API 빌드 스크립트
 # 로컬에서 CentOS 7 호환 바이너리를 빌드하여 배포용으로 생성
 
 set -e
@@ -30,9 +30,9 @@ log_error() {
 }
 
 # 설정
-PROJECT_NAME="minshool-api"
+PROJECT_NAME="mincenter-api"
 BUILD_DIR="build/centos7"
-BINARY_NAME="minshool-api"
+BINARY_NAME="mincenter-api"
 TARGET="x86_64-unknown-linux-gnu"
 RUST_VERSION="1.70.0"
 
@@ -184,16 +184,16 @@ create_deployment_package() {
     cp "$BUILD_DIR/$BINARY_NAME" "$DEPLOY_DIR/"
     
     # systemd 서비스 파일 생성
-    cat > "$DEPLOY_DIR/minshool-api.service" << 'EOF'
+    cat > "$DEPLOY_DIR/mincenter-api.service" << 'EOF'
 [Unit]
-Description=MinShool API Server
+Description=MinCenter API Server
 After=network.target postgresql.service redis.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/minshool-api
-ExecStart=/opt/minshool-api/minshool-api
+WorkingDirectory=/opt/mincenter-api
+ExecStart=/opt/mincenter-api/mincenter-api
 Restart=always
 RestartSec=3
 Environment=DATABASE_URL=postgresql://postgres:password@localhost:15432/mincenter
@@ -213,27 +213,27 @@ EOF
     cat > "$DEPLOY_DIR/install.sh" << 'EOF'
 #!/bin/bash
 
-# MinSchool API 설치 스크립트
+# MinCenter API 설치 스크립트
 
 set -e
 
-echo "MinSchool API 설치 시작..."
+echo "MinCenter API 설치 시작..."
 
 # 바이너리 복사
-sudo mkdir -p /opt/minshool-api
-sudo cp minshool-api /opt/minshool-api/
-sudo chmod +x /opt/minshool-api/minshool-api
-sudo chown root:root /opt/minshool-api/minshool-api
+sudo mkdir -p /opt/mincenter-api
+sudo cp mincenter-api /opt/mincenter-api/
+sudo chmod +x /opt/mincenter-api/mincenter-api
+sudo chown root:root /opt/mincenter-api/mincenter-api
 
 # systemd 서비스 설치
-sudo cp minshool-api.service /etc/systemd/system/
+sudo cp mincenter-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable minshool-api
+sudo systemctl enable mincenter-api
 
 echo "설치 완료!"
-echo "서비스 시작: sudo systemctl start minshool-api"
-echo "서비스 상태 확인: sudo systemctl status minshool-api"
-echo "로그 확인: sudo journalctl -u minshool-api -f"
+echo "서비스 시작: sudo systemctl start mincenter-api"
+echo "서비스 상태 확인: sudo systemctl status mincenter-api"
+echo "로그 확인: sudo journalctl -u mincenter-api -f"
 EOF
     
     chmod +x "$DEPLOY_DIR/install.sh"

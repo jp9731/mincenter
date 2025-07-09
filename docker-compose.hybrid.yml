@@ -37,7 +37,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/minshool-production.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/mincenter-production.conf:/etc/nginx/nginx.conf:ro
       - ./frontends/site/static:/var/www/site/static:ro
       - ./frontends/admin/static:/var/www/admin/static:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro

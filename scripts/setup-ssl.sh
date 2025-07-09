@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MinSchool SSL 인증서 설정 스크립트
+# MinCenter SSL 인증서 설정 스크립트
 # certbot을 사용하여 Let's Encrypt SSL 인증서 생성
 
 set -e
@@ -130,8 +130,8 @@ apply_ssl_config() {
     log_info "nginx SSL 설정 적용 중..."
     
     # SSL 설정이 포함된 nginx 설정 파일 생성
-    sudo tee /etc/nginx/conf.d/minshool-ssl.conf > /dev/null << 'EOF'
-# MinSchool SSL 설정
+    sudo tee /etc/nginx/conf.d/mincenter-ssl.conf > /dev/null << 'EOF'
+# MinCenter SSL 설정
 # certbot이 자동으로 생성한 설정
 
 # HTTP를 HTTPS로 리다이렉트

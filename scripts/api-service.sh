@@ -33,7 +33,7 @@ log_debug() {
 API_DIR="backends/api"
 PID_FILE="$API_DIR/api.pid"
 LOG_FILE="$API_DIR/api.log"
-BINARY_FILE="$API_DIR/target/release/minshool-api"
+BINARY_FILE="$API_DIR/target/release/mincenter-api"
 
 # 환경 변수 로드
 if [ -f ".env" ]; then
@@ -80,7 +80,7 @@ start_api() {
     
     # API 서버 시작
     log_info "API 서버를 시작합니다..."
-    nohup ./target/release/minshool-api > api.log 2>&1 &
+    nohup ./target/release/mincenter-api > api.log 2>&1 &
     local pid=$!
     echo $pid > api.pid
     
@@ -197,7 +197,7 @@ build_api() {
     
     if [ $? -eq 0 ]; then
         log_info "API 빌드가 완료되었습니다."
-        log_info "바이너리 크기: $(du -h target/release/minshool-api | cut -f1)"
+        log_info "바이너리 크기: $(du -h target/release/mincenter-api | cut -f1)"
     else
         log_error "API 빌드에 실패했습니다."
         exit 1

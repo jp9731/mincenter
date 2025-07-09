@@ -106,12 +106,12 @@ jobs:
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
           cd ${{ env.DEPLOY_PATH }}/backends/api
           # 기존 프로세스 종료
-          pkill -f minshool-api || true
+          pkill -f mincenter-api || true
           sleep 2
           # Rust 빌드
           cargo build --release
           # 백그라운드에서 실행
-          nohup ./target/release/minshool-api > api.log 2>&1 &
+          nohup ./target/release/mincenter-api > api.log 2>&1 &
           # PID 저장
           echo \$! > api.pid
           # 시작 대기

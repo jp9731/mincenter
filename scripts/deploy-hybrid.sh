@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MinSchool 하이브리드 배포 스크립트
+# MinCenter 하이브리드 배포 스크립트
 # Frontend, PostgreSQL, Redis는 Docker로 실행
 # API는 로컬에서 빌드한 바이너리로 실행
 
@@ -43,7 +43,7 @@ export HTTP_PORT=80
 export HTTPS_PORT=443
 
 # API 바이너리 경로
-API_BINARY="build/centos7/minshool-api"
+API_BINARY="build/centos7/mincenter-api"
 
 # 함수: API 바이너리 확인
 check_api_binary() {
@@ -78,7 +78,7 @@ cleanup_services() {
     log_info "기존 서비스 정리 중..."
     
     # API 프로세스 종료
-    pkill -f minshool-api || true
+    pkill -f mincenter-api || true
     sleep 2
     
     # Docker 서비스 정리
@@ -92,7 +92,7 @@ start_api_server() {
     log_info "API 서버 시작 중..."
     
     # 기존 프로세스 종료
-    pkill -f minshool-api || true
+    pkill -f mincenter-api || true
     sleep 2
     
     # Rust 빌드
@@ -103,11 +103,11 @@ start_api_server() {
     chmod +x "$API_BINARY"
     
     # API 서버 백그라운드 실행
-    nohup "$API_BINARY" > /tmp/minshool-api.log 2>&1 &
+    nohup "$API_BINARY" > /tmp/mincenter-api.log 2>&1 &
     API_PID=$!
     
     # PID 저장
-    echo $API_PID > /tmp/minshool-api.pid
+    echo $API_PID > /tmp/mincenter-api.pid
     
     # 서버 시작 대기
     sleep 5
@@ -117,7 +117,7 @@ start_api_server() {
         log_success "API 서버 시작 완료 (PID: $API_PID)"
     else
         log_error "API 서버 시작 실패"
-        cat /tmp/minshool-api.log
+        cat /tmp/mincenter-api.log
         exit 1
     fi
 }
@@ -175,8 +175,8 @@ check_services() {
     log_info "서비스 상태 확인 중..."
     
     echo "=== API 서버 상태 ==="
-    if [ -f /tmp/minshool-api.pid ]; then
-        API_PID=$(cat /tmp/minshool-api.pid)
+    if [ -f /tmp/mincenter-api.pid ]; then
+        API_PID=$(cat /tmp/mincenter-api.pid)
         if ps -p $API_PID > /dev/null; then
             log_success "API 서버 실행 중 (PID: $API_PID)"
         else
@@ -198,10 +198,10 @@ stop_services() {
     log_info "서비스 중지 중..."
     
     # API 서버 중지
-    if [ -f /tmp/minshool-api.pid ]; then
-        API_PID=$(cat /tmp/minshool-api.pid)
+    if [ -f /tmp/mincenter-api.pid ]; then
+        API_PID=$(cat /tmp/mincenter-api.pid)
         kill $API_PID 2>/dev/null || true
-        rm -f /tmp/minshool-api.pid
+        rm -f /tmp/mincenter-api.pid
         log_success "API 서버 중지됨"
     fi
     
@@ -214,7 +214,7 @@ stop_services() {
 main() {
     case "${1:-start}" in
         "start")
-            log_info "MinSchool 하이브리드 배포 시작"
+            log_info "MinCenter 하이브리드 배포 시작"
             check_api_binary
             check_docker
             cleanup_services
@@ -248,7 +248,7 @@ main() {
         "logs")
             log_info "로그 확인"
             echo "=== API 서버 로그 ==="
-            tail -f /tmp/minshool-api.log &
+            tail -f /tmp/mincenter-api.log &
             echo "=== Docker 서비스 로그 ==="
             docker-compose -f docker-compose.hybrid.yml logs -f
             ;;

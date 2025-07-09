@@ -48,7 +48,7 @@ docker ps -aq --filter "name=${APP_NAME}_" | xargs -r docker rm -f || true
 
 # 3. API 프로세스 종료
 log_info "API 프로세스를 종료합니다..."
-pkill -f minshool-api || true
+pkill -f mincenter-api || true
 if [ -f "backends/api/api.pid" ]; then
     API_PID=$(cat backends/api/api.pid)
     kill $API_PID 2>/dev/null || true

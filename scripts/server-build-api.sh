@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# MinSchool API 서버 빌드 및 systemd 서비스 등록 스크립트
+# MinCenter API 서버 빌드 및 systemd 서비스 등록 스크립트
 # 서버에서 직접 실행 (CentOS 7, Ubuntu 등)
 
 set -e
 
-SERVICE_NAME="minshool-api"
+SERVICE_NAME="mincenter-api"
 API_DIR="$(dirname "$0")/../backends/api"
-BINARY_NAME="minshool-api"
-INSTALL_DIR="/opt/minshool-api"
+BINARY_NAME="mincenter-api"
+INSTALL_DIR="/opt/mincenter-api"
 SYSTEMD_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # 1. 의존성 설치
@@ -50,7 +50,7 @@ setup_systemd() {
     echo "[INFO] systemd 서비스 파일 생성..."
     sudo tee "$SYSTEMD_PATH" > /dev/null <<EOF
 [Unit]
-Description=MinShool API Server
+Description=MinCenter API Server
 After=network.target postgresql.service redis.service
 
 [Service]

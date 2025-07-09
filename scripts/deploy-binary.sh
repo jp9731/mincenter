@@ -30,8 +30,8 @@ log_error() {
 }
 
 # 설정
-APP_NAME="minshool-api"
-BINARY_NAME="minshool-api"
+APP_NAME="mincenter-api"
+BINARY_NAME="mincenter-api"
 LOCAL_BINARY_PATH="backends/api/target/release/${BINARY_NAME}"
 REMOTE_USER="${REMOTE_USER:-root}"
 REMOTE_HOST="${REMOTE_HOST:-your-server-ip}"
@@ -87,7 +87,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 cat << EOF | ssh -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "cat > $SERVICE_FILE"
 [Unit]
-Description=MinShool API Server
+Description=MinCenter API Server
 After=network.target postgresql.service redis.service
 
 [Service]

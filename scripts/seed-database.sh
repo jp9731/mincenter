@@ -35,7 +35,7 @@ if [ -f ".env" ]; then
     export $(cat .env | grep -v '^#' | xargs)
 else
     log_warning ".env 파일이 없습니다. 기본값을 사용합니다."
-    export POSTGRES_DB=minshool_db
+    export POSTGRES_DB=mincenter_db
     export POSTGRES_USER=mincenter
     export POSTGRES_PASSWORD=mincenter123
     export POSTGRES_PORT=15432

@@ -63,8 +63,8 @@ jobs:
           
           # 바이너리 복사를 위한 디렉토리 생성
           mkdir -p ${{ env.DEPLOY_PATH }}/mincenter-api-bin
-          cp target/release/minshool-api ${{ env.DEPLOY_PATH }}/mincenter-api-bin/
-          chmod +x ${{ env.DEPLOY_PATH }}/mincenter-api-bin/minshool-api
+          cp target/release/mincenter-api ${{ env.DEPLOY_PATH }}/mincenter-api-bin/
+          chmod +x ${{ env.DEPLOY_PATH }}/mincenter-api-bin/mincenter-api
         "
         
         # systemd 서비스 파일 생성 (임시 파일로 생성 후 sudo로 이동)
@@ -80,7 +80,7 @@ jobs:
         Type=simple
         User=${{ env.DEPLOY_USER }}
         WorkingDirectory=${{ env.DEPLOY_PATH }}/backends/api
-        ExecStart=${{ env.DEPLOY_PATH }}/mincenter-api-bin/minshool-api
+        ExecStart=${{ env.DEPLOY_PATH }}/mincenter-api-bin/mincenter-api
         Restart=always
         RestartSec=3
         Environment=DATABASE_URL=postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'minshool-site',
+      name: 'mincenter-site',
       script: './frontends/site/build/index.js',
       cwd: './frontends/site',
       instances: 'max', // CPU 코어 수만큼 인스턴스 생성
@@ -31,7 +31,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
-      name: 'minshool-admin',
+      name: 'mincenter-admin',
       script: './frontends/admin/build/index.js',
       cwd: './frontends/admin',
       instances: 1, // 관리자 페이지는 단일 인스턴스
@@ -69,7 +69,7 @@ module.exports = {
       host: 'your-server-ip',
       ref: 'origin/main',
       repo: 'git@github.com:your-username/your-repo.git',
-      path: '/var/www/minshool',
+      path: '/var/www/mincenter',
       'pre-deploy-local': '',
       'post-deploy': 'npm install && npm run build && pm2 reload ecosystem.config.js --env production',
       'pre-setup': ''
