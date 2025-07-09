@@ -25,7 +25,7 @@ services:
     image: redis:7-alpine
     container_name: mincenter-redis
     restart: unless-stopped
-    command: redis-server --requirepass default_password
+    command: redis-server --requirepass DvzOYmv1V/fe/dEspn/1/HNSVQ39X7D/nOnSLtalqhU=
     volumes:
       - redis_data:/data
     ports:
