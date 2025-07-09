@@ -9,7 +9,7 @@ mod utils;
 
 use axum::{
     extract::{Path, Query, State, Extension},
-    http::{StatusCode, Method},
+    http::{StatusCode, Method, header},
     response::IntoResponse,
     routing::{get, post, put, delete},
     Json, Router,
@@ -197,8 +197,8 @@ async fn main() {
                     "http://localhost:13000".parse().unwrap(),
                     "http://localhost:13001".parse().unwrap(),
                 ])
-                .allow_methods([http::Method::GET, http::Method::POST, http::Method::PUT, http::Method::DELETE, http::Method::OPTIONS])
-                .allow_headers([http::header::AUTHORIZATION, http::header::CONTENT_TYPE])
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
                 .allow_credentials(true)
         )
         .with_state(state);
