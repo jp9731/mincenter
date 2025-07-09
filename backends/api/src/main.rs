@@ -40,8 +40,10 @@ async fn main() {
     // 로깅 초기화
     tracing_subscriber::fmt::init();
     
-    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let port: u16 = port.parse().expect("PORT must be a number");
+    // 설정 로드
+    let config = Config::from_env();
+    
+    let port = config.api_port;
     
     // 데이터베이스 연결
     let pool = crate::database::get_database().await.expect("Failed to connect to database");
@@ -49,9 +51,6 @@ async fn main() {
     // Redis 연결
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let redis = RedisClient::open(redis_url).expect("Failed to connect to Redis");
-    
-    // 설정 로드
-    let config = Config::from_env();
     
     let state = AppState {
         pool,
