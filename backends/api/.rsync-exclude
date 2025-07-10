@@ -1,0 +1,27 @@
+# Rust 빌드 결과물
+target/
+Cargo.lock
+
+# 환경변수 파일
+.env
+.env.*
+
+# 로그 파일
+*.log
+
+# PID 파일
+*.pid
+
+# 임시 파일
+*.tmp
+*.temp
+
+# IDE 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS 파일
+.DS_Store
+Thumbs.db 

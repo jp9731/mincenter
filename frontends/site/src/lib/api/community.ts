@@ -1,6 +1,6 @@
 import type { Board, Category, Post, PostDetail, Comment, CommentDetail, BoardStats, ApiResponse } from '../types/community.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL;
 
 // 인증 토큰 가져오기
 function getAuthHeaders(): HeadersInit {

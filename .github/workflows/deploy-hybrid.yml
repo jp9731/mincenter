@@ -97,7 +97,7 @@ jobs:
         rsync -avz --exclude='.env*' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
         
         # Rust API 소스 코드 업로드
-        rsync -avz --exclude='.env' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
+        rsync -avz --exclude-from='backends/api/.rsync-exclude' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
         
         # Docker Compose 서비스 시작 (Rust API 제외)
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml up -d --build postgres redis site admin"
