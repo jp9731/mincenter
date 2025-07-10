@@ -77,6 +77,27 @@ fn is_domain_allowed(origin: &str, allowed_origins: &[String]) -> bool {
     false
 }
 
+/// 모든 CORS 관련 헤더를 제거합니다.
+fn remove_all_cors_headers(response: &mut Response) {
+    let headers = response.headers_mut();
+    
+    // 모든 CORS 헤더 제거
+    headers.remove("Access-Control-Allow-Origin");
+    headers.remove("Access-Control-Allow-Methods");
+    headers.remove("Access-Control-Allow-Headers");
+    headers.remove("Access-Control-Allow-Credentials");
+    headers.remove("Access-Control-Expose-Headers");
+    headers.remove("Access-Control-Max-Age");
+    
+    // 추가적인 CORS 헤더들도 제거
+    headers.remove("access-control-allow-origin");
+    headers.remove("access-control-allow-methods");
+    headers.remove("access-control-allow-headers");
+    headers.remove("access-control-allow-credentials");
+    headers.remove("access-control-expose-headers");
+    headers.remove("access-control-max-age");
+}
+
 pub async fn custom_cors_middleware(
     request: Request,
     next: Next,
@@ -108,11 +129,8 @@ pub async fn custom_cors_middleware(
 
     let mut response = next.run(request).await;
 
-    // 기존 CORS 헤더 제거 (중복 방지)
-    response.headers_mut().remove("Access-Control-Allow-Origin");
-    response.headers_mut().remove("Access-Control-Allow-Methods");
-    response.headers_mut().remove("Access-Control-Allow-Headers");
-    response.headers_mut().remove("Access-Control-Allow-Credentials");
+    // 모든 기존 CORS 헤더 제거 (중복 방지)
+    remove_all_cors_headers(&mut response);
 
     // 허용된 도메인에 대해서만 CORS 헤더 설정
     if is_allowed {

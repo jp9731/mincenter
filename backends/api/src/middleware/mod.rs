@@ -18,10 +18,6 @@ pub mod cors;
 pub use rbac::*;
 pub use cors::*;
 
-pub fn cors() -> CorsLayer {
-    CorsLayer::permissive()
-}
-
 pub async fn optional_auth_middleware(
     State(state): State<AppState>,
     request: Request,
