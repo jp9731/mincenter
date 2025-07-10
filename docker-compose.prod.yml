@@ -78,6 +78,7 @@ services:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
         - NODE_ENV=production
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:18080}
       cache_from:
         - node:18-alpine
       no_cache: false
@@ -89,6 +90,7 @@ services:
       PORT: 3000
       API_URL: http://api:${API_PORT:-18080}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:18080}
       SESSION_SECRET: ${SESSION_SECRET:-default_secret}
     ports:
       - "13000:3000"
@@ -118,6 +120,7 @@ services:
         - API_URL=${API_URL:-http://localhost:18080}
         - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
         - NODE_ENV=production
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:18080}
       cache_from:
         - node:18-alpine
       no_cache: false
@@ -129,6 +132,7 @@ services:
       PORT: 3000
       API_URL: http://api:${API_PORT:-18080}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:18080}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:18080}
       SESSION_SECRET: ${ADMIN_SESSION_SECRET:-default_admin_secret}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@localhost}
     ports:

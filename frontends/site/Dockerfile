@@ -3,6 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# 빌드 시 환경변수 주입
+ARG VITE_API_URL
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_KAKAO_CLIENT_ID
+
 # 패키지 파일 복사
 COPY package*.json ./
 COPY svelte.config.js ./
@@ -16,6 +21,14 @@ RUN npm ci --silent
 # 소스 코드 복사
 COPY src ./src
 COPY static ./static
+
+# 환경변수 파일 복사 (빌드 시점에 필요)
+COPY .env* ./
+
+# 환경변수 파일 생성 (ARG로 전달된 값 사용)
+RUN echo "VITE_API_URL=${VITE_API_URL:-http://localhost:18080}" > .env.production && \
+    echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}" >> .env.production && \
+    echo "VITE_KAKAO_CLIENT_ID=${VITE_KAKAO_CLIENT_ID:-}" >> .env.production
 
 # 빌드
 RUN npm run build
