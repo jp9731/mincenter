@@ -37,6 +37,9 @@ pub async fn custom_cors_middleware(
         .unwrap_or("")
         .to_string();
 
+    // request.method()를 미리 저장 (request가 이동되기 전에)
+    let method = request.method().clone();
+
     // 허용된 도메인 목록
     let allowed_origins = get_allowed_origins();
     let is_allowed = allowed_origins.contains(&origin);
@@ -58,7 +61,7 @@ pub async fn custom_cors_middleware(
     }
 
     // OPTIONS 요청에 대한 preflight 응답
-    if request.method() == Method::OPTIONS {
+    if method == Method::OPTIONS {
         response.headers_mut().insert(
             "Access-Control-Allow-Methods",
             HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
