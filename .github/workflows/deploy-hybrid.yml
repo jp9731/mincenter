@@ -97,7 +97,7 @@ jobs:
         rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
         
         # Rust API 소스 코드 업로드
-        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
+        rsync -avz --exclude='.env' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
         
         # Docker Compose 서비스 시작 (Rust API 제외)
         ssh -p ${{ env.DEPLOY_PORT }} ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose -f docker-compose.deploy.yml up -d --build postgres redis site admin"
@@ -108,8 +108,8 @@ jobs:
           # 기존 프로세스 종료
           pkill -f mincenter-api || true
           sleep 2
-          # Rust 빌드
-          cargo build --release
+          # Rust 빌드 (--bin 옵션 추가)
+          cargo build --release --bin mincenter-api
           # 환경변수 설정
           export DATABASE_URL=postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter
           export REDIS_URL=redis://:tnekwoddl@localhost:16379
