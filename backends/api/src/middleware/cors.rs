@@ -5,7 +5,7 @@ use axum::{
     response::Response,
 };
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 
 pub fn cors_middleware() -> CorsLayer {
     CorsLayer::new()
@@ -81,21 +81,49 @@ fn is_domain_allowed(origin: &str, allowed_origins: &[String]) -> bool {
 fn remove_all_cors_headers(response: &mut Response) {
     let headers = response.headers_mut();
     
-    // 모든 CORS 헤더 제거
-    headers.remove("Access-Control-Allow-Origin");
-    headers.remove("Access-Control-Allow-Methods");
-    headers.remove("Access-Control-Allow-Headers");
-    headers.remove("Access-Control-Allow-Credentials");
-    headers.remove("Access-Control-Expose-Headers");
-    headers.remove("Access-Control-Max-Age");
+    // 모든 CORS 헤더 제거 (대소문자 구분 없이)
+    let cors_headers = [
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Expose-Headers",
+        "Access-Control-Max-Age",
+        "access-control-allow-origin",
+        "access-control-allow-methods",
+        "access-control-allow-headers",
+        "access-control-allow-credentials",
+        "access-control-expose-headers",
+        "access-control-max-age",
+    ];
     
-    // 추가적인 CORS 헤더들도 제거
-    headers.remove("access-control-allow-origin");
-    headers.remove("access-control-allow-methods");
-    headers.remove("access-control-allow-headers");
-    headers.remove("access-control-allow-credentials");
-    headers.remove("access-control-expose-headers");
-    headers.remove("access-control-max-age");
+    for header_name in &cors_headers {
+        headers.remove(*header_name);
+    }
+    
+    // 디버깅: 제거된 헤더들 로그
+    debug!("모든 CORS 헤더 제거 완료");
+}
+
+/// 응답 헤더를 로깅합니다.
+fn log_response_headers(response: &Response, origin: &str) {
+    let headers = response.headers();
+    
+    // CORS 관련 헤더만 필터링하여 로그
+    let cors_headers = headers
+        .iter()
+        .filter(|(name, _)| {
+            let name_lower = name.as_str().to_lowercase();
+            name_lower.contains("access-control")
+        })
+        .collect::<Vec<_>>();
+    
+    if !cors_headers.is_empty() {
+        warn!("⚠️  CORS 헤더 발견: {:?}", cors_headers);
+        warn!("⚠️  Origin: {}", origin);
+    } else {
+        debug!("✅ CORS 헤더 없음");
+    }
 }
 
 pub async fn custom_cors_middleware(
@@ -127,34 +155,59 @@ pub async fn custom_cors_middleware(
         }
     }
 
+    // OPTIONS preflight 요청 처리
+    if method == Method::OPTIONS {
+        info!("OPTIONS preflight 요청 처리: {}", request.uri());
+        
+        let mut response = Response::new(axum::body::Body::empty());
+        let headers = response.headers_mut();
+        
+        // 허용된 도메인에 대해서만 CORS 헤더 설정
+        if is_allowed {
+            headers.insert(
+                "Access-Control-Allow-Origin",
+                HeaderValue::from_str(&origin).unwrap_or_else(|_| HeaderValue::from_static("")),
+            );
+        }
+        
+        headers.insert(
+            "Access-Control-Allow-Methods",
+            HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
+        );
+        headers.insert(
+            "Access-Control-Allow-Headers",
+            HeaderValue::from_static("authorization, content-type, x-requested-with"),
+        );
+        headers.insert(
+            "Access-Control-Allow-Credentials",
+            HeaderValue::from_static("true"),
+        );
+        headers.insert(
+            "Access-Control-Max-Age",
+            HeaderValue::from_static("1728000"),
+        );
+        
+        info!("✅ OPTIONS preflight 응답 생성 완료");
+        return response;
+    }
+
     let mut response = next.run(request).await;
+
+    // 디버깅: 기존 응답 헤더 로깅
+    log_response_headers(&response, &origin);
 
     // 모든 기존 CORS 헤더 제거 (중복 방지)
     remove_all_cors_headers(&mut response);
 
     // 허용된 도메인에 대해서만 CORS 헤더 설정
     if is_allowed {
-        response.headers_mut().insert(
-            "Access-Control-Allow-Origin",
-            HeaderValue::from_str(&origin).unwrap_or_else(|_| HeaderValue::from_static("")),
-        );
+        let header_value = HeaderValue::from_str(&origin).unwrap_or_else(|_| HeaderValue::from_static(""));
+        response.headers_mut().insert("Access-Control-Allow-Origin", header_value);
+        info!("✅ CORS 헤더 설정: Access-Control-Allow-Origin = {}", origin);
     }
 
-    // OPTIONS 요청에 대한 preflight 응답
-    if method == Method::OPTIONS {
-        response.headers_mut().insert(
-            "Access-Control-Allow-Methods",
-            HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"),
-        );
-        response.headers_mut().insert(
-            "Access-Control-Allow-Headers",
-            HeaderValue::from_static("authorization, content-type, x-requested-with"),
-        );
-        response.headers_mut().insert(
-            "Access-Control-Allow-Credentials",
-            HeaderValue::from_static("true"),
-        );
-    }
+    // 최종 응답 헤더 로깅
+    log_response_headers(&response, &origin);
 
     response
 } 

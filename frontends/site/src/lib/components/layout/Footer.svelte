@@ -60,7 +60,7 @@
 		<div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-12 w-full">
 			<!-- 로고 이미지 -->
 			<div class="flex-shrink-0 mx-auto md:mx-0">
-				<img src="./images/min_logo.png" alt="민들레장애인자립생활센터 로고" class="w-32 h-32 object-contain">
+				<img src="/images/min_logo.png" alt="민들레장애인자립생활센터 로고" class="w-32 h-32 object-contain">
 			</div>
 			
 			<!-- 기존 정보 -->

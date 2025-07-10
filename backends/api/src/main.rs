@@ -186,7 +186,11 @@ async fn main() {
         .nest_service("/uploads", ServeDir::new("static/uploads"))
         .layer(axum::middleware::from_fn(middleware::custom_cors_middleware))
         .with_state(state)
-        .route("/*path", options(|| async { StatusCode::OK }));
+        // OPTIONS 요청을 위한 catch-all 핸들러
+        .route("/*path", options(|| async { 
+            info!("OPTIONS preflight 요청 처리");
+            StatusCode::OK 
+        }));
 
     info!("Server starting on port {}", port);
     
