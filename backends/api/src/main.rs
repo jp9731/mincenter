@@ -14,6 +14,7 @@ use axum::{
     routing::{get, post, put, delete},
     Json, Router,
 };
+use axum::routing::options;
 use std::collections::HashMap;
 use tower_http::cors::CorsLayer;
 use tower_http::services::fs::ServeDir;
@@ -184,7 +185,8 @@ async fn main() {
         // 정적 파일 서빙
         .nest_service("/uploads", ServeDir::new("static/uploads"))
         .layer(axum::middleware::from_fn(middleware::custom_cors_middleware))
-        .with_state(state);
+        .with_state(state)
+        .route("/*path", options(|| async { StatusCode::OK }));
 
     info!("Server starting on port {}", port);
     
