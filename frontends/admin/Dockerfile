@@ -24,7 +24,7 @@ COPY static ./static
 COPY .env* ./
 
 # 환경변수 파일 생성 (ARG로 전달된 값 사용)
-RUN echo "VITE_API_URL=${VITE_API_URL:-http://localhost:18080}" > .env.production
+RUN echo "VITE_API_URL=${VITE_API_URL:-}" > .env.production
 
 # 빌드
 RUN npm run build

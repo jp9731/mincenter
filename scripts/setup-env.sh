@@ -11,7 +11,7 @@ PROJECT_ROOT=$(pwd)
 if [ ! -f "frontends/site/.env" ]; then
     cat > frontends/site/.env << EOF
 # Site 프론트엔드 환경변수
-VITE_API_URL=\${VITE_API_URL:-http://localhost:18080}
+VITE_API_URL=\${VITE_API_URL:-https://api.mincenter.kr}
 VITE_GOOGLE_CLIENT_ID=\${VITE_GOOGLE_CLIENT_ID:-}
 VITE_KAKAO_CLIENT_ID=\${VITE_KAKAO_CLIENT_ID:-}
 EOF
@@ -24,7 +24,7 @@ fi
 if [ ! -f "frontends/admin/.env" ]; then
     cat > frontends/admin/.env << EOF
 # Admin 프론트엔드 환경변수
-VITE_API_URL=\${VITE_API_URL:-http://localhost:18080}
+VITE_API_URL=\${VITE_API_URL:-https://api.mincenter.kr}
 EOF
     echo "✅ Admin .env 파일 생성 완료"
 else

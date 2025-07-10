@@ -1,5 +1,5 @@
 // 환경 설정
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+export const API_URL = import.meta.env.VITE_API_URL || '';
 
 // 앱 설정
 export const APP_CONFIG = {
