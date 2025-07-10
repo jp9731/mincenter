@@ -2,7 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import type { Post, Comment, Category, Tag, PostFilter, PostsResponse, PostDetail, CommentDetail, Board } from '$lib/types/community.js';
 import * as api from '$lib/api/community.js';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mincenter.kr';
 
 // 게시글 목록
 export const posts = writable<PostDetail[]>([]);

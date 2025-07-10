@@ -26,7 +26,7 @@ COPY static ./static
 COPY .env* ./
 
 # 환경변수 파일 생성 (ARG로 전달된 값 사용)
-RUN echo "VITE_API_URL=${VITE_API_URL:-}" > .env.production && \
+RUN echo "VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}" > .env.production && \
     echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}" >> .env.production && \
     echo "VITE_KAKAO_CLIENT_ID=${VITE_KAKAO_CLIENT_ID:-}" >> .env.production
 
