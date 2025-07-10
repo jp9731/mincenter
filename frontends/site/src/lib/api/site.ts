@@ -68,11 +68,13 @@ export const DEFAULT_MENUS: MenuTree[] = [
 ];
 
 // 런타임 환경변수에서 API URL 가져오기
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.mincenter.kr';
 
 export async function getSiteMenus(): Promise<ApiResponse<SiteMenuResponse>> {
   try {
-    const response = await fetch(`${API_BASE}/api/site/menus`, {
+    // API_BASE가 undefined인 경우 기본값 사용
+    const baseUrl = API_BASE || 'https://api.mincenter.kr';
+    const response = await fetch(`${baseUrl}/api/site/menus`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -140,7 +142,8 @@ export interface Page {
 }
 
 export async function getPageBySlug(slug: string): Promise<ApiResponse<Page>> {
-  const response = await fetch(`${API_BASE}/api/pages/${slug}`);
+  const baseUrl = API_BASE || 'https://api.mincenter.kr';
+  const response = await fetch(`${baseUrl}/api/pages/${slug}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch page');

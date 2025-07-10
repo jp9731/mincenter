@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mincenter.kr';
 
 // JWT 토큰 관리
 export const ADMIN_JWT_TOKEN_KEY = 'admin_token';

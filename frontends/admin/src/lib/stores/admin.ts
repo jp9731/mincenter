@@ -14,7 +14,7 @@ import {
 } from '$lib/utils/auth';
 import { getUsers, getPosts, togglePostVisibility, updateUserStatus } from '$lib/api/admin';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mincenter.kr';
 
 export const adminUser = writable<AdminUser | null>(null);
 export const isAdminAuthenticated = writable(false);
