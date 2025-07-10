@@ -32,7 +32,7 @@ build_api() {
     echo "[INFO] API 빌드 중..."
     cd "$API_DIR"
     cargo clean
-    cargo build --release
+    cargo build --release --bin mincenter-api
     cd -
 }
 

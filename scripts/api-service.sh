@@ -192,8 +192,8 @@ build_api() {
     fi
     
     # 빌드 실행
-    log_info "cargo build --release 실행 중..."
-    cargo build --release
+    log_info "cargo build --release --bin mincenter-api 실행 중..."
+    cargo build --release --bin mincenter-api
     
     if [ $? -eq 0 ]; then
         log_info "API 빌드가 완료되었습니다."

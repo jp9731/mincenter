@@ -1,11 +1,10 @@
 use axum::{
     extract::Request,
-    http::{HeaderValue, Method, StatusCode},
+    http::{HeaderValue, Method},
     middleware::Next,
     response::Response,
 };
 use tower_http::cors::CorsLayer;
-use std::collections::HashMap;
 
 pub fn cors_middleware() -> CorsLayer {
     CorsLayer::new()
@@ -22,12 +21,12 @@ pub fn cors_middleware() -> CorsLayer {
             "http://localhost:3000".parse().unwrap(),
             "http://localhost:3001".parse().unwrap(),
             "http://localhost:13000".parse().unwrap(),
-            "http://localhost:13001".parse().unwrap(),
         ])
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
         .allow_headers([
-            axum::http::header::AUTHORIZATION,
-            axum::http::header::CONTENT_TYPE,
+            "authorization".parse().unwrap(),
+            "content-type".parse().unwrap(),
+            "x-requested-with".parse().unwrap(),
         ])
         .allow_credentials(true)
 }
@@ -35,45 +34,57 @@ pub fn cors_middleware() -> CorsLayer {
 pub async fn custom_cors_middleware(
     request: Request,
     next: Next,
-) -> Result<Response, StatusCode> {
-    let mut response = next.run(request).await;
-    
-    // Origin 헤더 가져오기
+) -> Response {
+    // Origin 헤더와 경로를 먼저 추출
     let origin = request
         .headers()
         .get("origin")
         .and_then(|h| h.to_str().ok())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_string();
     
-    // 요청 경로에 따라 다른 CORS 정책 적용
-    let path = request.uri().path();
-    
-    if path.starts_with("/api/admin") {
+    let path = request.uri().path().to_string();
+
+    // 요청 처리
+    let mut response = next.run(request).await;
+
+    // 요청 경로에 따라 CORS 정책 결정
+    let allowed_origins = if path.starts_with("/api/admin") {
         // Admin API: admin.mincenter.kr만 허용
-        if origin.contains("admin.mincenter.kr") || origin.contains("localhost") {
-            response.headers_mut().insert(
-                "Access-Control-Allow-Origin",
-                HeaderValue::from_static(origin),
-            );
-        }
-    } else if path.starts_with("/api/site") || path.starts_with("/api/community") || path.starts_with("/api/auth") {
-        // Site API: mincenter.kr, www.mincenter.kr만 허용
-        if origin.contains("mincenter.kr") && !origin.contains("admin.mincenter.kr") || origin.contains("localhost") {
-            response.headers_mut().insert(
-                "Access-Control-Allow-Origin",
-                HeaderValue::from_static(origin),
-            );
-        }
+        vec![
+            "http://admin.mincenter.kr",
+            "https://admin.mincenter.kr",
+            "http://localhost:13000",
+        ]
     } else {
-        // 기타 API: 모든 허용된 도메인
-        if origin.contains("mincenter.kr") || origin.contains("localhost") {
-            response.headers_mut().insert(
-                "Access-Control-Allow-Origin",
-                HeaderValue::from_static(origin),
-            );
-        }
+        // Site API: mincenter.kr, www.mincenter.kr 허용
+        vec![
+            "http://mincenter.kr",
+            "https://mincenter.kr",
+            "http://www.mincenter.kr",
+            "https://www.mincenter.kr",
+            "http://localhost:3000",
+            "http://localhost:3001",
+        ]
+    };
+
+    // Origin이 허용된 목록에 있는지 확인
+    let is_allowed = allowed_origins.contains(&origin.as_str());
+
+    // CORS 헤더 설정
+    if is_allowed {
+        response.headers_mut().insert(
+            "Access-Control-Allow-Origin",
+            HeaderValue::from_str(&origin).unwrap_or_else(|_| HeaderValue::from_static("")),
+        );
+    } else {
+        // 허용되지 않은 Origin인 경우 빈 값 설정
+        response.headers_mut().insert(
+            "Access-Control-Allow-Origin",
+            HeaderValue::from_static(""),
+        );
     }
-    
+
     // 공통 CORS 헤더
     response.headers_mut().insert(
         "Access-Control-Allow-Methods",
@@ -81,12 +92,12 @@ pub async fn custom_cors_middleware(
     );
     response.headers_mut().insert(
         "Access-Control-Allow-Headers",
-        HeaderValue::from_static("Content-Type, Authorization"),
+        HeaderValue::from_static("authorization, content-type, x-requested-with"),
     );
     response.headers_mut().insert(
         "Access-Control-Allow-Credentials",
         HeaderValue::from_static("true"),
     );
-    
-    Ok(response)
+
+    response
 } 
