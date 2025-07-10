@@ -68,9 +68,7 @@ export const DEFAULT_MENUS: MenuTree[] = [
 ];
 
 // 런타임 환경변수에서 API URL 가져오기
-const API_BASE = (typeof window !== 'undefined' && (window as any).ENV?.API_URL) || 
-                 import.meta.env.VITE_API_URL || 
-                 'http://api.mincenter.kr';
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export async function getSiteMenus(): Promise<ApiResponse<SiteMenuResponse>> {
   try {

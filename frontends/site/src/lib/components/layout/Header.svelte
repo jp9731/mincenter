@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button';
 	import { Icon, Bars3, XMark, User, ArrowRightOnRectangle } from 'svelte-hero-icons';
 	import { user, isAuthenticated, logout } from '$lib/stores/auth';
@@ -15,32 +14,46 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 
+	// Svelte 5 runes 방식으로 상태 변수 정의
 	let mobileMenuOpen = false;
-	let menus: MenuTree[] = [];
-	let loading = true;
-	let error: string | null = null;
+	let menus = $state<MenuTree[]>([]);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
 
-	onMount(async () => {
+	// Svelte 5 runes 방식으로 스토어 구독
+	let currentPage = $derived(page);
+	let currentUser = $derived(user);
+	let currentAuth = $derived(isAuthenticated);
+
+	// Svelte 5 runes 방식으로 반응형 변수들
+	let currentMenus = $derived(menus);
+	let currentLoading = $derived(loading);
+	let currentError = $derived(error);
+
+	// Svelte 5 runes 방식으로 라이프사이클 처리
+	$effect(() => {
+		// 컴포넌트 마운트 시 메뉴 로딩
+		loadMenus();
+	});
+
+	async function loadMenus() {
 		try {
 			const response = await getSiteMenus();
+			
 			if (response.success && response.data) {
 				menus = response.data.menus;
-				console.log('메뉴 로드 성공:', menus.length, '개 메뉴');
 			} else {
-				console.warn('API 응답이 성공이지만 데이터가 없습니다. 기본 메뉴를 사용합니다.');
 				menus = DEFAULT_MENUS;
 			}
 		} catch (error) {
-			console.error('메뉴 로드 실패:', error);
 			error = error instanceof Error ? error.message : '알 수 없는 오류';
 			
 			// 오류가 발생해도 기본 메뉴를 사용하여 사이트가 정상 작동하도록 함
 			menus = DEFAULT_MENUS;
-			console.log('기본 메뉴를 사용합니다:', menus.length, '개 메뉴');
 		} finally {
 			loading = false;
 		}
-	});
+	}
 
 	// 로그아웃 처리
 	async function handleLogout() {
@@ -67,7 +80,12 @@
 
 	function isActiveMenu(menu: MenuTree): boolean {
 		const menuUrl = getMenuUrl(menu);
-		return $page.url.pathname.startsWith(menuUrl);
+		return currentPage.url.pathname.startsWith(menuUrl);
+	}
+
+	// 모바일 메뉴 토글 함수
+	function toggleMobileMenu() {
+		mobileMenuOpen = !mobileMenuOpen;
 	}
 </script>
 
@@ -86,13 +104,14 @@
 			</div>
 
 			<!-- 데스크톱 메뉴 -->
-			<div class="hidden md:flex md:items-center md:space-x-8">
-				{#if !loading}
-					{#each menus as menu}
+			<div class="hidden sm:flex sm:items-center sm:space-x-4 lg:space-x-8">
+			
+				{#if !currentLoading || currentMenus.length > 0}
+					{#each currentMenus as menu}
 						<div class="group relative">
 							<a
 								href={getMenuUrl(menu)}
-								class="hover:text-primary-600 px-3 py-2 text-sm font-medium text-gray-700"
+								class="hover:text-primary-600 px-2 py-2 text-sm font-medium text-gray-700 lg:px-3"
 								class:border-b-2={isActiveMenu(menu)}
 								class:border-primary-600={isActiveMenu(menu)}
 							>
@@ -118,25 +137,32 @@
 							{/if}
 						</div>
 					{/each}
+				{:else}
+					<!-- 로딩 중 표시 -->
+					<div class="flex items-center space-x-4">
+						<div class="animate-pulse bg-gray-200 h-4 w-16 rounded"></div>
+						<div class="animate-pulse bg-gray-200 h-4 w-20 rounded"></div>
+						<div class="animate-pulse bg-gray-200 h-4 w-16 rounded"></div>
+					</div>
 				{/if}
 
 				<div class="flex items-center">
-					{#if $isAuthenticated && $user}
+					{#if currentAuth && currentUser}
 						<!-- 로그인 상태: PC 드롭다운/모바일 기존 방식 -->
 						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none">
-									{#if $user.profile_image}
-										<img src="{$user.profile_image}" alt="프로필 이미지" class="w-8 h-8 rounded-full object-cover border" />
+							<DropdownMenuTrigger>
+								<div class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none cursor-pointer">
+									{#if currentUser.profile_image}
+										<img src="{currentUser.profile_image}" alt="프로필 이미지" class="w-8 h-8 rounded-full object-cover border" />
 									{:else}
 										<UserIcon class="w-6 h-6" />
 									{/if}
-									<span>{$user.name} 님</span>
-								</button>
+									<span class="hidden sm:inline">{currentUser.name} 님</span>
+								</div>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent class="w-56">
 								<div class="px-2 py-1.5 text-sm text-gray-600">
-									포인트: {($user.points ?? 0).toLocaleString()}
+									포인트: {(currentUser.points ?? 0).toLocaleString()}
 								</div>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem asChild>
@@ -151,9 +177,9 @@
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
-						<div class="flex md:hidden items-center gap-2">
-							<span>안녕하세요, {$user.name}님</span>
-							<div class="text-sm text-gray-600">포인트: {($user.points ?? 0).toLocaleString()}</div>
+						<div class="flex sm:hidden items-center gap-2">
+							<span>안녕하세요, {currentUser.name}님</span>
+							<div class="text-sm text-gray-600">포인트: {(currentUser.points ?? 0).toLocaleString()}</div>
 							<a href="/my" class="flex items-center gap-1">
 								<Settings class="h-4 w-4" />
 								마이페이지
@@ -166,21 +192,21 @@
 					{:else}
 						<!-- 비로그인 상태: 로그인/회원가입 버튼 -->
 						<div class="flex items-center gap-2">
-							<Button variant="ghost" href="/auth/login">로그인</Button>
-							<Button href="/auth/register">회원가입</Button>
+							<Button variant="ghost" href="/auth/login" class="hidden sm:inline-flex">로그인</Button>
+							<Button href="/auth/register" class="hidden sm:inline-flex">회원가입</Button>
 						</div>
 					{/if}
 				</div>
 			</div>
 
 			<!-- 모바일 메뉴 버튼 -->
-			<div class="flex items-center md:hidden">
+			<div class="flex items-center sm:hidden">
 				<button
 					type="button"
 					class="hover:text-primary-600 focus:ring-primary-500 inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset"
 					aria-controls="mobile-menu"
 					aria-expanded={mobileMenuOpen}
-					onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
+					onclick={toggleMobileMenu}
 				>
 					<span class="sr-only">메뉴 열기</span>
 					{#if mobileMenuOpen}
@@ -194,10 +220,10 @@
 
 		<!-- 모바일 메뉴 -->
 		{#if mobileMenuOpen}
-			<div class="md:hidden" id="mobile-menu">
+			<div class="sm:hidden" id="mobile-menu">
 				<div class="space-y-1 pb-3 pt-2">
-					{#if !loading}
-						{#each menus as menu}
+					{#if !currentLoading || currentMenus.length > 0}
+						{#each currentMenus as menu}
 							<div>
 								<a
 									href={getMenuUrl(menu)}
@@ -223,13 +249,20 @@
 								{/if}
 							</div>
 						{/each}
+					{:else}
+						<!-- 로딩 중 표시 -->
+						<div class="space-y-2">
+							<div class="animate-pulse bg-gray-200 h-6 w-24 rounded mx-3"></div>
+							<div class="animate-pulse bg-gray-200 h-6 w-20 rounded mx-3"></div>
+							<div class="animate-pulse bg-gray-200 h-6 w-28 rounded mx-3"></div>
+						</div>
 					{/if}
 				</div>
 				<div class="border-t border-gray-200 pb-3 pt-4">
-					{#if $isAuthenticated && $user}
+					{#if currentAuth && currentUser}
 						<!-- 로그인된 상태 (모바일) -->
 						<div class="px-5 py-3">
-							<div class="mb-3 text-sm text-gray-700">안녕하세요, {$user.name}님</div>
+							<div class="mb-3 text-sm text-gray-700">안녕하세요, {currentUser.name}님</div>
 							<div class="space-y-2">
 								<!-- 포인트 정보 -->
 								<div class="px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-md">
@@ -238,12 +271,12 @@
 											<CreditCard class="h-4 w-4" />
 											포인트
 										</span>
-										<span class="font-semibold text-primary-600">{$user.points || 0}P</span>
+										<span class="font-semibold text-primary-600">{currentUser.points || 0}P</span>
 									</div>
 								</div>
 								<Button variant="ghost" href="/my" class="w-full justify-start">
-									{#if $user.profile_image}
-										<img src="{$user.profile_image}" alt="프로필 이미지" class="w-6 h-6 rounded-full object-cover border mr-2" />
+									{#if currentUser.profile_image}
+										<img src="{currentUser.profile_image}" alt="프로필 이미지" class="w-6 h-6 rounded-full object-cover border mr-2" />
 									{:else}
 										<Settings class="mr-2 h-4 w-4" />
 									{/if}
