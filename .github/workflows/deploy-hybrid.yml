@@ -93,8 +93,8 @@ jobs:
         scp -P ${{ env.DEPLOY_PORT }} database/seed.sql ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/database/
         
         # 프론트엔드 소스 코드 업로드
-        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/site/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/site/
-        rsync -avz -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
+        rsync -avz --exclude='.env' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/site/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/site/
+        rsync -avz --exclude='.env' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete frontends/admin/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/frontends/admin/
         
         # Rust API 소스 코드 업로드
         rsync -avz --exclude='.env' -e "ssh -p ${{ env.DEPLOY_PORT }}" --delete backends/api/ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/backends/api/
