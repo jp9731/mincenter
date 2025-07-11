@@ -21,7 +21,7 @@ use crate::{
 pub async fn register(
   State(state): State<AppState>,
   Json(data): Json<RegisterRequest>,
-) -> Result<AxumJson<ApiResponse<User>>, StatusCode> {
+) -> Result<AxumJson<ApiResponse<AuthResponse>>, StatusCode> {
   eprintln!("🔵 회원가입 시작: email={:?}, name={:?}", data.email, data.name);
   
   // 비밀번호 해시화
@@ -81,8 +81,19 @@ pub async fn register(
   eprintln!("✅ 리프레시 토큰 저장 성공");
 
   eprintln!("✅ 회원가입 완료: user_id={}", user.id);
+  
+  // AuthResponse 생성
+  let auth_response = AuthResponse {
+      user: user.clone(),
+      access_token: access_token.clone(),
+      refresh_token: refresh_token.clone(),
+      expires_in,
+  };
+  
+  eprintln!("✅ AuthResponse 생성 완료");
+  
   Ok(AxumJson(ApiResponse::success(
-      user,
+      auth_response,
       "회원가입이 완료되었습니다."
   )))
 }

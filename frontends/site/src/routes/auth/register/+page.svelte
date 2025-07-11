@@ -29,7 +29,7 @@
 		});
 
 		if (success) {
-			goto('/auth/login?registered=true');
+			goto('/');
 		}
 	}
 </script>
