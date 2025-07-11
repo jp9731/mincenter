@@ -1057,6 +1057,8 @@ pub async fn create_post(
     Extension(claims): Extension<crate::utils::auth::Claims>,
     Json(payload): Json<CreatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
+    eprintln!("📝 create_post 함수 시작: board_id={:?}, user_id={}", payload.board_id, claims.sub);
+    
     // 게시판 정보 조회 (권한 체크용)
     let board_raw = sqlx::query_as::<_, BoardRaw>(
         r#"
@@ -1067,17 +1069,24 @@ pub async fn create_post(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("Error fetching board: {:?}", e);
+        eprintln!("❌ create_post 게시판 조회 실패: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let board = convert_board_raw_to_board(board_raw);
+    eprintln!("📝 create_post 게시판 정보: id={}, name={}", board.id, board.name);
 
     // 권한 체크
     if !can_write_post(&board, Some(&claims.role)) {
+        eprintln!("❌ create_post 권한 없음: role={}", claims.role);
         return Err(StatusCode::FORBIDDEN);
     }
+    eprintln!("✅ create_post 권한 확인 완료");
     
     let sanitized_content = clean(&payload.content);
+    eprintln!("📝 콘텐츠 정리 완료: len={}", sanitized_content.len());
+    
+    eprintln!("📝 DB INSERT 시작: board_id={:?}, category_id={:?}, title={}", 
+             payload.board_id, payload.category_id, payload.title);
     
     let post = sqlx::query_as::<_, PostDetail>(
         "INSERT INTO posts (board_id, category_id, user_id, title, content, is_notice)
@@ -1099,9 +1108,11 @@ pub async fn create_post(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("Create post error: {:?}", e);
+        eprintln!("❌ create_post DB INSERT 실패: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+    
+    eprintln!("✅ create_post DB INSERT 성공: post_id={}", post.id);
 
     // 첨부된 파일들을 file_entities 테이블에 연결하고 상태를 published로 변경
     if let Some(attached_files) = payload.attached_files {
@@ -1960,6 +1971,9 @@ pub async fn create_post_by_slug(
     Path(slug): Path<String>,
     Json(mut payload): Json<CreatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
+    eprintln!("📝 게시글 작성 시작: slug={}, user_id={}", slug, claims.sub);
+    eprintln!("📝 요청 데이터: title={}, content_len={}", payload.title, payload.content.len());
+    
     // slug로 board_id 조회
     let board_raw = sqlx::query_as::<_, BoardRaw>(
         r#"
@@ -1969,22 +1983,38 @@ pub async fn create_post_by_slug(
     .bind(&slug)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    .map_err(|e| {
+        eprintln!("❌ 게시판 조회 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or_else(|| {
+        eprintln!("❌ 게시판을 찾을 수 없음: slug={}", slug);
+        StatusCode::NOT_FOUND
+    })?;
 
     let board = convert_board_raw_to_board(board_raw);
+    eprintln!("📝 게시판 정보: id={}, name={}, slug={}", board.id, board.name, board.slug);
 
     // 권한 체크
     if !can_write_post(&board, Some(&claims.role)) {
+        eprintln!("❌ 권한 없음: role={}", claims.role);
         return Err(StatusCode::FORBIDDEN);
     }
+    eprintln!("✅ 권한 확인 완료: role={}", claims.role);
 
     let sanitized_content = clean(&payload.content);
     payload.content = sanitized_content;
 
     payload.board_id = Some(board.id);
+    eprintln!("📝 create_post 호출 시작: board_id={}", board.id);
+    
     // 기존 create_post 로직 재사용
-    super::community::create_post(State(state), Extension(claims), Json(payload)).await
+    let result = create_post(State(state), Extension(claims), Json(payload)).await;
+    match &result {
+        Ok(_) => eprintln!("✅ create_post 성공"),
+        Err(e) => eprintln!("❌ create_post 실패: {:?}", e),
+    }
+    result
 }
 
 // 썸네일 URL 생성 함수 (누락된 썸네일 자동 생성 포함)

@@ -66,6 +66,7 @@ async fn main() {
         .route("/api/auth/login", post(handlers::auth::login))
         .route("/api/auth/register", post(handlers::auth::register))
         .route("/api/auth/refresh", post(handlers::auth::refresh))
+        .route("/api/auth/logout", post(handlers::auth::logout))
         // Community
         .route("/api/community/boards", get(handlers::community::get_boards))
         .route("/api/community/posts", get(handlers::community::get_posts))

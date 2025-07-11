@@ -139,15 +139,23 @@ pub async fn login(
   
   eprintln!("새 토큰 저장 성공, 응답 생성 시작");
 
-  Ok(AxumJson(ApiResponse::success(
-      AuthResponse {
-          user,
-          access_token,
-          refresh_token,
-          expires_in,
-      },
-      "로그인 성공"
-  )))
+  let auth_response = AuthResponse {
+      user: user.clone(),
+      access_token: access_token.clone(),
+      refresh_token: refresh_token.clone(),
+      expires_in,
+  };
+  
+  eprintln!("응답 데이터 생성 완료: user_id={}, access_token_len={}, refresh_token_len={}", 
+           auth_response.user.id, auth_response.access_token.len(), auth_response.refresh_token.len());
+
+  let api_response = ApiResponse::success(auth_response, "로그인 성공");
+  eprintln!("API 응답 래핑 완료, JSON 직렬화 시작");
+
+  let result = AxumJson(api_response);
+  eprintln!("✅ 로그인 응답 완료!");
+  
+  Ok(result)
 }
 
 pub async fn refresh(
@@ -233,8 +241,12 @@ pub async fn logout(
   State(state): State<AppState>,
   Json(data): Json<RefreshRequest>,
 ) -> Result<AxumJson<ApiResponse<()>>, StatusCode> {
+  eprintln!("로그아웃 요청 시작: service_type={:?}", data.service_type);
+  
   let refresh_token_hash = hash_refresh_token(&data.refresh_token);
   let service_type = data.service_type.unwrap_or_else(|| "site".to_string());
+  
+  eprintln!("리프레시 토큰 무효화 시작: service_type={}", service_type);
   
   sqlx::query!(
       "UPDATE refresh_tokens SET is_revoked = TRUE WHERE token_hash = $1 AND service_type = $2",
@@ -243,8 +255,12 @@ pub async fn logout(
   )
   .execute(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+  .map_err(|e| {
+      eprintln!("리프레시 토큰 무효화 실패: {:?}", e);
+      StatusCode::INTERNAL_SERVER_ERROR
+  })?;
 
+  eprintln!("✅ 로그아웃 성공");
   Ok(AxumJson(ApiResponse::success((), "로그아웃 성공")))
 }
 
