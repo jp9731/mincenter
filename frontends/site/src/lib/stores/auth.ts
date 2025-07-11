@@ -15,6 +15,7 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// Svelte 5 호환 writable 스토어 정의
 export const user = writable<User | null>(null);
 export const isAuthenticated = writable(false);
 export const isLoading = writable(false);

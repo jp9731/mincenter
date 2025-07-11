@@ -22,8 +22,10 @@
 
 	// Svelte 5 runes 방식으로 스토어 구독
 	let currentPage = $derived(page);
-	let currentUser = $derived(user);
-	let currentAuth = $derived(isAuthenticated);
+	
+	// Svelte 5 runes에서 스토어 구독 - 최종 방식
+	let currentUser = $derived($user);
+	let currentAuth = $derived($isAuthenticated);
 
 	// Svelte 5 runes 방식으로 반응형 변수들
 	let currentMenus = $derived(menus);
@@ -34,6 +36,12 @@
 	$effect(() => {
 		// 컴포넌트 마운트 시 메뉴 로딩
 		loadMenus();
+	});
+
+	// 스토어 값 변화 감지
+	$effect(() => {
+		console.log('🔄 currentUser 변화:', currentUser);
+		console.log('🔄 currentAuth 변화:', currentAuth);
 	});
 
 	async function loadMenus() {
@@ -147,6 +155,7 @@
 				{/if}
 
 				<div class="flex items-center">
+				
 					{#if currentAuth && currentUser}
 						<!-- 로그인 상태: PC 드롭다운/모바일 기존 방식 -->
 						<DropdownMenu>

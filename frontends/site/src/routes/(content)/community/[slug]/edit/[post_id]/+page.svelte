@@ -20,7 +20,7 @@
 	} from '$lib/stores/community';
 	import { uploadFile as uploadFileApi } from '$lib/api/community';
 	import { deletePostAttachment } from '$lib/api/community';
-	import { user } from '$lib/stores/auth';
+	import { user, isAuthenticated } from '$lib/stores/auth';
 	import type { Board, Category } from '$lib/types/community.ts';
 	import { get } from 'svelte/store';
 	import { Editor } from '@tadashi/svelte-editor-quill';
@@ -148,9 +148,12 @@
 		clearQuillInstance();
 	});
 
+	// Svelte 5 runes 방식으로 스토어 구독
+	let currentUser = $derived(user);
+	let currentAuth = $derived(isAuthenticated);
+
 	onMount(async () => {
 		// 인증 확인
-		const currentUser = get(user);
 		if (!currentUser) {
 			alert('로그인이 필요합니다.');
 			goto('/auth/login');
@@ -169,7 +172,6 @@
 			}
 
 			// 권한 확인 (작성자만 수정 가능)
-			const currentUser = get(user);
 			
 			// 문자열로 변환하여 비교 (타입 불일치 문제 해결)
 			const canEdit = String(post.user_id) === String(currentUser?.id);
@@ -224,7 +226,6 @@
 		e.preventDefault();
 
 		// 인증 재확인
-		const currentUser = get(user);
 		if (!currentUser) {
 			alert('로그인이 필요합니다.');
 			goto('/auth/login');
