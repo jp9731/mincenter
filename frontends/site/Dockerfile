@@ -3,10 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 빌드 시 환경변수 주입
+# 빌드 시 환경변수 주입 (GitHub Actions에서 전달)
 ARG VITE_API_URL
-ARG VITE_GOOGLE_CLIENT_ID
-ARG VITE_KAKAO_CLIENT_ID
+ARG PUBLIC_API_URL
+ARG API_URL
+ARG NODE_ENV
 
 # 패키지 파일 복사
 COPY package*.json ./
@@ -27,8 +28,9 @@ COPY .env* ./
 
 # 환경변수 파일 생성 (ARG로 전달된 값 사용)
 RUN echo "VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}" > .env.production && \
-    echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}" >> .env.production && \
-    echo "VITE_KAKAO_CLIENT_ID=${VITE_KAKAO_CLIENT_ID:-}" >> .env.production
+    echo "PUBLIC_API_URL=${PUBLIC_API_URL:-https://api.mincenter.kr}" >> .env.production && \
+    echo "API_URL=${API_URL:-https://api.mincenter.kr}" >> .env.production && \
+    echo "NODE_ENV=${NODE_ENV:-production}" >> .env.production
 
 # 빌드
 RUN npm run build

@@ -3,6 +3,13 @@ FROM rust:latest as builder
 
 WORKDIR /app
 
+# 빌드 시 환경변수 주입 (GitHub Actions에서 전달)
+ARG JWT_SECRET
+ARG REFRESH_SECRET
+ARG RUST_LOG
+ARG DATABASE_URL
+ARG REDIS_URL
+
 # 의존성 파일만 먼저 복사하여 캐시 활용
 COPY Cargo.toml Cargo.lock ./
 
@@ -18,6 +25,13 @@ COPY src ./src
 
 # SQLx 오프라인 모드 비활성화 (런타임에 데이터베이스 연결)
 ENV SQLX_OFFLINE=false
+
+# 빌드 시 환경변수 설정
+ENV JWT_SECRET=${JWT_SECRET}
+ENV REFRESH_SECRET=${REFRESH_SECRET}
+ENV RUST_LOG=${RUST_LOG:-info}
+ENV DATABASE_URL=${DATABASE_URL}
+ENV REDIS_URL=${REDIS_URL}
 
 RUN cargo build --release
 

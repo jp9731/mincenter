@@ -35,6 +35,12 @@ services:
     build:
       context: ./backends/api
       dockerfile: Dockerfile
+      args:
+        - JWT_SECRET=${JWT_SECRET}
+        - REFRESH_SECRET=${REFRESH_SECRET}
+        - RUST_LOG=${RUST_LOG:-info}
+        - DATABASE_URL=${DATABASE_URL}
+        - REDIS_URL=${REDIS_URL}
       cache_from:
         - rust:1.75-alpine
       no_cache: false
@@ -75,10 +81,10 @@ services:
       context: ./frontends/site
       dockerfile: Dockerfile
       args:
-        - API_URL=${API_URL:-http://localhost:18080}
-        - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
-        - NODE_ENV=production
-        - VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}
+        - VITE_API_URL=${VITE_API_URL}
+        - PUBLIC_API_URL=${PUBLIC_API_URL}
+        - API_URL=${API_URL}
+        - NODE_ENV=${NODE_ENV:-production}
       cache_from:
         - node:18-alpine
       no_cache: false
@@ -117,10 +123,10 @@ services:
       context: ./frontends/admin
       dockerfile: Dockerfile
       args:
-        - API_URL=${API_URL:-http://localhost:18080}
-        - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:18080}
-        - NODE_ENV=production
-        - VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}
+        - VITE_API_URL=${VITE_API_URL}
+        - PUBLIC_API_URL=${PUBLIC_API_URL}
+        - API_URL=${API_URL}
+        - NODE_ENV=${NODE_ENV:-production}
       cache_from:
         - node:18-alpine
       no_cache: false
