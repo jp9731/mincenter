@@ -48,15 +48,28 @@ if echo "$CHANGED_FILES" | grep -E "backends/api/|Cargo\.toml|Cargo\.lock"; then
     echo "✅ API 백엔드 변경됨"
 fi
 
-# 4. 선택적 빌드 및 배포
+# 4. .env 파일 확인 및 환경변수 로드
+echo "🔧 환경변수 설정..."
+if [ -f .env ]; then
+    echo "✅ .env 파일 발견, 환경변수 로드 중..."
+    set -a
+    source .env
+    set +a
+    echo "✅ 환경변수 로드 완료"
+else
+    echo "❌ .env 파일을 찾을 수 없습니다."
+    exit 1
+fi
+
+# 5. 선택적 빌드 및 배포
 echo "🚀 선택적 배포 시작..."
 
 # Site 프론트엔드 배포 (Docker Compose)
 if [ "$SITE_CHANGED" = true ]; then
     echo "🌐 Site 프론트엔드 빌드 및 배포..."
     
-    # 환경변수를 사용하여 Docker Compose로 Site만 재빌드 및 재시작
-    docker-compose -f docker-compose.prod.yml build --build-arg VITE_API_URL="$VITE_API_URL" --build-arg PUBLIC_API_URL="$PUBLIC_API_URL" --build-arg NODE_ENV="$NODE_ENV" site || {
+    # Docker Compose로 Site만 재빌드 및 재시작 (.env 파일 자동 사용)
+    docker-compose -f docker-compose.prod.yml build site || {
         echo "❌ Site Docker 빌드 실패"
         exit 1
     }
@@ -73,8 +86,8 @@ fi
 if [ "$ADMIN_CHANGED" = true ]; then
     echo "⚡ Admin 프론트엔드 빌드 및 배포..."
     
-    # 환경변수를 사용하여 Docker Compose로 Admin만 재빌드 및 재시작
-    docker-compose -f docker-compose.prod.yml build --build-arg VITE_API_URL="$VITE_API_URL" --build-arg PUBLIC_API_URL="$PUBLIC_API_URL" --build-arg NODE_ENV="$NODE_ENV" admin || {
+    # Docker Compose로 Admin만 재빌드 및 재시작 (.env 파일 자동 사용)
+    docker-compose -f docker-compose.prod.yml build admin || {
         echo "❌ Admin Docker 빌드 실패"
         exit 1
     }
@@ -91,8 +104,8 @@ fi
 if [ "$API_CHANGED" = true ]; then
     echo "🚀 API 백엔드 빌드 및 배포..."
     
-    # 환경변수를 사용하여 Docker Compose로 API만 재빌드 및 재시작
-    docker-compose -f docker-compose.prod.yml build --build-arg JWT_SECRET="$JWT_SECRET" --build-arg REFRESH_SECRET="$REFRESH_SECRET" --build-arg RUST_LOG="$RUST_LOG" api || {
+    # Docker Compose로 API만 재빌드 및 재시작 (.env 파일 자동 사용)
+    docker-compose -f docker-compose.prod.yml build api || {
         echo "❌ API Docker 빌드 실패"
         exit 1
     }
@@ -105,14 +118,14 @@ if [ "$API_CHANGED" = true ]; then
     echo "✅ API 백엔드 배포 완료"
 fi
 
-# 5. 배포 결과 요약
+# 6. 배포 결과 요약
 echo ""
 echo "📊 배포 결과 요약:"
 echo "- Site 프론트엔드: $([ "$SITE_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
 echo "- Admin 프론트엔드: $([ "$ADMIN_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
 echo "- API 백엔드: $([ "$API_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
 
-# 6. 서비스 상태 확인
+# 7. 서비스 상태 확인
 echo ""
 echo "🔍 서비스 상태 확인..."
 

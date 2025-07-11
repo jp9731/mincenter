@@ -14,6 +14,9 @@ jobs:
   smart-deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Setup SSH for Deployment
         uses: webfactory/ssh-agent@v0.8.0
         with:
@@ -39,17 +42,25 @@ jobs:
             exit 1
           fi
           
-          if [ -z "${{ secrets.JWT_SECRET }}" ]; then
-            echo "❌ JWT_SECRET secret is missing"
-            exit 1
-          fi
-          
-          if [ -z "${{ secrets.REFRESH_SECRET }}" ]; then
-            echo "❌ REFRESH_SECRET secret is missing"
-            exit 1
-          fi
-          
           echo "✅ All required secrets are present"
+      
+      - name: Deploy .env file to server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+        run: |
+          echo "📁 Deploying .env file to server..."
+          
+          # SSH known_hosts 추가
+          mkdir -p ~/.ssh
+          ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
+          
+          # .env 파일을 서버로 복사
+          scp -P $DEPLOY_PORT .env $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env
+          
+          echo "✅ .env file deployed successfully"
       
       - name: Smart Deploy on Server
         env:
@@ -57,24 +68,6 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          REFRESH_SECRET: ${{ secrets.REFRESH_SECRET }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          PUBLIC_API_URL: ${{ secrets.PUBLIC_API_URL }}
-          API_URL: ${{ secrets.API_URL }}
-          NODE_ENV: production
-          RUST_LOG: info
-          CORS_ORIGIN: '*'
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          API_PORT: 18080
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
           echo "🚀 Starting Smart Deploy..."
           echo "Trigger: ${{ github.event_name }}"
@@ -84,29 +77,22 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
-          # 서버에 스마트 배포 스크립트 실행 (환경변수 전달)
+          # 서버에 스마트 배포 스크립트 실행 (.env 파일 사용)
           ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             cd $DEPLOY_PATH
             
-            # 환경 변수 설정 (빌드 시점용)
-            export JWT_SECRET='$JWT_SECRET'
-            export REFRESH_SECRET='$REFRESH_SECRET'
-            export VITE_API_URL='$VITE_API_URL'
-            export PUBLIC_API_URL='$PUBLIC_API_URL'
-            export API_URL='$API_URL'
-            export NODE_ENV='$NODE_ENV'
-            export RUST_LOG='$RUST_LOG'
-            export CORS_ORIGIN='$CORS_ORIGIN'
-            export DATABASE_URL='$DATABASE_URL'
-            export REDIS_URL='$REDIS_URL'
-            export API_PORT='$API_PORT'
-            export REDIS_PASSWORD='$REDIS_PASSWORD'
-            export POSTGRES_USER='$POSTGRES_USER'
-            export POSTGRES_PASSWORD='$POSTGRES_PASSWORD'
-            export POSTGRES_DB='$POSTGRES_DB'
-            export SESSION_SECRET='$SESSION_SECRET'
-            export ADMIN_SESSION_SECRET='$ADMIN_SESSION_SECRET'
-            export ADMIN_EMAIL='$ADMIN_EMAIL'
+            # .env 파일이 있는지 확인
+            if [ ! -f .env ]; then
+              echo '❌ .env file not found on server'
+              exit 1
+            fi
+            
+            # .env 파일을 환경변수로 로드
+            set -a
+            source .env
+            set +a
+            
+            echo '✅ Environment variables loaded from .env file'
             
             # 스마트 배포 스크립트 실행
             chmod +x scripts/smart-deploy-server.sh
