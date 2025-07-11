@@ -1,8 +1,8 @@
-name: Deploy Frontend Services
+name: Deploy Frontend Services (Legacy)
 
 on:
-  push:
-    branches: [ main, develop ]
+  # push:
+  #   branches: [ main, develop ]
   workflow_dispatch:
 
 env:

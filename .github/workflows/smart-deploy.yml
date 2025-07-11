@@ -175,7 +175,8 @@ jobs:
           
           # 실제 배포 명령어들
           # scp ./backends/api/target/release/mincenter-api user@server:/opt/mincenter/
-          # ssh user@server 'systemctl restart mincenter-api'
+          # scp ./scripts/start-api.sh user@server:/opt/mincenter/scripts/
+          # ssh user@server 'cd /opt/mincenter && chmod +x scripts/start-api.sh && ./scripts/start-api.sh'
           
           echo "✅ API deployment completed!"
 
