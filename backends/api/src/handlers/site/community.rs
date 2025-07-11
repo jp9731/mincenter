@@ -1348,17 +1348,24 @@ pub async fn get_comments(
     State(state): State<AppState>,
     Extension(claims): Extension<Option<Claims>>,
 ) -> Result<Json<ApiResponse<Vec<CommentDetail>>>, StatusCode> {
+    eprintln!("🔵 댓글 조회 시작: post_id={}", post_id);
     let user_role = claims.as_ref().map(|c| c.role.as_str());
+    eprintln!("사용자 역할: {:?}", user_role);
     
     // 게시글 정보 조회 (게시판 ID 확인용)
     let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status = 'active'", post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
-            eprintln!("Post query error: {:?}", e);
+            eprintln!("❌ Post query error: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .ok_or_else(|| {
+            eprintln!("❌ Post not found: {}", post_id);
+            StatusCode::NOT_FOUND
+        })?;
+    
+    eprintln!("✅ 게시글 조회 성공: board_id={}", post.board_id);
 
     // 게시판 정보 조회 (권한 체크용)
     let board_raw = sqlx::query_as::<_, BoardRaw>(
@@ -1370,17 +1377,24 @@ pub async fn get_comments(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("Error fetching board: {:?}", e);
+        eprintln!("❌ Error fetching board: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let board = convert_board_raw_to_board(board_raw);
+    
+    eprintln!("✅ 게시판 조회 성공: name={}, read_permission={}", board.name, board.read_permission);
 
     // 권한 체크 (댓글 보기는 게시글 읽기 권한과 동일)
-    if !can_read_post(&board, user_role) {
+    let can_read = can_read_post(&board, user_role);
+    eprintln!("권한 체크 결과: can_read={}", can_read);
+    
+    if !can_read {
+        eprintln!("❌ 권한 없음: user_role={:?}, read_permission={}", user_role, board.read_permission);
         return Err(StatusCode::FORBIDDEN);
     }
 
     // 댓글 목록 조회
+    eprintln!("🔵 댓글 목록 조회 시작");
     let comments_raw = sqlx::query!(
         "SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.likes, c.status::text as status, c.created_at, c.updated_at, u.name as user_name
          FROM comments c
@@ -1391,7 +1405,12 @@ pub async fn get_comments(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        eprintln!("❌ 댓글 조회 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    
+    eprintln!("✅ 댓글 조회 성공: {}개", comments_raw.len());
 
     // 각 댓글에 대해 좋아요 상태 확인
     let mut comments = Vec::new();
