@@ -59,17 +59,48 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
+          echo "🔗 Testing SSH connection..."
+          # SSH 연결 테스트
+          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "echo 'SSH connection successful'" || {
+            echo "❌ SSH connection failed"
+            exit 1
+          }
+          
+          echo "📁 Checking server directory..."
+          # 서버 디렉토리 확인
+          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
+            echo 'Current directory: \$(pwd)'
+            echo 'Target directory: $DEPLOY_PATH'
+            ls -la $DEPLOY_PATH || echo 'Directory does not exist'
+          "
+          
           # 서버에 스마트 배포 스크립트 실행 (서버의 .env 파일 사용)
           ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             cd $DEPLOY_PATH
             
+            echo 'Current working directory: \$(pwd)'
+            echo 'Files in directory:'
+            ls -la
+            
             # .env 파일이 있는지 확인
             if [ ! -f .env ]; then
               echo '❌ .env file not found on server'
+              echo 'Available files:'
+              ls -la
               exit 1
             fi
             
             echo '✅ Using existing .env file on server'
+            
+            # 스크립트 파일 확인
+            if [ ! -f scripts/smart-deploy-server.sh ]; then
+              echo '❌ smart-deploy-server.sh not found'
+              echo 'Available scripts:'
+              ls -la scripts/ || echo 'scripts directory does not exist'
+              exit 1
+            fi
+            
+            echo '✅ Found smart-deploy-server.sh'
             
             # 스마트 배포 스크립트 실행
             chmod +x scripts/smart-deploy-server.sh
