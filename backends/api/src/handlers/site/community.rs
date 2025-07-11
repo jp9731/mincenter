@@ -7,6 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use uuid::Uuid;
 use tracing::error;
 use crate::utils::auth::get_current_user;
 use crate::{
@@ -19,7 +20,6 @@ use crate::{
     services::thumbnail::ThumbnailService,
     AppState,
 };
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use community::{Post, PostDetail, Comment, CommentDetail, CreatePostRequest, UpdatePostRequest, CreateCommentRequest, UpdateCommentRequest, PostFilter, PostListResponse, CommentListResponse, RecentPostsResponse, BoardStats, PostQuery, PostSummary, ThumbnailUrls, PostStatus, PostSummaryDb, AttachedFile};
 use ammonia::clean;
@@ -1089,8 +1089,8 @@ pub async fn create_post(
              payload.board_id, payload.category_id, payload.title);
     
     let post = sqlx::query_as::<_, PostDetail>(
-        "INSERT INTO posts (board_id, category_id, user_id, title, content, is_notice)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        "INSERT INTO posts (board_id, category_id, user_id, title, content, is_notice, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'published')
          RETURNING id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status, created_at, updated_at,
          (SELECT name FROM users WHERE id = $3) as user_name,
          (SELECT email FROM users WHERE id = $3) as user_email,

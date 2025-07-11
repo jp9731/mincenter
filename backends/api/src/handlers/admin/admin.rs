@@ -127,7 +127,7 @@ pub async fn admin_login(
 
     // role 체크
     match admin_user_db.role {
-        Some(crate::models::user::UserRole::Admin) | Some(crate::models::user::UserRole::SuperAdmin) => {}
+        Some(crate::models::user::UserRole::Admin) => {}
         _ => {
             warn!("Admin login failed for email: {} - not admin", data.email);
             return Ok(Json(ApiResponse::<AdminAuthResponse>::error("관리자 권한이 없습니다.")));

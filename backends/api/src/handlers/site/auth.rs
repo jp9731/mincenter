@@ -46,8 +46,10 @@ pub async fn register(
   // 리프레시 토큰을 데이터베이스에 저장
   let refresh_token_hash = hash_refresh_token(&refresh_token);
   let service_type = data.service_type.unwrap_or_else(|| "site".to_string());
+  let refresh_token_id = uuid::Uuid::new_v4();
   sqlx::query!(
-      "INSERT INTO refresh_tokens (user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO refresh_tokens (id, user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4, $5)",
+      refresh_token_id,
       user.id,
       refresh_token_hash,
       service_type,
@@ -216,8 +218,10 @@ pub async fn refresh(
 
   // 새로운 리프레시 토큰 저장
   let new_refresh_token_hash = hash_refresh_token(&new_refresh_token);
+  let new_refresh_token_id = uuid::Uuid::new_v4();
   sqlx::query!(
-      "INSERT INTO refresh_tokens (user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO refresh_tokens (id, user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4, $5)",
+      new_refresh_token_id,
       user_id,
       new_refresh_token_hash,
       service_type,

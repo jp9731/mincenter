@@ -398,7 +398,7 @@ CREATE TABLE public.point_transactions (
 );
 
 CREATE TABLE public.posts (
-    id uuid NOT NULL,
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     board_id uuid NOT NULL,
     category_id uuid,
     user_id uuid NOT NULL,
@@ -422,11 +422,12 @@ CREATE TABLE public.posts (
 );
 
 CREATE TABLE public.refresh_tokens (
-    id uuid NOT NULL,
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL,
     token_hash character varying(255) NOT NULL,
     service_type character varying(50) DEFAULT 'web',
     expires_at timestamp with time zone NOT NULL,
+    is_revoked boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
@@ -528,7 +529,7 @@ CREATE TABLE public.user_social_accounts (
 );
 
 CREATE TABLE public.users (
-    id uuid NOT NULL,
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     email character varying(255) NOT NULL,
     password_hash character varying(255),
     name character varying(100) NOT NULL,

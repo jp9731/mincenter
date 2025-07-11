@@ -26,7 +26,6 @@ pub struct User {
 pub enum UserRole {
     User,
     Admin,
-    SuperAdmin,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
