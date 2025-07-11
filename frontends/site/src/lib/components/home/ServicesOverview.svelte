@@ -8,25 +8,25 @@
 			title: 'IL사업',
 			description: '동료상담, 권익옹호활동, 정보제공, 자조모임 등 다양한 사업기획 및 지원',
 			icon: UserGroup,
-			href: '/services/support'
+			href: '/services'
 		},
 		{
 			title: '자립지원사업',
 			description: '탈시설 및 탈재가장애인의 자립생활전환으로 거주공간을 마련, 자립생활기술 습득',
 			icon: Heart,
-			href: '/services/activity'
+			href: '/services'
 		},
 		{
 			title: '활동지원사업',
 			description: '장애인이 지역사회에서 사회구성원으로 동등하게 살아갈 수 있도록 활동지원사 파견',
 			icon: Truck,
-			href: '/services/mobility'
+			href: '/services'
 		},
 		{
 			title: '기타',
 			description: '차별상담전화, 보장구수리 및 점검, 회원교육, 명절행사, 투쟁활동참여',
 			icon: ShieldCheck,
-			href: '/services/advocacy'
+			href: '/services'
 		}
 	];
 </script>
