@@ -62,20 +62,21 @@ if [ "$SITE_CHANGED" = true ]; then
     echo "🌐 Site 프론트엔드 빌드 및 배포..."
     cd frontends/site
     
-    # 의존성 설치
-    npm ci || {
-        echo "❌ Site 의존성 설치 실패"
+    # Docker 빌드
+    docker build -t mincenter-site . || {
+        echo "❌ Site Docker 빌드 실패"
         exit 1
     }
     
-    # 빌드
-    npm run build || {
-        echo "❌ Site 빌드 실패"
+    # 기존 컨테이너 중지 및 제거
+    docker stop mincenter-site || true
+    docker rm mincenter-site || true
+    
+    # 새 컨테이너 실행
+    docker run -d --name mincenter-site -p 13000:80 mincenter-site || {
+        echo "❌ Site 컨테이너 실행 실패"
         exit 1
     }
-    
-    # 배포 (예: nginx 재시작)
-    sudo systemctl reload nginx || true
     
     echo "✅ Site 프론트엔드 배포 완료"
     cd ../..
@@ -86,20 +87,21 @@ if [ "$ADMIN_CHANGED" = true ]; then
     echo "⚡ Admin 프론트엔드 빌드 및 배포..."
     cd frontends/admin
     
-    # 의존성 설치
-    npm ci || {
-        echo "❌ Admin 의존성 설치 실패"
+    # Docker 빌드
+    docker build -t mincenter-admin . || {
+        echo "❌ Admin Docker 빌드 실패"
         exit 1
     }
     
-    # 빌드
-    npm run build || {
-        echo "❌ Admin 빌드 실패"
+    # 기존 컨테이너 중지 및 제거
+    docker stop mincenter-admin || true
+    docker rm mincenter-admin || true
+    
+    # 새 컨테이너 실행
+    docker run -d --name mincenter-admin -p 13001:80 mincenter-admin || {
+        echo "❌ Admin 컨테이너 실행 실패"
         exit 1
     }
-    
-    # 배포 (예: nginx 재시작)
-    sudo systemctl reload nginx || true
     
     echo "✅ Admin 프론트엔드 배포 완료"
     cd ../..
