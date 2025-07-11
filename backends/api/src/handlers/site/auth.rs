@@ -22,11 +22,18 @@ pub async fn register(
   State(state): State<AppState>,
   Json(data): Json<RegisterRequest>,
 ) -> Result<AxumJson<ApiResponse<User>>, StatusCode> {
+  eprintln!("🔵 회원가입 시작: email={:?}, name={:?}", data.email, data.name);
+  
   // 비밀번호 해시화
   let password_hash = hash(data.password.as_bytes(), DEFAULT_COST)
-      .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+      .map_err(|e| {
+          eprintln!("❌ 비밀번호 해시화 실패: {:?}", e);
+          StatusCode::INTERNAL_SERVER_ERROR
+      })?;
+  eprintln!("✅ 비밀번호 해시화 성공");
 
   // 사용자 생성
+  eprintln!("🔵 사용자 생성 시작");
   let user = sqlx::query_as::<_, User>(
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) 
        VALUES ($1, $2, $3, 'user', 'active', NOW(), NOW()) 
@@ -37,15 +44,27 @@ pub async fn register(
   .bind(password_hash)
   .fetch_one(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+  .map_err(|e| {
+      eprintln!("❌ 사용자 생성 실패: {:?}", e);
+      StatusCode::INTERNAL_SERVER_ERROR
+  })?;
+  eprintln!("✅ 사용자 생성 성공: user_id={}", user.id);
 
+  eprintln!("🔵 토큰 생성 시작");
   let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
-      .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+      .map_err(|e| {
+          eprintln!("❌ 토큰 생성 실패: {:?}", e);
+          StatusCode::INTERNAL_SERVER_ERROR
+      })?;
   let expires_in = state.config.access_token_expiry * 60; // minutes to seconds
+  eprintln!("✅ 토큰 생성 성공");
 
   // 리프레시 토큰을 데이터베이스에 저장
+  eprintln!("🔵 리프레시 토큰 저장 시작");
   let refresh_token_hash = hash_refresh_token(&refresh_token);
   let service_type = data.service_type.unwrap_or_else(|| "site".to_string());
+  eprintln!("service_type={:?}, user_id={}", service_type, user.id);
+  
   sqlx::query!(
       "INSERT INTO refresh_tokens (user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4)",
       user.id,
@@ -55,8 +74,13 @@ pub async fn register(
   )
   .execute(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+  .map_err(|e| {
+      eprintln!("❌ 리프레시 토큰 저장 실패: {:?}", e);
+      StatusCode::INTERNAL_SERVER_ERROR
+  })?;
+  eprintln!("✅ 리프레시 토큰 저장 성공");
 
+  eprintln!("✅ 회원가입 완료: user_id={}", user.id);
   Ok(AxumJson(ApiResponse::success(
       user,
       "회원가입이 완료되었습니다."
