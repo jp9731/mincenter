@@ -48,14 +48,10 @@ if echo "$CHANGED_FILES" | grep -E "backends/api/|Cargo\.toml|Cargo\.lock"; then
     echo "✅ API 백엔드 변경됨"
 fi
 
-# 4. .env 파일 확인 및 환경변수 로드
+# 4. .env 파일 확인
 echo "🔧 환경변수 설정..."
 if [ -f .env ]; then
-    echo "✅ .env 파일 발견, 환경변수 로드 중..."
-    set -a
-    source .env
-    set +a
-    echo "✅ 환경변수 로드 완료"
+    echo "✅ .env 파일 발견, Docker Compose가 자동으로 사용합니다"
 else
     echo "❌ .env 파일을 찾을 수 없습니다."
     exit 1

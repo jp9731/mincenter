@@ -44,24 +44,6 @@ jobs:
           
           echo "✅ All required secrets are present"
       
-      - name: Deploy .env file to server
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
-        run: |
-          echo "📁 Deploying .env file to server..."
-          
-          # SSH known_hosts 추가
-          mkdir -p ~/.ssh
-          ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
-          
-          # .env 파일을 서버로 복사
-          scp -P $DEPLOY_PORT .env $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env
-          
-          echo "✅ .env file deployed successfully"
-      
       - name: Smart Deploy on Server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -77,7 +59,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
-          # 서버에 스마트 배포 스크립트 실행 (.env 파일 사용)
+          # 서버에 스마트 배포 스크립트 실행 (서버의 .env 파일 사용)
           ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             cd $DEPLOY_PATH
             
@@ -87,12 +69,7 @@ jobs:
               exit 1
             fi
             
-            # .env 파일을 환경변수로 로드
-            set -a
-            source .env
-            set +a
-            
-            echo '✅ Environment variables loaded from .env file'
+            echo '✅ Using existing .env file on server'
             
             # 스마트 배포 스크립트 실행
             chmod +x scripts/smart-deploy-server.sh
