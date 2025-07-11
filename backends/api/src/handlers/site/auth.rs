@@ -80,9 +80,12 @@ pub async fn login(
       }
   };
 
-  let password_hash = user.password_hash
-      .as_ref()
-      .ok_or_else(|| StatusCode::INTERNAL_SERVER_ERROR)?;
+  let password_hash = match user.password_hash.as_ref() {
+      Some(hash) => hash,
+      None => {
+          return Ok(AxumJson(ApiResponse::<AuthResponse>::error("이메일 또는 비밀번호가 올바르지 않습니다.")));
+      }
+  };
 
   if !crate::utils::auth::verify_password(&data.password, password_hash) {
       return Ok(AxumJson(ApiResponse::<AuthResponse>::error("이메일 또는 비밀번호가 올바르지 않습니다.")));
