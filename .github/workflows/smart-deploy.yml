@@ -168,15 +168,31 @@ jobs:
         working-directory: ./backends/api
         run: cargo build --release --bin mincenter-api
       
+      - name: Setup SSH for Deployment
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          
       - name: Deploy API
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
         run: |
           echo "🚀 Deploying API Backend..."
           echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to API changes' }}"
           
-          # 실제 배포 명령어들
-          # scp ./backends/api/target/release/mincenter-api user@server:/opt/mincenter/
-          # scp ./scripts/start-api.sh user@server:/opt/mincenter/scripts/
-          # ssh user@server 'cd /opt/mincenter && chmod +x scripts/start-api.sh && ./scripts/start-api.sh'
+          # SSH known_hosts 추가
+          mkdir -p ~/.ssh
+          ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
+          
+          # 서버에 배포 스크립트 업로드
+          scp -P $DEPLOY_PORT ./scripts/deploy-api.sh $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/
+          scp -P $DEPLOY_PORT ./scripts/start-api.sh $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/
+          
+          # 서버에서 배포 실행
+          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_PATH && chmod +x scripts/deploy-api.sh && ./scripts/deploy-api.sh"
           
           echo "✅ API deployment completed!"
 
