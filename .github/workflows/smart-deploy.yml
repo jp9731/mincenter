@@ -5,237 +5,53 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      deploy_target:
-        description: 'Select what to deploy'
-        required: true
-        default: 'auto'
-        type: choice
-        options:
-          - auto
-          - site
-          - admin
-          - api
-          - database
-          - all
       reason:
         description: 'Deployment reason'
         required: false
         default: 'Manual deployment'
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      site-changed: ${{ steps.changes.outputs.site }}
-      admin-changed: ${{ steps.changes.outputs.admin }}
-      api-changed: ${{ steps.changes.outputs.api }}
-      database-changed: ${{ steps.changes.outputs.database }}
-      deploy-site: ${{ steps.decide.outputs.deploy-site }}
-      deploy-admin: ${{ steps.decide.outputs.deploy-admin }}
-      deploy-api: ${{ steps.decide.outputs.deploy-api }}
-      deploy-database: ${{ steps.decide.outputs.deploy-database }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            site:
-              - 'frontends/site/**'
-            admin:
-              - 'frontends/admin/**'
-            api:
-              - 'backends/api/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            database:
-              - 'database/**'
-              - 'scripts/**/*.sql'
-      
-      - name: Decide what to deploy
-        id: decide
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # 수동 실행 시
-            target="${{ github.event.inputs.deploy_target }}"
-            if [ "$target" = "auto" ]; then
-              echo "deploy-site=${{ steps.changes.outputs.site }}" >> $GITHUB_OUTPUT
-              echo "deploy-admin=${{ steps.changes.outputs.admin }}" >> $GITHUB_OUTPUT
-              echo "deploy-api=${{ steps.changes.outputs.api }}" >> $GITHUB_OUTPUT
-              echo "deploy-database=${{ steps.changes.outputs.database }}" >> $GITHUB_OUTPUT
-            elif [ "$target" = "all" ]; then
-              echo "deploy-site=true" >> $GITHUB_OUTPUT
-              echo "deploy-admin=true" >> $GITHUB_OUTPUT
-              echo "deploy-api=true" >> $GITHUB_OUTPUT
-              echo "deploy-database=true" >> $GITHUB_OUTPUT
-            else
-              echo "deploy-site=$([ "$target" = "site" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-              echo "deploy-admin=$([ "$target" = "admin" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-              echo "deploy-api=$([ "$target" = "api" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-              echo "deploy-database=$([ "$target" = "database" ] && echo true || echo false)" >> $GITHUB_OUTPUT
-            fi
-          else
-            # 자동 실행 시 (push)
-            echo "deploy-site=${{ steps.changes.outputs.site }}" >> $GITHUB_OUTPUT
-            echo "deploy-admin=${{ steps.changes.outputs.admin }}" >> $GITHUB_OUTPUT
-            echo "deploy-api=${{ steps.changes.outputs.api }}" >> $GITHUB_OUTPUT
-            echo "deploy-database=${{ steps.changes.outputs.database }}" >> $GITHUB_OUTPUT
-          fi
-
-  deploy-site:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-site == 'true'
+  smart-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './frontends/site/package-lock.json'
-      
-      - name: Install dependencies
-        working-directory: ./frontends/site
-        run: npm ci
-      
-      - name: Build Site
-        working-directory: ./frontends/site
-        run: npm run build
-      
-      - name: Deploy Site
-        run: |
-          echo "🌐 Deploying Site Frontend..."
-          echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to site changes' }}"
-          
-          # 실제 배포 명령어들
-          # rsync -avz ./frontends/site/build/ user@server:/var/www/mincenter/
-          # ssh user@server 'systemctl reload nginx'
-          
-          echo "✅ Site deployment completed!"
-
-  deploy-admin:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-admin == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './frontends/admin/package-lock.json'
-      
-      - name: Install dependencies
-        working-directory: ./frontends/admin
-        run: npm ci
-      
-      - name: Build Admin
-        working-directory: ./frontends/admin
-        run: npm run build
-      
-      - name: Deploy Admin
-        run: |
-          echo "⚡ Deploying Admin Frontend..."
-          echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to admin changes' }}"
-          
-          # 실제 배포 명령어들
-          # rsync -avz ./frontends/admin/build/ user@server:/var/www/admin/
-          # ssh user@server 'systemctl reload nginx'
-          
-          echo "✅ Admin deployment completed!"
-
-  deploy-api:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-api == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      
-      - name: Build API
-        working-directory: ./backends/api
-        run: cargo build --release --bin mincenter-api
-      
       - name: Setup SSH for Deployment
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-          
-      - name: Deploy API
+      
+      - name: Smart Deploy on Server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REFRESH_SECRET: ${{ secrets.REFRESH_SECRET }}
         run: |
-          echo "🚀 Deploying API Backend..."
-          echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to API changes' }}"
+          echo "🚀 Starting Smart Deploy..."
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to code changes' }}"
           
           # SSH known_hosts 추가
           mkdir -p ~/.ssh
           ssh-keyscan -H -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
-          # 서버에 배포 스크립트 업로드
-          scp -P $DEPLOY_PORT ./scripts/deploy-api.sh $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/
-          scp -P $DEPLOY_PORT ./scripts/start-api.sh $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/
+          # 서버에 스마트 배포 스크립트 실행
+          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
+            cd $DEPLOY_PATH
+            
+            # 환경 변수 설정
+            export JWT_SECRET='$JWT_SECRET'
+            export REFRESH_SECRET='$REFRESH_SECRET'
+            export DATABASE_URL='postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter'
+            export REDIS_URL='redis://:tnekwoddl@localhost:16379'
+            export API_PORT=18080
+            export RUST_LOG=info
+            export CORS_ORIGIN='*'
+            
+            # 스마트 배포 스크립트 실행
+            chmod +x scripts/smart-deploy-server.sh
+            ./scripts/smart-deploy-server.sh
+          "
           
-          # 서버에서 배포 실행
-          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_PATH && chmod +x scripts/deploy-api.sh && ./scripts/deploy-api.sh"
-          
-          echo "✅ API deployment completed!"
-
-  deploy-database:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.deploy-database == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy Database Changes
-        run: |
-          echo "🗄️ Deploying Database Changes..."
-          echo "Reason: ${{ github.event.inputs.reason || 'Auto-deployment due to database changes' }}"
-          
-          # 실제 데이터베이스 마이그레이션 명령어들
-          # ssh user@server 'cd /opt/mincenter && ./scripts/migrate.sh'
-          # 또는 PostgreSQL 직접 연결하여 스크립트 실행
-          
-          echo "✅ Database deployment completed!"
-
-  summary:
-    needs: [detect-changes, deploy-site, deploy-admin, deploy-api, deploy-database]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deployment Summary
-        run: |
-          echo "## 🎯 Deployment Summary"
-          echo "### Changes Detected:"
-          echo "- Site: ${{ needs.detect-changes.outputs.site-changed }}"
-          echo "- Admin: ${{ needs.detect-changes.outputs.admin-changed }}"
-          echo "- API: ${{ needs.detect-changes.outputs.api-changed }}"
-          echo "- Database: ${{ needs.detect-changes.outputs.database-changed }}"
-          echo ""
-          echo "### Deployed Components:"
-          echo "- Site: ${{ needs.detect-changes.outputs.deploy-site }}"
-          echo "- Admin: ${{ needs.detect-changes.outputs.deploy-admin }}"
-          echo "- API: ${{ needs.detect-changes.outputs.deploy-api }}"
-          echo "- Database: ${{ needs.detect-changes.outputs.deploy-database }}"
-          echo ""
-          echo "### Deployment Results:"
-          echo "- Site: ${{ needs.deploy-site.result }}"
-          echo "- Admin: ${{ needs.deploy-admin.result }}"
-          echo "- API: ${{ needs.deploy-api.result }}"
-          echo "- Database: ${{ needs.deploy-database.result }}"
+          echo "✅ Smart Deploy completed!"
