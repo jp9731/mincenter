@@ -1353,7 +1353,7 @@ pub async fn get_comments(
     eprintln!("사용자 역할: {:?}", user_role);
     
     // 게시글 정보 조회 (게시판 ID 확인용)
-    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status = 'active'", post_id)
+    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
