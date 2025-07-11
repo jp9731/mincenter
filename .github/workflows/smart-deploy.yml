@@ -19,6 +19,38 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
       
+      - name: Check Required Secrets
+        run: |
+          echo "🔍 Checking required secrets..."
+          
+          # 필수 Secrets 확인
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then
+            echo "❌ DEPLOY_HOST secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.DEPLOY_USER }}" ]; then
+            echo "❌ DEPLOY_USER secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.DEPLOY_PATH }}" ]; then
+            echo "❌ DEPLOY_PATH secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.JWT_SECRET }}" ]; then
+            echo "❌ JWT_SECRET secret is missing"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.REFRESH_SECRET }}" ]; then
+            echo "❌ REFRESH_SECRET secret is missing"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are present"
+      
       - name: Smart Deploy on Server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -79,6 +111,9 @@ jobs:
             # 스마트 배포 스크립트 실행
             chmod +x scripts/smart-deploy-server.sh
             ./scripts/smart-deploy-server.sh
-          "
+          " || {
+            echo "❌ Smart Deploy failed"
+            exit 1
+          }
           
           echo "✅ Smart Deploy completed!"
