@@ -35,8 +35,8 @@ pub async fn register(
   // 사용자 생성
   eprintln!("🔵 사용자 생성 시작");
   let user = sqlx::query_as::<_, User>(
-      "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) 
-       VALUES ($1, $2, $3, 'user', 'active', NOW(), NOW()) 
+      "INSERT INTO users (id, email, name, password_hash, role, status, created_at, updated_at) 
+       VALUES (gen_random_uuid(), $1, $2, $3, 'user', 'active', NOW(), NOW()) 
        RETURNING *"
   )
   .bind(&data.email)
