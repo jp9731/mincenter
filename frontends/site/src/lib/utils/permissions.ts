@@ -1,5 +1,3 @@
-import { get } from 'svelte/store';
-import { user } from '$lib/stores/auth';
 import type { User, PostDetail, Board } from '$lib/types';
 
 // 권한 상수
@@ -80,8 +78,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 // 현재 사용자의 권한 확인
-export function hasPermission(permission: string): boolean {
-  const currentUser = get(user) as User | null;
+export function hasPermission(currentUser: User | null, permission: string): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 권한을 가짐
@@ -92,20 +89,18 @@ export function hasPermission(permission: string): boolean {
 }
 
 // 여러 권한 중 하나라도 있는지 확인
-export function hasAnyPermission(permissions: string[]): boolean {
-  return permissions.some(permission => hasPermission(permission));
+export function hasAnyPermission(currentUser: User | null, permissions: string[]): boolean {
+  return permissions.some(permission => hasPermission(currentUser, permission));
 }
 
 // 모든 권한을 가지고 있는지 확인
-export function hasAllPermissions(permissions: string[]): boolean {
-  return permissions.every(permission => hasPermission(permission));
+export function hasAllPermissions(currentUser: User | null, permissions: string[]): boolean {
+  return permissions.every(permission => hasPermission(currentUser, permission));
 }
 
 // 역할 확인
-export function hasRole(role: string): boolean {
-  const currentUser = get(user) as User | null;
+export function hasRole(currentUser: User | null, role: string): boolean {
   if (!currentUser) return false;
-
   return currentUser.role === role;
 }
 
@@ -116,14 +111,12 @@ export function hasRolePermission(role: string, permission: string): boolean {
 }
 
 // 게시글 작성 권한 확인
-export function canCreatePost(): boolean {
-  const currentUser = get(user) as User | null;
+export function canCreatePost(currentUser: User | null): boolean {
   return !!currentUser; // 로그인한 사용자는 글쓰기 가능
 }
 
 // 게시글 수정 권한 확인
-export function canEditPost(post: PostDetail): boolean {
-  const currentUser = get(user) as User | null;
+export function canEditPost(post: PostDetail, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 게시글 수정 가능
@@ -134,8 +127,7 @@ export function canEditPost(post: PostDetail): boolean {
 }
 
 // 게시글 삭제 권한 확인
-export function canDeletePost(post: PostDetail): boolean {
-  const currentUser = get(user) as User | null;
+export function canDeletePost(post: PostDetail, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 게시글 삭제 가능
@@ -146,13 +138,12 @@ export function canDeletePost(post: PostDetail): boolean {
 }
 
 // 댓글 작성 권한 확인
-export function canCreateComment(): boolean {
-  return hasPermission(PERMISSIONS.COMMENT_CREATE);
+export function canCreateComment(currentUser: User | null): boolean {
+  return hasPermission(currentUser, PERMISSIONS.COMMENT_CREATE);
 }
 
 // 댓글 수정 권한 확인
-export function canEditComment(comment: any): boolean {
-  const currentUser = get(user) as User | null;
+export function canEditComment(comment: any, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 댓글 수정 가능
@@ -163,8 +154,7 @@ export function canEditComment(comment: any): boolean {
 }
 
 // 댓글 삭제 권한 확인
-export function canDeleteComment(comment: any): boolean {
-  const currentUser = get(user) as User | null;
+export function canDeleteComment(comment: any, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 댓글 삭제 가능
@@ -175,23 +165,22 @@ export function canDeleteComment(comment: any): boolean {
 }
 
 // 봉사 신청 권한 확인
-export function canApplyVolunteer(): boolean {
-  return hasPermission(PERMISSIONS.VOLUNTEER_APPLY);
+export function canApplyVolunteer(currentUser: User | null): boolean {
+  return hasPermission(currentUser, PERMISSIONS.VOLUNTEER_APPLY);
 }
 
 // 관리자 권한 확인
-export function isAdmin(): boolean {
-  return hasRole('admin');
+export function isAdmin(currentUser: User | null): boolean {
+  return hasRole(currentUser, 'admin');
 }
 
 // 모더레이터 권한 확인
-export function isModerator(): boolean {
-  return hasRole('moderator') || hasRole('admin');
+export function isModerator(currentUser: User | null): boolean {
+  return hasRole(currentUser, 'moderator') || hasRole(currentUser, 'admin');
 }
 
 // 게시판 권한 체크 함수들
-export function canListBoard(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canListBoard(board: Board, currentUser: User | null): boolean {
   const permission = board.list_permission || 'guest';
   
   switch (permission) {
@@ -206,8 +195,7 @@ export function canListBoard(board: Board): boolean {
   }
 }
 
-export function canReadPost(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canReadPost(board: Board, currentUser: User | null): boolean {
   const permission = board.read_permission || 'guest';
   
   switch (permission) {
@@ -222,8 +210,7 @@ export function canReadPost(board: Board): boolean {
   }
 }
 
-export function canWritePost(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canWritePost(board: Board, currentUser: User | null): boolean {
   const permission = board.write_permission || 'member';
   
   // 익명 작성 허용 체크
@@ -243,8 +230,7 @@ export function canWritePost(board: Board): boolean {
   }
 }
 
-export function canReplyPost(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canReplyPost(board: Board, currentUser: User | null): boolean {
   const permission = board.reply_permission || 'member';
   
   switch (permission) {
@@ -259,8 +245,7 @@ export function canReplyPost(board: Board): boolean {
   }
 }
 
-export function canCreateCommentInBoard(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canCreateCommentInBoard(board: Board, currentUser: User | null): boolean {
   const permission = board.comment_permission || 'member';
   
   // 댓글 허용 체크
@@ -280,8 +265,7 @@ export function canCreateCommentInBoard(board: Board): boolean {
   }
 }
 
-export function canDownloadFile(board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canDownloadFile(board: Board, currentUser: User | null): boolean {
   const permission = board.download_permission || 'member';
   
   switch (permission) {
@@ -297,8 +281,7 @@ export function canDownloadFile(board: Board): boolean {
 }
 
 // 게시글 수정/삭제 제한 체크
-export function canEditPostWithLimit(post: PostDetail, board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canEditPostWithLimit(post: PostDetail, board: Board, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 게시글 수정 가능
@@ -316,8 +299,7 @@ export function canEditPostWithLimit(post: PostDetail, board: Board): boolean {
   return true;
 }
 
-export function canDeletePostWithLimit(post: PostDetail, board: Board): boolean {
-  const currentUser = get(user) as User | null;
+export function canDeletePostWithLimit(post: PostDetail, board: Board, currentUser: User | null): boolean {
   if (!currentUser) return false;
 
   // 관리자는 모든 게시글 삭제 가능
