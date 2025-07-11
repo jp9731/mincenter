@@ -92,7 +92,7 @@ pub async fn login(
   }
   
   eprintln!("비밀번호 검증 성공, 토큰 생성 시작");
-  eprintln!("사용자 정보: id={}, email={}, role={:?}", user.id, user.email, user.role);
+  eprintln!("사용자 정보: id={}, email={:?}, role={:?}", user.id, user.email, user.role);
 
   let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
       .map_err(|e| {
