@@ -29,7 +29,7 @@ export REDIS_URL=${REDIS_URL:-"redis://:tnekwoddl@localhost:16379"}
 export JWT_SECRET=${JWT_SECRET:-"your-jwt-secret-here"}
 export REFRESH_SECRET=${REFRESH_SECRET:-"your-refresh-secret-here"}
 export API_PORT=${API_PORT:-18080}
-export RUST_LOG=${RUST_LOG:-"info"}
+export RUST_LOG=${RUST_LOG:-"debug,mincenter_api=debug,sqlx=debug"}
 export CORS_ORIGIN=${CORS_ORIGIN:-"*"}
 
 # 4. 환경 변수 확인
