@@ -90,10 +90,17 @@ pub async fn login(
   if !crate::utils::auth::verify_password(&data.password, password_hash) {
       return Ok(AxumJson(ApiResponse::<AuthResponse>::error("이메일 또는 비밀번호가 올바르지 않습니다.")));
   }
+  
+  eprintln!("비밀번호 검증 성공, 토큰 생성 시작");
 
   let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
-      .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+      .map_err(|e| {
+          eprintln!("토큰 생성 실패: {:?}", e);
+          StatusCode::INTERNAL_SERVER_ERROR
+      })?;
   let expires_in = state.config.access_token_expiry * 60; // minutes to seconds
+  
+  eprintln!("토큰 생성 성공, 기존 토큰 무효화 시작");
 
   // 기존 리프레시 토큰들을 무효화 (같은 서비스 타입만)
   let service_type = data.service_type.unwrap_or_else(|| "site".to_string());
@@ -104,12 +111,19 @@ pub async fn login(
   )
   .execute(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+  .map_err(|e| {
+      eprintln!("기존 토큰 무효화 실패: {:?}", e);
+      StatusCode::INTERNAL_SERVER_ERROR
+  })?;
+  
+  eprintln!("기존 토큰 무효화 성공, 새 토큰 저장 시작");
 
   // 새로운 리프레시 토큰을 데이터베이스에 저장
   let refresh_token_hash = hash_refresh_token(&refresh_token);
+  let refresh_token_id = uuid::Uuid::new_v4();
   sqlx::query!(
-      "INSERT INTO refresh_tokens (user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO refresh_tokens (id, user_id, token_hash, service_type, expires_at) VALUES ($1, $2, $3, $4, $5)",
+      refresh_token_id,
       user.id,
       refresh_token_hash,
       service_type,
@@ -117,7 +131,12 @@ pub async fn login(
   )
   .execute(&state.pool)
   .await
-  .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+  .map_err(|e| {
+      eprintln!("리프레시 토큰 저장 실패: {:?}", e);
+      StatusCode::INTERNAL_SERVER_ERROR
+  })?;
+  
+  eprintln!("새 토큰 저장 성공, 응답 생성 시작");
 
   Ok(AxumJson(ApiResponse::success(
       AuthResponse {
