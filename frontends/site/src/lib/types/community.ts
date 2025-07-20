@@ -81,6 +81,7 @@ export interface Post {
   board_id: string;
   category_id?: string;
   user_id: string;
+  parent_id?: string; // 답글의 경우 부모 게시글 ID
   title: string;
   content: string;
   views?: number;
@@ -97,6 +98,8 @@ export interface Post {
   updated_at?: string;
   attached_files?: AttachedFile[];
   thumbnail_urls?: ThumbnailUrls;
+  depth?: number; // 답글 깊이 (0: 원글, 1: 1차 답글, 2: 2차 답글 등)
+  reply_count?: number; // 답글 수
 }
 
 export interface PostDetail extends Post {
@@ -157,6 +160,14 @@ export interface Tag {
   id: string;
   name: string;
   postCount: number;
+}
+
+// 답글 생성 요청
+export interface CreateReplyRequest {
+  parent_id: string; // 부모 게시글 ID
+  title: string;
+  content: string;
+  attached_files?: string[];
 }
 
 export type PostSortOption = 'latest' | 'popular' | 'comments';

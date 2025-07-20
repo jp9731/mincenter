@@ -21,8 +21,9 @@ use crate::{
     AppState,
 };
 use chrono::{DateTime, Utc};
-use community::{Post, PostDetail, Comment, CommentDetail, CreatePostRequest, UpdatePostRequest, CreateCommentRequest, UpdateCommentRequest, PostFilter, PostListResponse, CommentListResponse, RecentPostsResponse, BoardStats, PostQuery, PostSummary, ThumbnailUrls, PostStatus, PostSummaryDb, AttachedFile};
+use community::{Post, PostDetail, Comment, CommentDetail, CreatePostRequest, CreateReplyRequest, UpdatePostRequest, CreateCommentRequest, UpdateCommentRequest, PostFilter, PostListResponse, CommentListResponse, RecentPostsResponse, BoardStats, PostQuery, PostSummary, ThumbnailUrls, PostStatus, PostSummaryDb, AttachedFile};
 use ammonia::clean;
+use std::str::FromStr;
 
 // 권한 체크 유틸리티 함수들
 fn can_list_board(board: &Board, user_role: Option<&str>) -> bool {
@@ -38,6 +39,18 @@ fn can_list_board(board: &Board, user_role: Option<&str>) -> bool {
 
 fn can_read_post(board: &Board, user_role: Option<&str>) -> bool {
     let permission = &board.read_permission;
+    
+    match permission.as_str() {
+        "guest" => true,
+        "member" => user_role.is_some(),
+        "admin" => user_role == Some("admin"),
+        _ => true,
+    }
+}
+
+fn can_create_reply(board: &Board, user_role: Option<&str>) -> bool {
+    // 답글 생성 권한은 게시글 작성 권한과 동일하게 설정
+    let permission = &board.write_permission;
     
     match permission.as_str() {
         "guest" => true,
@@ -146,6 +159,9 @@ struct PostDetailRaw {
     pub user_id: Uuid,
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
+    pub parent_id: Option<Uuid>,
+    pub depth: Option<i32>,
+    pub reply_count: Option<i32>,
     pub is_notice: Option<bool>,
     pub views: Option<i32>,
     pub likes: Option<i32>,
@@ -522,7 +538,7 @@ pub async fn get_posts(
                 sqlx::query_scalar!(
                     r#"SELECT COUNT(*) as total FROM posts p
                         JOIN users u ON p.user_id = u.id
-                        WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                        WHERE p.status IN ('active', 'published') AND p.board_id = $1 AND p.category_id = $2
                         AND (
                             p.title ILIKE $3 OR
                             p.content ILIKE $3 OR
@@ -543,7 +559,7 @@ pub async fn get_posts(
                 sqlx::query_scalar!(
                     r#"SELECT COUNT(*) as total FROM posts p
                         JOIN users u ON p.user_id = u.id
-                        WHERE p.status = 'active' AND p.board_id = $1
+                        WHERE p.status IN ('active', 'published') AND p.board_id = $1
                         AND (
                             p.title ILIKE $2 OR
                             p.content ILIKE $2 OR
@@ -565,7 +581,7 @@ pub async fn get_posts(
             sqlx::query_scalar!(
                 r#"SELECT COUNT(*) as total FROM posts p
                     JOIN users u ON p.user_id = u.id
-                    WHERE p.status = 'active'
+                    WHERE p.status IN ('active', 'published')
                     AND (
                         p.title ILIKE $1 OR
                         p.content ILIKE $1 OR
@@ -587,7 +603,7 @@ pub async fn get_posts(
         if let Some(board_id) = query.board_id {
             if let Some(category_id) = query.category_id {
                 sqlx::query_scalar!(
-                    "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2",
+                    "SELECT COUNT(*) as total FROM posts p WHERE p.status IN ('active', 'published') AND p.board_id = $1 AND p.category_id = $2",
                     board_id, category_id
                 )
                 .fetch_one(&state.pool)
@@ -599,7 +615,7 @@ pub async fn get_posts(
                 .unwrap_or(0)
             } else {
                 sqlx::query_scalar!(
-                    "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active' AND p.board_id = $1",
+                    "SELECT COUNT(*) as total FROM posts p WHERE p.status IN ('active', 'published') AND p.board_id = $1",
                     board_id
                 )
                 .fetch_one(&state.pool)
@@ -612,7 +628,7 @@ pub async fn get_posts(
             }
         } else {
             sqlx::query_scalar!(
-                "SELECT COUNT(*) as total FROM posts p WHERE p.status = 'active'"
+                "SELECT COUNT(*) as total FROM posts p WHERE p.status IN ('active', 'published')"
             )
             .fetch_one(&state.pool)
             .await
@@ -632,14 +648,15 @@ pub async fn get_posts(
                     PostSummaryDb,
                     r#"
                     SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                            p.content, p.views, p.likes, p.is_notice,
-                           COALESCE(c.name, NULL) as category_name
+                           COALESCE(c.name, NULL) as category_name,
+                           p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     JOIN boards b ON p.board_id = b.id
                     LEFT JOIN categories c ON p.category_id = c.id
-                    WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                    WHERE p.status IN ('active', 'published') AND p.board_id = $1 AND p.category_id = $2
                         AND (
                             p.title ILIKE $3 OR
                             p.content ILIKE $3 OR
@@ -658,14 +675,15 @@ pub async fn get_posts(
                     PostSummaryDb,
                     r#"
                     SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                            p.content, p.views, p.likes, p.is_notice,
-                           COALESCE(c.name, NULL) as category_name
+                           COALESCE(c.name, NULL) as category_name,
+                           p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     JOIN boards b ON p.board_id = b.id
                     LEFT JOIN categories c ON p.category_id = c.id
-                    WHERE p.status = 'active' AND p.board_id = $1
+                    WHERE p.status IN ('active', 'published') AND p.board_id = $1
                         AND (
                             p.title ILIKE $2 OR
                             p.content ILIKE $2 OR
@@ -685,14 +703,15 @@ pub async fn get_posts(
                 PostSummaryDb,
                 r#"
                 SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                        p.content, p.views, p.likes, p.is_notice,
-                       COALESCE(c.name, NULL) as category_name
+                       COALESCE(c.name, NULL) as category_name,
+                       p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
                 JOIN boards b ON p.board_id = b.id
                 LEFT JOIN categories c ON p.category_id = c.id
-                WHERE p.status = 'active'
+                WHERE p.status IN ('active', 'published')
                     AND (
                         p.title ILIKE $1 OR
                         p.content ILIKE $1 OR
@@ -714,14 +733,15 @@ pub async fn get_posts(
                     PostSummaryDb,
                     r#"
                     SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                            p.content, p.views, p.likes, p.is_notice,
-                           COALESCE(c.name, NULL) as category_name
+                           COALESCE(c.name, NULL) as category_name,
+                           p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     JOIN boards b ON p.board_id = b.id
                     LEFT JOIN categories c ON p.category_id = c.id
-                    WHERE p.status = 'active' AND p.board_id = $1 AND p.category_id = $2
+                    WHERE p.status IN ('active', 'published') AND p.board_id = $1 AND p.category_id = $2
                     ORDER BY p.is_notice DESC, p.created_at DESC
                     LIMIT $3 OFFSET $4
                     "#,
@@ -734,14 +754,15 @@ pub async fn get_posts(
                     PostSummaryDb,
                     r#"
                     SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                           COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                            p.content, p.views, p.likes, p.is_notice,
-                           COALESCE(c.name, NULL) as category_name
+                           COALESCE(c.name, NULL) as category_name,
+                           p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                     FROM posts p
                     JOIN users u ON p.user_id = u.id
                     JOIN boards b ON p.board_id = b.id
                     LEFT JOIN categories c ON p.category_id = c.id
-                    WHERE p.status = 'active' AND p.board_id = $1
+                    WHERE p.status IN ('active', 'published') AND p.board_id = $1
                     ORDER BY p.is_notice DESC, p.created_at DESC
                     LIMIT $2 OFFSET $3
                     "#,
@@ -755,14 +776,15 @@ pub async fn get_posts(
                 PostSummaryDb,
                 r#"
                 SELECT p.id, p.title, u.name as user_name, p.board_id, b.name as board_name, b.slug as board_slug, p.created_at,
-                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'active'), 0) as comment_count,
+                       COALESCE((SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')), 0) as comment_count,
                        p.content, p.views, p.likes, p.is_notice,
-                       COALESCE(c.name, NULL) as category_name
+                       COALESCE(c.name, NULL) as category_name,
+                       p.parent_id, p.depth, p.reply_count, p.thumbnail_urls
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
                 JOIN boards b ON p.board_id = b.id
                 LEFT JOIN categories c ON p.category_id = c.id
-                WHERE p.status = 'active'
+                WHERE p.status IN ('active', 'published')
                 ORDER BY p.is_notice DESC, p.created_at DESC
                 LIMIT $1 OFFSET $2
                 "#,
@@ -819,6 +841,9 @@ pub async fn get_posts(
             is_notice: post.is_notice,
             attached_files: attached_files_option,
             thumbnail_urls,
+            parent_id: post.parent_id,
+            depth: post.depth,
+            reply_count: post.reply_count,
         };
         
         posts_with_files.push(post_with_files);
@@ -893,7 +918,7 @@ pub async fn get_post(
     
     // 먼저 기본 게시글 정보만 조회해서 테스트 (status를 text로 캐스팅)
     let post_basic = sqlx::query!(
-        "SELECT id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status::text as status, created_at, updated_at FROM posts WHERE id = $1",
+        "SELECT id, board_id, category_id, user_id, parent_id, depth, reply_count, title, content, views, likes, dislikes, is_notice, status::text as status, created_at, updated_at FROM posts WHERE id = $1 AND status IN ('active', 'published')",
         post_id
     )
     .fetch_optional(&state.pool)
@@ -967,7 +992,7 @@ pub async fn get_post(
     };
 
     // 댓글 수 조회
-    let comment_count = sqlx::query!("SELECT COUNT(*) as count FROM comments WHERE post_id = $1 AND status = 'active'", post_id)
+    let comment_count = sqlx::query!("SELECT COUNT(*) as count FROM comments WHERE post_id = $1 AND status IN ('active', 'published')", post_id)
         .fetch_one(&state.pool)
         .await
         .map_err(|e| {
@@ -1002,8 +1027,8 @@ pub async fn get_post(
         file_path: format!("/uploads/{}", file.file_path.trim_start_matches("static/uploads/")),
         file_size: file.file_size,
         mime_type: file.mime_type,
-        file_purpose: FilePurpose::Attachment, // 기본값으로 설정
-        display_order: file.display_order.unwrap_or(0),
+        file_purpose: Some(FilePurpose::Attachment), // 기본값으로 설정
+        display_order: Some(file.display_order.unwrap_or(0)),
     })
     .collect::<Vec<AttachedFile>>();
 
@@ -1023,6 +1048,9 @@ pub async fn get_post(
         board_id: post_basic.board_id,
         category_id: post_basic.category_id,
         user_id: post_basic.user_id,
+        parent_id: post_basic.parent_id,
+        depth: post_basic.depth,
+        reply_count: post_basic.reply_count,
         title: post_basic.title,
         content: post_basic.content,
         views: post_basic.views,
@@ -1054,11 +1082,11 @@ pub async fn get_post(
 // 게시글 작성 (권한 체크 적용)
 pub async fn create_post(
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Json(payload): Json<CreatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
-    eprintln!("📝 create_post 함수 시작: board_id={:?}, user_id={}", payload.board_id, claims.sub);
-    
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 게시판 정보 조회 (권한 체크용)
     let board_raw = sqlx::query_as::<_, BoardRaw>(
         r#"
@@ -1069,50 +1097,118 @@ pub async fn create_post(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("❌ create_post 게시판 조회 실패: {:?}", e);
+        error!("create_post 게시판 조회 실패: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let board = convert_board_raw_to_board(board_raw);
-    eprintln!("📝 create_post 게시판 정보: id={}, name={}", board.id, board.name);
 
     // 권한 체크
     if !can_write_post(&board, Some(&claims.role)) {
-        eprintln!("❌ create_post 권한 없음: role={}", claims.role);
+        error!("create_post 권한 없음: role={}", claims.role);
         return Err(StatusCode::FORBIDDEN);
     }
-    eprintln!("✅ create_post 권한 확인 완료");
     
     let sanitized_content = clean(&payload.content);
-    eprintln!("📝 콘텐츠 정리 완료: len={}", sanitized_content.len());
     
-    eprintln!("📝 DB INSERT 시작: board_id={:?}, category_id={:?}, title={}", 
-             payload.board_id, payload.category_id, payload.title);
-    
-    let post = sqlx::query_as::<_, PostDetail>(
+    // 먼저 게시글을 생성
+    let post_result = sqlx::query!(
         "INSERT INTO posts (board_id, category_id, user_id, title, content, is_notice, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'published')
-         RETURNING id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status, created_at, updated_at,
-         (SELECT name FROM users WHERE id = $3) as user_name,
-         (SELECT email FROM users WHERE id = $3) as user_email,
-         (SELECT name FROM boards WHERE id = $1) as board_name,
-         (SELECT slug FROM boards WHERE id = $1) as board_slug,
-         (SELECT name FROM categories WHERE id = $2) as category_name,
-         0::bigint as comment_count"
+         RETURNING id, board_id, category_id, user_id, parent_id, depth, reply_count, title, content, views, likes, dislikes, is_notice, status::text, created_at, updated_at",
+        payload.board_id,
+        payload.category_id,
+        claims.sub,
+        payload.title,
+        sanitized_content,
+        payload.is_notice.unwrap_or(false)
     )
-    .bind(payload.board_id)
-    .bind(payload.category_id)
-    .bind(claims.sub)
-    .bind(payload.title)
-    .bind(sanitized_content)
-    .bind(payload.is_notice.unwrap_or(false))
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("❌ create_post DB INSERT 실패: {:?}", e);
+        error!("create_post DB INSERT 실패: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     
-    eprintln!("✅ create_post DB INSERT 성공: post_id={}", post.id);
+    // 사용자 정보 조회
+    let user_info = sqlx::query!("SELECT name, email FROM users WHERE id = $1", claims.sub)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("User query error: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    
+    // 게시판 정보 조회
+    let board_info = sqlx::query!("SELECT name, slug FROM boards WHERE id = $1", post_result.board_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("Board query error: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    
+    // 카테고리 정보 조회
+    let category_name = if let Some(category_id) = post_result.category_id {
+        sqlx::query_scalar!("SELECT name FROM categories WHERE id = $1", category_id)
+            .fetch_optional(&state.pool)
+            .await
+            .unwrap_or(None)
+    } else {
+        None
+    };
+    
+    // 첨부파일에서 썸네일 URL 생성
+    let thumbnail_urls = if let Some(ref attached_files) = payload.attached_files {
+        generate_thumbnail_urls(&Some(attached_files.clone())).await
+    } else {
+        None
+    };
+    
+    // 썸네일 URL을 posts 테이블에 저장
+    if let Some(ref thumbnails) = thumbnail_urls {
+        sqlx::query!(
+            "UPDATE posts SET thumbnail_urls = $1 WHERE id = $2",
+            serde_json::to_value(thumbnails).unwrap(),
+            post_result.id
+        )
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("썸네일 URL 저장 실패: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
+    
+    // PostDetail 객체 생성
+    let post = PostDetail {
+        id: post_result.id,
+        board_id: post_result.board_id,
+        category_id: post_result.category_id,
+        user_id: post_result.user_id,
+        parent_id: post_result.parent_id,
+        depth: post_result.depth,
+        reply_count: post_result.reply_count,
+        title: post_result.title,
+        content: post_result.content,
+        views: post_result.views,
+        likes: post_result.likes,
+        dislikes: post_result.dislikes,
+        is_notice: post_result.is_notice,
+        status: post_result.status.and_then(|s| s.parse::<PostStatus>().ok()),
+        created_at: post_result.created_at,
+        updated_at: post_result.updated_at,
+        user_name: user_info.as_ref().map(|u| u.name.clone()),
+        user_email: user_info.as_ref().map(|u| u.email.clone()),
+        board_name: board_info.as_ref().map(|b| b.name.clone()),
+        board_slug: board_info.as_ref().map(|b| b.slug.clone()),
+        category_name,
+        comment_count: Some(0),
+        attached_files: None,
+        thumbnail_urls,
+        is_liked: None,
+    };
+    
+
 
     // 첨부된 파일들을 file_entities 테이블에 연결하고 상태를 published로 변경
     if let Some(attached_files) = payload.attached_files {
@@ -1165,10 +1261,12 @@ pub async fn create_post(
 
                         // file_entities 테이블에 연결 정보 저장
                         sqlx::query!(
-                            "INSERT INTO file_entities (file_id, entity_id, display_order)
-                             VALUES ($1, $2, $3)",
+                            "INSERT INTO file_entities (file_id, entity_type, entity_id, file_purpose, display_order)
+                             VALUES ($1, $2, $3, $4, $5)",
                             file_id,
+                            EntityType::Post as EntityType,  // entity_type을 Post로 설정
                             post.id,
+                            FilePurpose::Attachment as FilePurpose,  // file_purpose를 Attachment로 설정
                             index as i32
                         )
                         .execute(&state.pool)
@@ -1201,12 +1299,14 @@ pub async fn create_post(
 pub async fn update_post(
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Json(payload): Json<UpdatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 권한 확인
     let post = sqlx::query_as::<_, Post>(
-        "SELECT * FROM posts WHERE id = $1 AND status = 'active'"
+        "SELECT * FROM posts WHERE id = $1 AND status = 'published'"
     )
     .bind(post_id)
     .fetch_optional(&state.pool)
@@ -1217,9 +1317,10 @@ pub async fn update_post(
     })?
     .ok_or(StatusCode::NOT_FOUND)?;
 
+    // 게시글 작성자만 수정 가능
     if post.user_id != claims.sub {
-        // 관리자 권한 확인 (임시로 모든 인증된 사용자를 관리자로 처리)
-        // 실제로는 데이터베이스에서 사용자 역할을 확인해야 함
+        eprintln!("권한 없음: post_user_id={}, current_user_id={}", post.user_id, claims.sub);
+        return Err(StatusCode::FORBIDDEN);
     }
 
     // 업데이트할 필드들
@@ -1257,6 +1358,28 @@ pub async fn update_post(
 
     updates.push("updated_at = NOW()".to_string());
 
+    // 첨부파일에서 썸네일 URL 생성
+    let thumbnail_urls = if let Some(ref attached_files) = payload.attached_files {
+        generate_thumbnail_urls(&Some(attached_files.clone())).await
+    } else {
+        None
+    };
+    
+    // 썸네일 URL을 posts 테이블에 저장
+    if let Some(ref thumbnails) = thumbnail_urls {
+        sqlx::query!(
+            "UPDATE posts SET thumbnail_urls = $1 WHERE id = $2",
+            serde_json::to_value(thumbnails).unwrap(),
+            post_id
+        )
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("썸네일 URL 저장 실패: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
+
     param_count += 1;
     let sql = format!(
         "UPDATE posts SET {} WHERE id = ${} RETURNING id, board_id, category_id, user_id, title, content, views, likes, dislikes, is_notice, status, created_at, updated_at,
@@ -1264,7 +1387,7 @@ pub async fn update_post(
          (SELECT name FROM boards WHERE id = board_id) as board_name,
          (SELECT slug FROM boards WHERE id = board_id) as board_slug,
          (SELECT name FROM categories WHERE id = category_id) as category_name,
-         (SELECT COUNT(*)::bigint FROM comments WHERE post_id = posts.id AND status = 'active') as comment_count",
+         (SELECT COUNT(*)::bigint FROM comments WHERE post_id = posts.id AND status IN ('active', 'published')) as comment_count",
         updates.join(", "),
         param_count
     );
@@ -1298,6 +1421,73 @@ pub async fn update_post(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // 첨부파일 처리 (기존 파일 연결 제거 후 새로 연결)
+    if let Some(attached_files) = payload.attached_files {
+        // 기존 파일 연결 제거
+        sqlx::query!(
+            "DELETE FROM file_entities WHERE entity_type = 'post' AND entity_id = $1",
+            post_id
+        )
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("기존 파일 연결 제거 실패: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        // 새 파일 연결
+        for (index, file_url) in attached_files.iter().enumerate() {
+            // file_url에서 파일명 추출
+            let file_name = if file_url.contains("/uploads/") {
+                let path_part = file_url.split("/uploads/").last().unwrap_or("");
+                let extracted_name = path_part.split('/').last().unwrap_or("");
+                
+                if extracted_name.contains("_large.") {
+                    extracted_name.replace("_large.", ".")
+                } else {
+                    extracted_name.to_string()
+                }
+            } else {
+                file_url.to_string()
+            };
+            
+            // files 테이블에서 해당 파일 조회
+            let file_exists = sqlx::query!(
+                "SELECT id, status::text FROM files WHERE stored_name = $1",
+                file_name
+            )
+            .fetch_optional(&state.pool)
+            .await;
+            
+            match file_exists {
+                Ok(Some(file_info)) => {
+                    let status = file_info.status.as_deref().unwrap_or("unknown");
+                    if status == "published" {
+                        // file_entities 테이블에 연결 정보 저장
+                        sqlx::query!(
+                            "INSERT INTO file_entities (file_id, entity_type, entity_id, file_purpose, display_order)
+                             VALUES ($1, $2, $3, $4, $5)",
+                            file_info.id,
+                            EntityType::Post as EntityType,
+                            post_id,
+                            FilePurpose::Attachment as FilePurpose,
+                            index as i32
+                        )
+                        .execute(&state.pool)
+                        .await
+                        .map_err(|e| {
+                            error!("파일 연결 실패: {:?}", e);
+                            StatusCode::INTERNAL_SERVER_ERROR
+                        })?;
+                    }
+                },
+                _ => {
+                    // 파일이 데이터베이스에 없는 경우 무시
+                }
+            }
+        }
+    }
+
     Ok(Json(ApiResponse {
         success: true,
         message: "게시글이 성공적으로 수정되었습니다.".to_string(),
@@ -1310,11 +1500,14 @@ pub async fn update_post(
 pub async fn delete_post(
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
+    
     // 권한 확인
     let post = sqlx::query_as::<_, Post>(
-        "SELECT * FROM posts WHERE id = $1 AND status = 'active'"
+        "SELECT * FROM posts WHERE id = $1 AND status = 'published'"
     )
     .bind(post_id)
     .fetch_optional(&state.pool)
@@ -1322,9 +1515,10 @@ pub async fn delete_post(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     .ok_or(StatusCode::NOT_FOUND)?;
 
+    // 게시글 작성자만 삭제 가능
     if post.user_id != claims.sub {
-        // 관리자 권한 확인 (임시로 모든 인증된 사용자를 관리자로 처리)
-        // 실제로는 데이터베이스에서 사용자 역할을 확인해야 함
+        eprintln!("삭제 권한 없음: post_user_id={}, current_user_id={}", post.user_id, claims.sub);
+        return Err(StatusCode::FORBIDDEN);
     }
 
     // 소프트 삭제
@@ -1348,24 +1542,20 @@ pub async fn get_comments(
     State(state): State<AppState>,
     Extension(claims): Extension<Option<Claims>>,
 ) -> Result<Json<ApiResponse<Vec<CommentDetail>>>, StatusCode> {
-    eprintln!("🔵 댓글 조회 시작: post_id={}", post_id);
     let user_role = claims.as_ref().map(|c| c.role.as_str());
-    eprintln!("사용자 역할: {:?}", user_role);
     
     // 게시글 정보 조회 (게시판 ID 확인용)
     let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
-            eprintln!("❌ Post query error: {:?}", e);
+            error!("Post query error: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .ok_or_else(|| {
-            eprintln!("❌ Post not found: {}", post_id);
+            error!("Post not found: {}", post_id);
             StatusCode::NOT_FOUND
         })?;
-    
-    eprintln!("✅ 게시글 조회 성공: board_id={}", post.board_id);
 
     // 게시판 정보 조회 (권한 체크용)
     let board_raw = sqlx::query_as::<_, BoardRaw>(
@@ -1377,40 +1567,59 @@ pub async fn get_comments(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("❌ Error fetching board: {:?}", e);
+        error!("Error fetching board: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let board = convert_board_raw_to_board(board_raw);
-    
-    eprintln!("✅ 게시판 조회 성공: name={}, read_permission={}", board.name, board.read_permission);
 
     // 권한 체크 (댓글 보기는 게시글 읽기 권한과 동일)
     let can_read = can_read_post(&board, user_role);
-    eprintln!("권한 체크 결과: can_read={}", can_read);
     
     if !can_read {
-        eprintln!("❌ 권한 없음: user_role={:?}, read_permission={}", user_role, board.read_permission);
+        error!("권한 없음: user_role={:?}, read_permission={}", user_role, board.read_permission);
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // 댓글 목록 조회
-    eprintln!("🔵 댓글 목록 조회 시작");
+    // 댓글 목록 조회 (계층 구조 정렬 적용)
     let comments_raw = sqlx::query!(
-        "SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.likes, c.status::text as status, c.created_at, c.updated_at, u.name as user_name
-         FROM comments c
-         JOIN users u ON c.user_id = u.id
-         WHERE c.post_id = $1 AND c.status = 'active'
-         ORDER BY c.created_at",
+        r#"
+        WITH RECURSIVE comment_tree AS (
+            -- 최상위 댓글들 (parent_id가 NULL인 것들)
+            SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.likes, 
+                   c.status::text as status, c.created_at, c.updated_at, c.depth, c.is_deleted,
+                   u.name as user_name,
+                   c.created_at::text as sort_path,
+                   0 as level
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.post_id = $1 AND c.parent_id IS NULL AND c.is_deleted = false
+            
+            UNION ALL
+            
+            -- 하위 댓글들 (재귀적으로)
+            SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.likes,
+                   c.status::text as status, c.created_at, c.updated_at, c.depth, c.is_deleted,
+                   u.name as user_name,
+                   ct.sort_path || ',' || c.created_at::text as sort_path,
+                   ct.level + 1 as level
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            JOIN comment_tree ct ON c.parent_id = ct.id
+            WHERE c.post_id = $1 AND c.is_deleted = false
+        )
+        SELECT id, post_id, user_id, parent_id, content, likes, status, 
+               created_at, updated_at, depth, is_deleted, user_name
+        FROM comment_tree
+        ORDER BY sort_path
+        "#,
         post_id
     )
     .fetch_all(&state.pool)
     .await
     .map_err(|e| {
-        eprintln!("❌ 댓글 조회 실패: {:?}", e);
+        error!("댓글 조회 실패: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    
-    eprintln!("✅ 댓글 조회 성공: {}개", comments_raw.len());
 
     // 각 댓글에 대해 좋아요 상태 확인
     let mut comments = Vec::new();
@@ -1426,16 +1635,18 @@ pub async fn get_comments(
         };
 
         let comment = CommentDetail {
-            id: comment_raw.id,
-            post_id: comment_raw.post_id,
-            user_id: comment_raw.user_id,
+            id: comment_raw.id.expect("Comment ID should not be null"),
+            post_id: comment_raw.post_id.expect("Post ID should not be null"),
+            user_id: comment_raw.user_id.expect("User ID should not be null"),
             parent_id: comment_raw.parent_id,
-            content: comment_raw.content,
+            content: comment_raw.content.expect("Content should not be null"),
             likes: comment_raw.likes,
             status: comment_raw.status.and_then(|s| s.parse::<PostStatus>().ok()),
             created_at: comment_raw.created_at,
             updated_at: comment_raw.updated_at,
-            user_name: comment_raw.user_name,
+            depth: comment_raw.depth,
+            is_deleted: comment_raw.is_deleted,
+            user_name: comment_raw.user_name.expect("User name should not be null"),
             is_liked: Some(is_liked),
         };
         comments.push(comment);
@@ -1452,11 +1663,13 @@ pub async fn get_comments(
 // 댓글 작성 (권한 체크 적용)
 pub async fn create_comment(
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Json(payload): Json<CreateCommentRequest>,
 ) -> Result<Json<ApiResponse<CommentDetail>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 게시글 정보 조회 (게시판 ID 확인용)
-    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status = 'active'", payload.post_id)
+    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", payload.post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
@@ -1485,15 +1698,38 @@ pub async fn create_comment(
         return Err(StatusCode::FORBIDDEN);
     }
 
+    // 대댓글 깊이 계산
+    let depth = if let Some(parent_id) = payload.parent_id {
+        // 부모 댓글의 깊이를 조회
+        let parent_depth = sqlx::query!(
+            "SELECT depth FROM comments WHERE id = $1",
+            parent_id
+        )
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            eprintln!("Parent comment query error: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .map(|row| row.depth.unwrap_or(0))
+        .unwrap_or(0);
+
+        // 최대 깊이 제한 (예: 3단계까지만 허용)
+        std::cmp::min(parent_depth + 1, 3)
+    } else {
+        0 // 최상위 댓글
+    };
+
     let comment = sqlx::query_as::<_, Comment>(
-        "INSERT INTO comments (post_id, user_id, parent_id, content)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, post_id, user_id, parent_id, content, likes, status, created_at, updated_at"
+        "INSERT INTO comments (post_id, user_id, parent_id, content, depth, is_deleted)
+         VALUES ($1, $2, $3, $4, $5, false)
+         RETURNING id, post_id, user_id, parent_id, content, likes, status, created_at, updated_at, depth, is_deleted"
     )
     .bind(payload.post_id)
     .bind(claims.sub)
     .bind(payload.parent_id)
     .bind(payload.content)
+    .bind(depth)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
@@ -1520,6 +1756,8 @@ pub async fn create_comment(
         status: comment.status,
         created_at: comment.created_at,
         updated_at: comment.updated_at,
+        depth: comment.depth,
+        is_deleted: comment.is_deleted,
         user_name: user.name,
         is_liked: Some(false), // 새로 생성된 댓글은 좋아요하지 않은 상태
     };
@@ -1536,12 +1774,14 @@ pub async fn create_comment(
 pub async fn update_comment(
     Path(comment_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Json(payload): Json<UpdateCommentRequest>,
 ) -> Result<Json<ApiResponse<CommentDetail>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 권한 확인
     let comment = sqlx::query_as::<_, Comment>(
-        "SELECT * FROM comments WHERE id = $1 AND status = 'active'"
+        "SELECT * FROM comments WHERE id = $1 AND status IN ('active', 'published')"
     )
     .bind(comment_id)
     .fetch_optional(&state.pool)
@@ -1558,7 +1798,7 @@ pub async fn update_comment(
     let updated_comment_raw = sqlx::query!(
         "UPDATE comments SET content = $1, updated_at = NOW()
          WHERE id = $2
-         RETURNING id, post_id, user_id, parent_id, content, likes, status::text as status, created_at, updated_at",
+         RETURNING id, post_id, user_id, parent_id, content, likes, status::text as status, created_at, updated_at, depth, is_deleted",
         payload.content,
         comment_id
     )
@@ -1582,6 +1822,8 @@ pub async fn update_comment(
         status: updated_comment_raw.status.and_then(|s| s.parse::<PostStatus>().ok()),
         created_at: updated_comment_raw.created_at,
         updated_at: updated_comment_raw.updated_at,
+        depth: updated_comment_raw.depth,
+        is_deleted: updated_comment_raw.is_deleted,
         user_name: user.name,
         is_liked: None, // 수정 시에는 좋아요 상태를 확인하지 않음
     };
@@ -1598,11 +1840,13 @@ pub async fn update_comment(
 pub async fn delete_comment(
     Path(comment_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 권한 확인
     let comment = sqlx::query_as::<_, Comment>(
-        "SELECT * FROM comments WHERE id = $1 AND status = 'active'"
+        "SELECT * FROM comments WHERE id = $1 AND status IN ('active', 'published')"
     )
     .bind(comment_id)
     .fetch_optional(&state.pool)
@@ -1615,8 +1859,8 @@ pub async fn delete_comment(
         // 실제로는 데이터베이스에서 사용자 역할을 확인해야 함
     }
 
-    // 소프트 삭제
-    sqlx::query("UPDATE comments SET status = 'deleted' WHERE id = $1")
+    // 소프트 삭제 (is_deleted = true로 설정)
+    sqlx::query("UPDATE comments SET is_deleted = true, updated_at = NOW() WHERE id = $1")
         .bind(comment_id)
         .execute(&state.pool)
         .await
@@ -1645,14 +1889,14 @@ pub async fn get_board_stats(
         LEFT JOIN (
             SELECT board_id, COUNT(*) as post_count
             FROM posts 
-            WHERE status = 'active'
+            WHERE status IN ('active', 'published')
             GROUP BY board_id
         ) p ON b.id = p.board_id
         LEFT JOIN (
             SELECT p.board_id, COUNT(c.id) as comment_count
             FROM posts p
             LEFT JOIN comments c ON p.id = c.post_id AND c.status = 'active'
-            WHERE p.status = 'active'
+            WHERE p.status IN ('active', 'published')
             GROUP BY p.board_id
         ) c ON b.id = c.board_id
         WHERE b.is_public = true
@@ -1685,14 +1929,14 @@ pub async fn get_board_groups_recent_posts(
         LEFT JOIN (
             SELECT board_id, COUNT(*) as post_count
             FROM posts 
-            WHERE status = 'active'
+            WHERE status IN ('active', 'published')
             GROUP BY board_id
         ) p ON b.id = p.board_id
         LEFT JOIN (
             SELECT p.board_id, COUNT(c.id) as comment_count
             FROM posts p
             LEFT JOIN comments c ON p.id = c.post_id AND c.status = 'active'
-            WHERE p.status = 'active'
+            WHERE p.status IN ('active', 'published')
             GROUP BY p.board_id
         ) c ON b.id = c.board_id
         WHERE b.is_public = true
@@ -1792,6 +2036,9 @@ pub async fn get_posts_by_slug(
     let mut count_conditions = Vec::new();
     let mut count_param_count = 1;
 
+    // 삭제된 게시글 제외
+    count_conditions.push("p.status IN ('active', 'published')".to_string());
+
     if let Some(ref search) = query.search {
         count_conditions.push(format!("(p.title ILIKE ${} OR p.content ILIKE ${} OR EXISTS (SELECT 1 FROM users u WHERE u.id = p.user_id AND u.name ILIKE ${}))", 
             count_param_count, count_param_count, count_param_count));
@@ -1820,10 +2067,11 @@ pub async fn get_posts_by_slug(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // 게시글 목록 조회
+    // 게시글 목록 조회 (답글 포함)
     let mut sql = r#"
         SELECT 
             p.id, p.title, p.board_id, p.user_id, p.content, p.views, p.likes, p.is_notice, p.created_at,
+            p.parent_id, p.depth, p.reply_count, p.thumbnail_urls,
             u.name as user_name,
             b.name as board_name,
             b.slug as board_slug,
@@ -1836,13 +2084,16 @@ pub async fn get_posts_by_slug(
         LEFT JOIN (
             SELECT post_id, COUNT(*) as count 
             FROM comments 
-            WHERE status = 'active' 
+            WHERE status IN ('active', 'published') 
             GROUP BY post_id
         ) comment_count ON p.id = comment_count.post_id
     "#.to_string();
     
     let mut conditions = Vec::new();
     let mut param_count = 1;
+
+    // 삭제된 게시글 제외
+    conditions.push("p.status IN ('active', 'published')".to_string());
 
     if let Some(ref search) = query.search {
         conditions.push(format!("(p.title ILIKE ${} OR p.content ILIKE ${} OR u.name ILIKE ${})", 
@@ -1857,8 +2108,8 @@ pub async fn get_posts_by_slug(
         sql.push_str(&format!(" WHERE {}", conditions.join(" AND ")));
     }
 
-    // 공지사항을 먼저, 그 다음 일반 게시글 순으로 정렬
-    sql.push_str(&format!(" ORDER BY p.is_notice DESC, p.created_at DESC LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+    // 공지사항을 먼저, 그 다음 일반 게시글 순으로 정렬 (답글은 부모 글 아래에 계층적 구조로)
+    sql.push_str(&format!(" ORDER BY p.is_notice DESC, COALESCE(p.parent_id, p.id), p.depth, p.created_at DESC LIMIT ${} OFFSET ${}", param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, PostSummaryDb>(&sql);
     
@@ -1919,6 +2170,9 @@ pub async fn get_posts_by_slug(
             is_notice: post.is_notice,
             attached_files: attached_files_option,
             thumbnail_urls,
+            parent_id: post.parent_id,
+            depth: post.depth,
+            reply_count: post.reply_count,
         };
         
         posts_with_files.push(post_with_files);
@@ -1986,10 +2240,12 @@ pub async fn get_posts_by_slug(
 // 게시판 slug로 게시글 생성 (권한 체크 적용)
 pub async fn create_post_by_slug(
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Path(slug): Path<String>,
     Json(mut payload): Json<CreatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     eprintln!("📝 게시글 작성 시작: slug={}, user_id={}", slug, claims.sub);
     eprintln!("📝 요청 데이터: title={}, content_len={}", payload.title, payload.content.len());
     
@@ -2028,12 +2284,230 @@ pub async fn create_post_by_slug(
     eprintln!("📝 create_post 호출 시작: board_id={}", board.id);
     
     // 기존 create_post 로직 재사용
-    let result = create_post(State(state), Extension(claims), Json(payload)).await;
+    let result = create_post(State(state), Extension(Some(claims)), Json(payload)).await;
     match &result {
         Ok(_) => eprintln!("✅ create_post 성공"),
         Err(e) => eprintln!("❌ create_post 실패: {:?}", e),
     }
     result
+}
+
+// 답글 생성 (권한 체크 적용)
+pub async fn create_reply_by_slug(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
+    Path(slug): Path<String>,
+    Json(payload): Json<CreateReplyRequest>,
+) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
+    // 부모 게시글 조회 및 게시판 정보 확인
+    let parent_post = sqlx::query_as::<_, PostDetailRaw>(
+        r#"
+        SELECT 
+            p.id, p.board_id, p.category_id, p.user_id, p.parent_id, p.title, p.content,
+            p.views, p.likes, p.dislikes, p.is_notice, p.status::text, p.created_at, p.updated_at,
+            p.depth, p.reply_count, p.attached_files, p.thumbnail_urls,
+            u.name as user_name, u.email as user_email,
+            b.name as board_name, b.slug as board_slug,
+            c.name as category_name,
+            (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND is_deleted = false) as comment_count
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        LEFT JOIN boards b ON p.board_id = b.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id = $1 AND b.slug = $2 AND p.is_deleted = false
+        "#
+    )
+    .bind(payload.parent_id)
+    .bind(&slug)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("부모 게시글 조회 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or_else(|| {
+        error!("부모 게시글을 찾을 수 없음: parent_id={}, slug={}", payload.parent_id, slug);
+        StatusCode::NOT_FOUND
+    })?;
+
+    // 게시판 정보 조회
+    let board_raw = sqlx::query_as::<_, BoardRaw>(
+        r#"SELECT * FROM boards WHERE slug = $1"#
+    )
+    .bind(&slug)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("게시판 조회 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let board = convert_board_raw_to_board(board_raw);
+
+    // 답글 생성 권한 체크
+    if !can_create_reply(&board, Some(&claims.role)) {
+        error!("답글 생성 권한 없음: role={}", claims.role);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let sanitized_content = clean(&payload.content);
+    let parent_depth = parent_post.depth.unwrap_or(0);
+    let reply_depth = parent_depth + 1;
+
+    // 최대 답글 깊이 제한 (예: 5단계)
+    if reply_depth > 5 {
+        error!("답글 깊이 제한 초과: depth={}", reply_depth);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // 답글 생성
+    let post_result = sqlx::query!(
+        r#"
+        INSERT INTO posts (board_id, category_id, user_id, parent_id, title, content, status, depth)
+        VALUES ($1, $2, $3, $4, $5, $6, 'published', $7)
+        RETURNING id
+        "#,
+        parent_post.board_id,
+        parent_post.category_id,
+        claims.sub,
+        payload.parent_id,
+        payload.title,
+        sanitized_content,
+        reply_depth
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("답글 생성 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let reply_id = post_result.id;
+
+    // 첨부파일 처리 (필요한 경우)
+    if let Some(attached_files) = &payload.attached_files {
+        for file_path in attached_files {
+            sqlx::query!(
+                r#"
+                INSERT INTO file_entities (file_id, entity_type, entity_id, file_purpose, display_order)
+                SELECT f.id, $1, $2, 'attachment', 0
+                FROM files f
+                WHERE f.file_path = $3 AND f.status = 'published'
+                AND NOT EXISTS (
+                    SELECT 1 FROM file_entities fe 
+                    WHERE fe.file_id = f.id AND fe.entity_type = $1 AND fe.entity_id = $2
+                )
+                "#,
+                EntityType::Post as EntityType,
+                reply_id,
+                file_path
+            )
+            .execute(&state.pool)
+            .await
+            .map_err(|e| {
+                error!("파일 연결 실패: {:?}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        }
+    }
+
+    // 첨부파일에서 썸네일 URL 생성
+    let thumbnail_urls = if let Some(ref attached_files) = payload.attached_files {
+        generate_thumbnail_urls(&Some(attached_files.clone())).await
+    } else {
+        None
+    };
+    
+    // 썸네일 URL을 posts 테이블에 저장
+    if let Some(ref thumbnails) = thumbnail_urls {
+        sqlx::query!(
+            "UPDATE posts SET thumbnail_urls = $1 WHERE id = $2",
+            serde_json::to_value(thumbnails).unwrap(),
+            reply_id
+        )
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("썸네일 URL 저장 실패: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
+    
+    // 부모 게시글의 답글 수 증가
+    sqlx::query!(
+        "UPDATE posts SET reply_count = reply_count + 1 WHERE id = $1",
+        payload.parent_id
+    )
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("부모 게시글 답글 수 업데이트 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // 생성된 답글 조회
+    let reply = sqlx::query_as::<_, PostDetailRaw>(
+        r#"
+        SELECT 
+            p.id, p.board_id, p.category_id, p.user_id, p.parent_id, p.title, p.content,
+            p.views, p.likes, p.dislikes, p.is_notice, p.status::text, p.created_at, p.updated_at,
+            p.depth, p.reply_count, p.attached_files, p.thumbnail_urls,
+            u.name as user_name, u.email as user_email,
+            b.name as board_name, b.slug as board_slug,
+            c.name as category_name,
+            (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND is_deleted = false) as comment_count
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        LEFT JOIN boards b ON p.board_id = b.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id = $1
+        "#
+    )
+    .bind(reply_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("생성된 답글 조회 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // PostDetailRaw를 PostDetail로 변환
+    let reply_detail = PostDetail {
+        id: reply.id,
+        board_id: reply.board_id,
+        category_id: reply.category_id,
+        user_id: reply.user_id,
+        parent_id: reply.parent_id,
+        title: reply.title,
+        content: reply.content,
+        views: reply.views,
+        likes: reply.likes,
+        dislikes: reply.dislikes,
+        is_notice: reply.is_notice,
+        status: reply.status.and_then(|s| s.parse::<PostStatus>().ok()),
+        created_at: reply.created_at,
+        updated_at: reply.updated_at,
+        depth: reply.depth,
+        reply_count: reply.reply_count,
+        user_name: reply.user_name,
+        user_email: reply.user_email,
+        board_name: reply.board_name,
+        board_slug: reply.board_slug,
+        category_name: reply.category_name,
+        comment_count: reply.comment_count,
+        attached_files: None, // 필요시 별도 로드
+        thumbnail_urls: reply.thumbnail_urls.and_then(|v| serde_json::from_value(v).ok()),
+        is_liked: None,
+    };
+
+    Ok(Json(ApiResponse {
+        success: true,
+        message: "답글이 성공적으로 작성되었습니다.".to_string(),
+        data: Some(reply_detail),
+        pagination: None,
+    }))
 }
 
 // 썸네일 URL 생성 함수 (누락된 썸네일 자동 생성 포함)
@@ -2127,10 +2601,12 @@ fn is_image_file_path(file_path: &str) -> bool {
 pub async fn toggle_post_like(
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 게시글 존재 확인
-    let post = sqlx::query!("SELECT id, board_id, user_id FROM posts WHERE id = $1 AND status = 'active'", post_id)
+    let post = sqlx::query!("SELECT id, board_id, user_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
@@ -2250,10 +2726,12 @@ pub async fn toggle_post_like(
 pub async fn toggle_comment_like(
     Path(comment_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     // 댓글 존재 확인
-    let comment = sqlx::query!("SELECT id, post_id, user_id FROM comments WHERE id = $1 AND status = 'active'", comment_id)
+    let comment = sqlx::query!("SELECT id, post_id, user_id FROM comments WHERE id = $1 AND status IN ('active', 'published')", comment_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
@@ -2373,8 +2851,10 @@ pub async fn toggle_comment_like(
 pub async fn get_post_like_status(
     Path(post_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     let liked = sqlx::query!(
         "SELECT id FROM likes WHERE user_id = $1 AND entity_type = 'post' AND entity_id = $2",
         claims.sub,
@@ -2402,8 +2882,10 @@ pub async fn get_post_like_status(
 pub async fn get_comment_like_status(
     Path(comment_id): Path<Uuid>,
     State(state): State<AppState>,
-    Extension(claims): Extension<crate::utils::auth::Claims>,
+    Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
+    // 인증 확인
+    let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
     let liked = sqlx::query!(
         "SELECT id FROM likes WHERE user_id = $1 AND entity_type = 'comment' AND entity_id = $2",
         claims.sub,
@@ -2439,7 +2921,7 @@ pub async fn get_recent_posts(
     Query(query): Query<RecentPostsQuery>,
 ) -> Result<Json<ApiResponse<Vec<PostDetail>>>, StatusCode> {
     let limit = query.limit.unwrap_or(3);
-    let slugs = query.slugs.unwrap_or_else(|| "notice,volunteer-review".to_string());
+    let slugs = query.slugs.unwrap_or_else(|| "notice,volunteer-review,community".to_string());
     
     // slug 목록을 파싱
     let slug_list: Vec<&str> = slugs.split(',').map(|s| s.trim()).collect();
@@ -2453,6 +2935,9 @@ pub async fn get_recent_posts(
             p.user_id,
             p.board_id,
             p.category_id,
+            NULL as parent_id,
+            NULL as depth,
+            NULL as reply_count,
             p.is_notice,
             p.views,
             p.likes,
@@ -2467,14 +2952,13 @@ pub async fn get_recent_posts(
             b.name as board_name,
             b.slug as board_slug,
             c.name as category_name,
-            (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND is_deleted = false) as comment_count
+            (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status IN ('active', 'published')) as comment_count
         FROM posts p
         LEFT JOIN users u ON p.user_id = u.id
         LEFT JOIN boards b ON p.board_id = b.id
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE b.slug = ANY($1)
-        AND p.status = 'published'
-        AND p.is_deleted = false
+        AND p.status IN ('active', 'published')
         ORDER BY p.created_at DESC
         LIMIT $2
         "#
@@ -2488,31 +2972,49 @@ pub async fn get_recent_posts(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // PostDetailRaw를 PostDetail로 변환
-    let posts = posts.into_iter().map(|post_raw| PostDetail {
-        id: post_raw.id,
-        title: post_raw.title,
-        content: post_raw.content,
-        user_id: post_raw.user_id,
-        board_id: post_raw.board_id,
-        category_id: post_raw.category_id,
-        is_notice: post_raw.is_notice,
-        views: post_raw.views,
-        likes: post_raw.likes,
-        dislikes: post_raw.dislikes,
-        status: post_raw.status.and_then(|s| s.parse::<PostStatus>().ok()),
-        created_at: post_raw.created_at,
-        updated_at: post_raw.updated_at,
-        attached_files: None, // 나중에 별도로 로드
-        thumbnail_urls: post_raw.thumbnail_urls.and_then(|v| serde_json::from_value(v).ok()),
-        user_name: post_raw.user_name,
-        user_email: post_raw.user_email,
-        board_name: post_raw.board_name,
-        board_slug: post_raw.board_slug,
-        category_name: post_raw.category_name,
-        comment_count: post_raw.comment_count,
-        is_liked: None, // 나중에 별도로 로드
-    }).collect();
+    // PostDetailRaw를 PostDetail로 변환 (썸네일 URL 생성 포함)
+    let mut posts_with_thumbnails = Vec::new();
+    
+    for post_raw in posts {
+        let thumbnail_urls = if let Some(v) = post_raw.thumbnail_urls {
+            serde_json::from_value(v).ok()
+        } else {
+            // 썸네일 URL이 없으면 첨부파일에서 생성
+            generate_thumbnail_urls(&post_raw.attached_files).await
+        };
+        
+        let post_detail = PostDetail {
+            id: post_raw.id,
+            title: post_raw.title,
+            content: post_raw.content,
+            user_id: post_raw.user_id,
+            board_id: post_raw.board_id,
+            category_id: post_raw.category_id,
+            parent_id: post_raw.parent_id,
+            depth: post_raw.depth,
+            reply_count: post_raw.reply_count,
+            is_notice: post_raw.is_notice,
+            views: post_raw.views,
+            likes: post_raw.likes,
+            dislikes: post_raw.dislikes,
+            status: post_raw.status.and_then(|s| s.parse::<PostStatus>().ok()),
+            created_at: post_raw.created_at,
+            updated_at: post_raw.updated_at,
+            attached_files: None, // 최근글에서는 첨부파일 상세 정보 불필요
+            thumbnail_urls,
+            user_name: post_raw.user_name,
+            user_email: post_raw.user_email,
+            board_name: post_raw.board_name,
+            board_slug: post_raw.board_slug,
+            category_name: post_raw.category_name,
+            comment_count: post_raw.comment_count,
+            is_liked: None, // 나중에 별도로 로드
+        };
+        
+        posts_with_thumbnails.push(post_detail);
+    }
+    
+    let posts = posts_with_thumbnails;
 
     Ok(Json(ApiResponse::success(posts, "최근 게시글을 성공적으로 조회했습니다.")))
 } 

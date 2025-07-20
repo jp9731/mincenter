@@ -181,7 +181,9 @@
 			is_public: board.is_public,
 			allow_anonymous: board.allow_anonymous,
 			category: board.category || '',
-			allowed_iframe_domains: board.allowed_iframe_domains || ''
+			allowed_iframe_domains: Array.isArray(board.allowed_iframe_domains) 
+				? board.allowed_iframe_domains.join(', ') 
+				: (board.allowed_iframe_domains || '')
 		};
 	}
 
@@ -209,14 +211,14 @@
 			
 			
 			// allowed_iframe_domains를 문자열에서 배열로 변환
-			const allowed_iframe_domains_arr = allowed_iframe_domains
+			const allowed_iframe_domains_arr = allowed_iframe_domains && typeof allowed_iframe_domains === 'string'
 				? allowed_iframe_domains.split(',').map((domain: string) => domain.trim()).filter((domain: string) => domain.length > 0)
 				: [];
 			
 			
 			const dataToSend = {
 				...restFormData,
-				allowed_iframe_domains: allowed_iframe_domains_arr.length > 0 ? allowed_iframe_domains_arr : undefined,
+				allowed_iframe_domains: allowed_iframe_domains_arr, // 빈 배열도 전송하여 기존 내용 삭제
 				// allowed_file_types: 빈 배열이면 undefined, 아니면 1차원 배열로 평탄화
 				...(allowed_file_types && allowed_file_types.length > 0 ? { allowed_file_types: allowed_file_types.flat() } : {})
 			};
@@ -309,14 +311,14 @@
 </script>
 
 <svelte:head>
-	<title>{$page.params.id === 'create' ? '게시판 생성' : '게시판 수정'} - 관리자</title>
+	<title>{$page.params.id === 'create' ? '게시판 생성' : `게시판 수정 - ${board?.name || '로딩 중...'}`} - 관리자</title>
 </svelte:head>
 
 <div class="container mx-auto py-6 space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-3xl font-bold">
-				{$page.params.id === 'create' ? '게시판 생성' : '게시판 수정'}
+				{$page.params.id === 'create' ? '게시판 생성' : `게시판 수정 - ${board?.name || '로딩 중...'}`}
 			</h1>
 			<p class="text-muted-foreground">
 				게시판의 상세 설정을 관리합니다.
@@ -435,7 +437,7 @@
 							<div class="grid grid-cols-2 gap-4">
 								<div class="space-y-2">
 									<Label for="write_permission">글쓰기 권한</Label>
-									<Select bind:value={formData.write_permission}>
+									<Select type="single" bind:value={formData.write_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.write_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -448,7 +450,7 @@
 								</div>
 								<div class="space-y-2">
 									<Label for="list_permission">목록보기 권한</Label>
-									<Select bind:value={formData.list_permission}>
+									<Select type="single" bind:value={formData.list_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.list_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -463,7 +465,7 @@
 							<div class="grid grid-cols-2 gap-4">
 								<div class="space-y-2">
 									<Label for="read_permission">글읽기 권한</Label>
-									<Select bind:value={formData.read_permission}>
+									<Select type="single" bind:value={formData.read_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.read_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -476,7 +478,7 @@
 								</div>
 								<div class="space-y-2">
 									<Label for="reply_permission">글답변 권한</Label>
-									<Select bind:value={formData.reply_permission}>
+									<Select type="single" bind:value={formData.reply_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.reply_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -491,7 +493,7 @@
 							<div class="grid grid-cols-2 gap-4">
 								<div class="space-y-2">
 									<Label for="comment_permission">댓글쓰기 권한</Label>
-									<Select bind:value={formData.comment_permission}>
+									<Select type="single" bind:value={formData.comment_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.comment_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -504,7 +506,7 @@
 								</div>
 								<div class="space-y-2">
 									<Label for="download_permission">다운로드 권한</Label>
-									<Select bind:value={formData.download_permission}>
+									<Select type="single" bind:value={formData.download_permission}>
 										<SelectTrigger>
 											{permissionOptions.find(p => p.value === formData.download_permission)?.label || '권한 선택'}
 										</SelectTrigger>
@@ -613,7 +615,7 @@
 							</div>
 							<div class="space-y-2">
 								<Label for="editor_type">에디터 타입</Label>
-								<Select bind:value={formData.editor_type}>
+								<Select type="single" bind:value={formData.editor_type}>
 									<SelectTrigger>
 										{editorOptions.find(e => e.value === formData.editor_type)?.label || '에디터 선택'}
 									</SelectTrigger>
@@ -682,7 +684,7 @@
 										<div>
 											<Label class="text-sm font-medium">기본 파일 타입 선택</Label>
 											<div class="flex gap-2 mt-2">
-												<Select bind:value={newFileType}>
+												<Select type="single" bind:value={newFileType}>
 													<SelectTrigger class="w-80">
 														{newFileType ? defaultFileTypes.find(t => t.value === newFileType)?.label || newFileType : '파일 타입 선택'}
 													</SelectTrigger>

@@ -5,10 +5,10 @@
 	import { getRecentPosts } from '$lib/api/community';
 	import type { PostDetail } from '$lib/types/community';
 
-	// Props - 임시로 모든 게시판에서 조회하도록 수정
-	const { slugs = '', limit = 3 } = $props<{
-		slugs?: string;
-		limit?: number;
+	// Props - 슬러그와 글 수를 설정할 수 있도록 개선
+	const { slugs = 'notice,volunteer-review,community', limit = 3 } = $props<{
+		slugs?: string; // 쉼표로 구분된 게시판 슬러그 목록 (예: "notice,community,event")
+		limit?: number; // 가져올 게시글 수
 	}>();
 
 	// 상태
@@ -18,23 +18,20 @@
 
 	// 첫 번째 이미지 URL 추출 함수
 	function getFirstImageUrl(post: PostDetail): string | null {
+		console.log('Getting first image for post:', post.title);
+		console.log('Thumbnail URLs:', post.thumbnail_urls);
+		
 		// 썸네일 URL이 있으면 우선 사용
 		if (post.thumbnail_urls) {
 			if (post.thumbnail_urls.card) {
+				console.log('Using card thumbnail:', post.thumbnail_urls.card);
 				return post.thumbnail_urls.card;
 			} else if (post.thumbnail_urls.thumb) {
+				console.log('Using thumb thumbnail:', post.thumbnail_urls.thumb);
 				return post.thumbnail_urls.thumb;
 			} else if (post.thumbnail_urls.large) {
+				console.log('Using large thumbnail:', post.thumbnail_urls.large);
 				return post.thumbnail_urls.large;
-			}
-		}
-
-		// 썸네일이 없으면 첨부파일에서 이미지 찾기
-		if (post.attached_files && post.attached_files.length > 0) {
-			for (const fileUrl of post.attached_files) {
-				if (isImageFile(fileUrl)) {
-					return fileUrl;
-				}
 			}
 		}
 		
@@ -42,10 +39,12 @@
 		if (post.content) {
 			const imgMatch = post.content.match(/<img[^>]+src="([^"]+)"/);
 			if (imgMatch && imgMatch[1]) {
+				console.log('Using content image:', imgMatch[1]);
 				return imgMatch[1];
 			}
 		}
 		
+		console.log('No image found for post:', post.title);
 		return null;
 	}
 
@@ -60,7 +59,7 @@
 		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
 			return fileUrl;
 		}
-		const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18080';
+		const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
 	}
 
@@ -134,7 +133,7 @@
 			<div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
 				{#each posts as post}
 					{@const imageUrl = getFirstImageUrl(post)}
-					<Card class="overflow-hidden transition-shadow hover:shadow-lg">
+					<Card class="overflow-hidden transition-shadow hover:shadow-lg !py-0">
 						{#if imageUrl}
 							<div class="aspect-w-16 aspect-h-9">
 								<img 
@@ -149,7 +148,7 @@
 								<img src="/images/min_logo.png" alt="기본 이미지" class=" object-contain opacity-40" />
 							</div>
 						{/if}
-						<div class="p-6">
+						<div class="px-6 pb-6">
 							<div class="mb-2 flex items-center gap-2">
 								<span class="text-primary-600 text-sm font-medium">
 									{post.category_name || post.board_name}

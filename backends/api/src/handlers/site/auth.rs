@@ -301,8 +301,10 @@ pub async fn logout(
 
 pub async fn me(
   State(state): State<AppState>,
-  Extension(claims): Extension<crate::utils::auth::Claims>,
+  Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<AxumJson<ApiResponse<User>>, StatusCode> {
+  // 인증 확인
+  let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
   let user = sqlx::query_as::<_, User>(
     "SELECT * FROM users WHERE id = $1"
   )

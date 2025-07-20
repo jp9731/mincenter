@@ -48,6 +48,7 @@ pub struct Post {
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
     pub user_id: Uuid,
+    pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
     pub title: String,
     pub content: String,
     pub views: Option<i32>,
@@ -56,6 +57,8 @@ pub struct Post {
     pub status: Option<PostStatus>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub depth: Option<i32>, // 답글 깊이
+    pub reply_count: Option<i32>, // 답글 수
 }
 
 // 첨부 파일 정보
@@ -66,8 +69,8 @@ pub struct AttachedFile {
     pub file_path: String,
     pub file_size: i64,
     pub mime_type: String,
-    pub file_purpose: FilePurpose,
-    pub display_order: i32,
+    pub file_purpose: Option<FilePurpose>,
+    pub display_order: Option<i32>,
 }
 
 // 게시글 상세 정보 (사용자 정보 포함)
@@ -77,6 +80,7 @@ pub struct PostDetail {
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
     pub user_id: Uuid,
+    pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
     pub title: String,
     pub content: String,
     pub views: Option<i32>,
@@ -86,6 +90,8 @@ pub struct PostDetail {
     pub status: Option<PostStatus>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub depth: Option<i32>, // 답글 깊이
+    pub reply_count: Option<i32>, // 답글 수
     pub user_name: Option<String>,
     pub user_email: Option<String>,
     pub board_name: Option<String>,
@@ -112,6 +118,8 @@ pub struct Comment {
     pub status: Option<PostStatus>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub depth: Option<i32>, // 대댓글 깊이
+    pub is_deleted: Option<bool>, // 댓글 삭제 여부
 }
 
 // 댓글 상세 정보 (사용자 정보 포함)
@@ -126,6 +134,8 @@ pub struct CommentDetail {
     pub status: Option<PostStatus>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub depth: Option<i32>, // 대댓글 깊이
+    pub is_deleted: Option<bool>, // 댓글 삭제 여부
     pub user_name: String,
     #[sqlx(skip)]
     pub is_liked: Option<bool>,
@@ -142,6 +152,15 @@ pub struct CreatePostRequest {
     pub attached_files: Option<Vec<String>>,
 }
 
+// 답글 생성 요청
+#[derive(Debug, Deserialize)]
+pub struct CreateReplyRequest {
+    pub parent_id: Uuid, // 부모 게시글 ID
+    pub title: String,
+    pub content: String,
+    pub attached_files: Option<Vec<String>>,
+}
+
 // 게시글 수정 요청
 #[derive(Debug, Deserialize)]
 pub struct UpdatePostRequest {
@@ -150,6 +169,7 @@ pub struct UpdatePostRequest {
     pub title: Option<String>,
     pub content: Option<String>,
     pub is_notice: Option<bool>,
+    pub attached_files: Option<Vec<String>>,
 }
 
 // 댓글 생성 요청
@@ -237,6 +257,10 @@ pub struct PostSummaryDb {
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub is_notice: Option<bool>,
+    pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
+    pub depth: Option<i32>, // 답글 깊이
+    pub reply_count: Option<i32>, // 답글 수
+    pub thumbnail_urls: Option<serde_json::Value>, // 썸네일 URL들
 }
 
 // 게시글 간단 요약 (API 응답용)
@@ -259,6 +283,9 @@ pub struct PostSummary {
     pub attached_files: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail_urls: Option<ThumbnailUrls>,
+    pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
+    pub depth: Option<i32>, // 답글 깊이
+    pub reply_count: Option<i32>, // 답글 수
 }
 
 // 썸네일 URL들

@@ -25,10 +25,10 @@
 			</p>
 
 			<div class="flex flex-col gap-4 sm:flex-row">
-				<Button size="lg" href="/participate/volunteer" variant="secondary">봉사하기</Button>
+				<!-- <Button size="lg" href="/participate/volunteer" variant="secondary">봉사하기</Button> -->
 				<Button
 					size="lg"
-					href="/participate/donate"
+					href="/donation"
 					variant="outline"
 					class="bg-white/10 hover:bg-white/20"
 				>

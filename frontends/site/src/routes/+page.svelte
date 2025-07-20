@@ -8,7 +8,7 @@
 
 <HeroSection />
 <ServicesOverview />
-<RecentPosts />
+<RecentPosts slugs="notice,news,free" limit={3} />
 
 
 <DonationGuide />

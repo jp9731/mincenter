@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import {
-		Upload,
-		X,
-		File,
-		Image as ImageIcon,
-		FileText,
-		Music,
-		Video,
-		Archive,
-		Zap
-	} from 'lucide-svelte';
+	// lucide-svelte 대신 기본 HTML 아이콘 사용
+	const Upload = '📤';
+	const X = '❌';
+	const File = '📄';
+	const ImageIcon = '🖼️';
+	const FileText = '📝';
+	const Music = '🎵';
+	const Video = '🎬';
+	const Archive = '📦';
+	const Zap = '⚡';
 
 	export let files: File[] = [];
 	export let maxFiles = 5;
@@ -21,7 +18,7 @@
 	export let onUpload: ((file: File) => Promise<string>) | null = null;
 	export let onUploadComplete: ((event: CustomEvent) => void) | null = null;
 	export let disabled = false;
-	export let enableImageCompression = true; // 이미지 압축 활성화 여부
+	export let enableImageCompression = false; // 이미지 압축 일시 비활성화 (File 생성자 문제 해결 전까지)
 
 	const dispatch = createEventDispatcher();
 
@@ -32,10 +29,11 @@
 	let compressedFiles: Record<string, CompressedImageInfo> = {};
 
 	interface CompressedImageInfo {
-		file: File;
+		file: Blob;
 		originalSize: number;
 		compressedSize: number;
 		compressionRatio: number;
+		fileName: string;
 	}
 
 	// allowedTypes가 null이거나 undefined일 때 기본값 사용
@@ -90,20 +88,27 @@
 						const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
 						const newFileName = `${nameWithoutExt}_compressed.${options.format}`;
 
-						const compressedFile = new File([blob], newFileName, {
-							type: `image/${options.format}`,
-							lastModified: Date.now()
+						// File 생성자 대신 안전한 방법으로 파일 객체 생성
+						let compressedFile: File;
+						
+						// Blob을 사용하여 압축된 파일 객체 생성
+						const compressedBlob = new Blob([blob], {
+							type: `image/${options.format}`
 						});
+						
+						// Blob을 그대로 사용 (File 객체 대신)
+						compressedFile = compressedBlob as File;
 
 						const originalSize = file.size;
 						const compressedSize = compressedFile.size;
 						const compressionRatio = ((originalSize - compressedSize) / originalSize) * 100;
 
 						resolve({
-							file: compressedFile,
+							file: compressedBlob,
 							originalSize,
 							compressedSize,
-							compressionRatio
+							compressionRatio,
+							fileName: newFileName
 						});
 					},
 					`image/${options.format}`,
@@ -273,8 +278,8 @@
 		uploadProgress = { ...uploadProgress };
 
 		try {
-			// 압축된 파일이 있으면 사용, 없으면 원본 사용
-			const fileToUpload = compressedFiles[file.name]?.file || file;
+					// 원본 파일 사용 (압축 기능 일시 비활성화)
+		const fileToUpload = file;
 			const url = await onUpload(fileToUpload);
 			uploadedFiles[file.name] = url;
 			uploadProgress[file.name] = 100;
@@ -307,9 +312,7 @@
 	// 파일 미리보기 URL 생성
 	function getFilePreview(file: File): string | null {
 		if (file.type.startsWith('image/')) {
-			// 압축된 파일이 있으면 압축된 파일로 미리보기
-			const previewFile = compressedFiles[file.name]?.file || file;
-			return URL.createObjectURL(previewFile);
+			return URL.createObjectURL(file);
 		}
 		return null;
 	}
@@ -336,7 +339,7 @@
 		ondrop={handleDrop}
 		onclick={handleFileSelect}
 	>
-		<Upload class="mx-auto mb-4 h-12 w-12 text-gray-400" />
+		<div class="mx-auto mb-4 h-12 w-12 text-gray-400 text-4xl flex items-center justify-center">{Upload}</div>
 		<div class="mb-2 text-lg font-medium text-gray-900">
 			파일을 드래그하여 업로드하거나 클릭하여 선택하세요
 		</div>
@@ -363,7 +366,13 @@
 					선택된 파일 ({files.length}/{maxFiles})
 				</h3>
 				{#if onUpload}
-					<Button size="sm" onclick={uploadAllFiles} {disabled}>모두 업로드</Button>
+					<button 
+						class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+						onclick={uploadAllFiles} 
+						{disabled}
+					>
+						모두 업로드
+					</button>
 				{/if}
 			</div>
 
@@ -371,7 +380,7 @@
 				{#each files as file, index}
 					<div class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
 						<div class="flex items-center space-x-3">
-							<svelte:component this={getFileIcon(file)} class="h-8 w-8 text-gray-500" />
+							<div class="h-8 w-8 text-gray-500 text-2xl flex items-center justify-center">{getFileIcon(file)}</div>
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-medium text-gray-900">{file.name}</p>
 								<p class="text-sm text-gray-500">
@@ -383,7 +392,7 @@
 								</p>
 								{#if compressionProgress[file.name] !== undefined && compressionProgress[file.name] < 100}
 									<div class="mt-1 flex items-center space-x-2">
-										<Zap class="h-3 w-3 text-blue-500" />
+										<div class="h-3 w-3 text-blue-500 text-sm">{Zap}</div>
 										<div class="h-2 flex-1 rounded-full bg-gray-200">
 											<div
 												class="h-2 rounded-full bg-blue-600 transition-all duration-300"
@@ -406,20 +415,23 @@
 
 						<div class="flex items-center space-x-2">
 							{#if uploadedFiles[file.name]}
-								<Badge variant="default">업로드 완료</Badge>
+								<span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">업로드 완료</span>
 							{:else if onUpload}
-								<Button
-									size="sm"
-									variant="outline"
+								<button
+									class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 									onclick={() => uploadFile(file)}
 									disabled={disabled || uploadProgress[file.name] !== undefined}
 								>
 									업로드
-								</Button>
+								</button>
 							{/if}
-							<Button size="sm" variant="ghost" onclick={() => removeFile(index)} {disabled}>
-								<X class="h-4 w-4" />
-							</Button>
+							<button 
+								class="px-2 py-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+								onclick={() => removeFile(index)} 
+								{disabled}
+							>
+								<div class="h-4 w-4 text-sm">{X}</div>
+							</button>
 						</div>
 					</div>
 

@@ -792,4 +792,36 @@ export async function checkPermission(userId: string, resource: string, action: 
   const json: ApiResponse<boolean> = await res.json();
   if (!json.success) throw new Error(json.message);
   return json.data || false;
+}
+
+// 이미지 업로드
+export interface UploadResponse {
+  filename: string;
+  url: string;
+  size: number;
+  mime_type: string;
+  file_info: {
+    id: string;
+    original_name: string;
+    file_path: string;
+    file_size: number;
+    mime_type: string;
+    file_type: string;
+  };
+  thumbnail_url?: string;
+}
+
+export async function uploadImage(file: File): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await authenticatedAdminFetch('/api/upload/posts', {
+    method: 'POST',
+    body: formData,
+    headers: {} // FormData에는 Content-Type을 설정하지 않음
+  });
+
+  const json: ApiResponse<UploadResponse> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
 } 

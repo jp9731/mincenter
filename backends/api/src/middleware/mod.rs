@@ -59,15 +59,27 @@ pub async fn auth_middleware(
         .and_then(|header| header.to_str().ok())
         .and_then(|header| header.strip_prefix("Bearer "));
 
-    let token = auth_header.ok_or(StatusCode::UNAUTHORIZED)?;
+    eprintln!("🔐 인증 미들웨어 - Authorization 헤더: {:?}", auth_header);
+    
+    let token = auth_header.ok_or_else(|| {
+        eprintln!("❌ 토큰 없음");
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    eprintln!("🔐 토큰 추출 성공, 길이: {}", token.len());
 
     // 토큰 검증
     let claims = verify_token(token, &state.config)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .map_err(|e| {
+            eprintln!("❌ 토큰 검증 실패: {:?}", e);
+            StatusCode::UNAUTHORIZED
+        })?;
+
+    eprintln!("✅ 토큰 검증 성공, 사용자 ID: {}", claims.sub);
 
     // 요청에 사용자 정보 추가
     let mut request = request;
-    request.extensions_mut().insert(claims);
+    request.extensions_mut().insert(Some(claims));
 
     Ok(next.run(request).await)
 }

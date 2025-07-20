@@ -28,6 +28,42 @@
 	let statusFilter = '';
 	let currentPage = 1;
 
+	// API URL 가져오기
+	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+	// 완전한 파일 URL 생성 (site와 동일한 방식)
+	function getFullFileUrl(fileUrl: string): string {
+		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+			return fileUrl;
+		}
+		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+	}
+
+	// 첫 번째 이미지 URL 추출 함수
+	function getFirstImageUrl(post: Post): string | null {
+		// 썸네일 URL이 있으면 우선 사용
+		if (post.thumbnail_urls) {
+			if (post.thumbnail_urls.card) {
+				return getFullFileUrl(post.thumbnail_urls.card);
+			} else if (post.thumbnail_urls.thumb) {
+				return getFullFileUrl(post.thumbnail_urls.thumb);
+			} else if (post.thumbnail_urls.large) {
+				return getFullFileUrl(post.thumbnail_urls.large);
+			}
+		}
+		
+		// 썸네일이 없으면 첨부파일에서 이미지 찾기
+		if (post.attached_files && post.attached_files.length > 0) {
+			for (const file of post.attached_files) {
+				if (file.mime_type && file.mime_type.startsWith('image/')) {
+					return getFullFileUrl(file.file_path);
+				}
+			}
+		}
+		
+		return null;
+	}
+
 	onMount(() => {
 		loadPosts({ page: 1, limit: 20 });
 	});
@@ -155,6 +191,7 @@
 			<Table>
 				<TableHeader>
 					<TableRow>
+						<TableHead>썸네일</TableHead>
 						<TableHead>제목</TableHead>
 						<TableHead>작성자</TableHead>
 						<TableHead>게시판</TableHead>
@@ -168,6 +205,23 @@
 				<TableBody>
 					{#each $posts as post}
 						<TableRow>
+							<TableCell>
+								<div class="w-16 h-12 flex items-center justify-center">
+									{#if getFirstImageUrl(post)}
+										<img 
+											src={getFirstImageUrl(post)} 
+											alt="썸네일" 
+											class="w-full h-full object-cover rounded"
+										/>
+									{:else}
+										<img 
+											src="/images/min_logo.png" 
+											alt="기본 이미지" 
+											class="w-full h-full object-contain opacity-40"
+										/>
+									{/if}
+								</div>
+							</TableCell>
 							<TableCell>
 								<div class="max-w-xs">
 									<p class="truncate font-medium text-gray-900">

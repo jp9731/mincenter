@@ -102,11 +102,11 @@
 	);
 	
 	let canWriteInCurrentBoard = $derived(
-		currentBoard ? canWritePost(currentBoard) : canCreatePost()
+		currentBoard && !$isLoading ? canWritePost(currentBoard, $user) : false
 	);
 	
 	let canListCurrentBoard = $derived(
-		currentBoard ? canListBoard(currentBoard) : true
+		currentBoard ? canListBoard(currentBoard, $user) : true
 	);
 	
 	let showSearch = $derived(
@@ -475,6 +475,18 @@
 		<div>
 			<h1 class="text-3xl font-bold">{boardName}</h1>
 			<p class="mt-2 text-gray-600">게시글 {$posts.length}개</p>
+			
+			<!-- 디버그 정보 -->
+			{#if import.meta.env.DEV}
+				<div class="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+					<strong>디버그:</strong>
+					사용자: {$user?.email || '비로그인'} (역할: {$user?.role || 'none'}) |
+					게시판: {currentBoard?.name || '없음'} |
+					글쓰기 권한: {currentBoard?.write_permission || '없음'} |
+					글쓰기 가능: {canWriteInCurrentBoard ? 'Yes' : 'No'} |
+					로딩: {$isLoading ? 'Yes' : 'No'}
+				</div>
+			{/if}
 		</div>
 		<div class="flex items-center gap-4">
 			<!-- 뷰 모드 토글 -->
@@ -566,7 +578,14 @@
 		<div>
 			{#each $posts as post, index}
 				{@const thumbnailUrl = getFirstImageUrl(post, viewMode === 'list' ? 'list' : 'card')}
-				<div class="flex justify-between items-center gap-4 p-4 sm:px-8 px-4 hover:bg-gray-50 transition-colors {index < $posts.length - 1 ? 'border-b border-gray-200' : ''}">
+				{@const indentLevel = (post.depth || 0) * 24} <!-- 답글 들여쓰기 계산 -->
+				<div class="flex justify-between items-center gap-4 p-4 sm:px-8 px-4 hover:bg-gray-50 transition-colors {index < $posts.length - 1 ? 'border-b border-gray-200' : ''}" style="margin-left: {indentLevel}px;">
+					<!-- 답글 표시 아이콘 -->
+					{#if post.depth && post.depth > 0}
+						<div class="flex-shrink-0 text-gray-400">
+							{'└'.repeat(post.depth)} ↳
+						</div>
+					{/if}
 					<!-- 왼쪽: 섬네일 + 제목/배지/카테고리 -->
 					<div class="flex items-center gap-3 min-w-0 flex-1">
 						<!-- 섬네일 이미지 -->
@@ -586,7 +605,9 @@
 							{#if post.is_notice}
 								<Badge variant="secondary" class={`${fontSizeBadgeClass} ${leadingBadgeClass}`}>공지</Badge>
 							{/if}
-							<a href="/community/{data.slug}/{post.id}" class={`text-gray-900 hover:text-blue-600 transition-colors font-medium truncate ${fontSizeClass} ${leadingClass}`}>{post.category_name ? `[${post.category_name}] ` : ''}{post.title}</a>
+							<a href="/community/{data.slug}/{post.id}" class={`text-gray-900 hover:text-blue-600 transition-colors font-medium truncate ${fontSizeClass} ${leadingClass}`}>
+								{post.category_name ? `[${post.category_name}] ` : ''}{post.title}
+							</a>
 							{#if isNewPost(post)}
 								<Badge variant="outline" class={`${fontSizeBadgeClass} ${leadingBadgeClass} text-blue-600 border-blue-600`}>신규</Badge>
 							{/if}
@@ -621,8 +642,10 @@
 			{#each $posts as post, idx (post.id)}
 				{@const thumbnailUrl = getFirstImageUrl(post, viewMode === 'list' ? 'list' : 'card')}
 				{@const isNewCard = idx >= newPostsStartIndex}
+				{@const indentLevel = (post.depth || 0) * 16} <!-- 카드뷰에서는 작은 들여쓰기 -->
 				<Card
 					class="masonry-item hover:shadow-lg transition-all duration-200 hover:-translate-y-1 overflow-hidden mt-4 {thumbnailUrl ? 'pt-0' : ''} {isNewCard ? 'fade-in' : ''}"
+					style="margin-left: {indentLevel}px;"
 				>
 					<!-- 카드 헤더 이미지 -->
 					{#if thumbnailUrl}
@@ -641,6 +664,9 @@
 							<div class="flex-1 min-w-0">
 								<CardTitle class={`leading-tight break-words whitespace-pre-line pr-10 sm:pr-24 ${fontSizeClass} ${leadingClass}`}> <!-- 우측 패딩 추가 -->
 									<a href="/community/{data.slug}/{post.id}" class="hover:text-blue-600 transition-colors">
+										{#if post.depth && post.depth > 0}
+											<span class="text-gray-400 mr-1">{'└'.repeat(post.depth)} ↳</span>
+										{/if}
 										{post.category_name ? `[${post.category_name}] ` : ''}{post.title}
 									</a>
 								</CardTitle>

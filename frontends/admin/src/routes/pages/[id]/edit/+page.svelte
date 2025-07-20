@@ -15,6 +15,13 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import {
+		Dialog,
+		DialogContent,
+		DialogHeader,
+		DialogTitle,
+		DialogTrigger
+	} from '$lib/components/ui/dialog';
+	import {
 		Save,
 		Eye,
 		Globe,
@@ -22,14 +29,25 @@
 		ArrowLeft,
 		ExternalLink,
 		Calendar,
-		User
+		User,
+		Monitor,
+		Tablet,
+		Smartphone,
+		X
 	} from 'lucide-svelte';
 	import { getPage, updatePage } from '$lib/api/admin';
 	import { goto } from '$app/navigation';
+	import BlockEditor from '$lib/components/BlockEditor.svelte';
+	import TemplateSelector from '$lib/components/TemplateSelector.svelte';
+	import type { BlocksData } from '$lib/types/blocks';
+	import type { PageTemplate } from '$lib/types/templates';
+
+	type ViewportMode = 'desktop' | 'tablet' | 'mobile';
 
 	let loading = true;
 	let saving = false;
-	let showPreview = false;
+	let previewModalOpen = false;
+	let viewportMode: ViewportMode = 'desktop';
 	let pageData: any = null;
 
 	// 페이지 데이터 초기화
@@ -64,6 +82,9 @@
 				is_published: pageData.is_published || false,
 				sort_order: pageData.sort_order || 0
 			};
+			
+			// 블록 에디터에 기존 내용 전달을 위한 지연 처리
+			await new Promise(resolve => setTimeout(resolve, 100));
 		} catch (error) {
 			console.error('페이지 로드 실패:', error);
 			alert('페이지를 불러오는데 실패했습니다.');
@@ -84,7 +105,22 @@
 			return;
 		}
 
-		if (!formData.content.trim()) {
+		// Check if content is valid (either plain text or valid blocks)
+		const hasContent = formData.content.trim() && (
+			// Check for plain text
+			formData.content.trim().length > 0 ||
+			// Check for block content
+			(() => {
+				try {
+					const blocksData: BlocksData = JSON.parse(formData.content);
+					return blocksData.blocks && blocksData.blocks.length > 0;
+				} catch {
+					return formData.content.trim().length > 0;
+				}
+			})()
+		);
+
+		if (!hasContent) {
 			alert('내용을 입력해주세요.');
 			return;
 		}
@@ -109,7 +145,33 @@
 	}
 
 	function handlePreview() {
-		showPreview = !showPreview;
+		previewModalOpen = true;
+	}
+
+	function getViewportClass(mode: ViewportMode): string {
+		switch (mode) {
+			case 'desktop':
+				return 'w-full';
+			case 'tablet':
+				return 'max-w-3xl mx-auto';
+			case 'mobile':
+				return 'max-w-sm mx-auto';
+			default:
+				return 'w-full';
+		}
+	}
+
+	function getViewportWidth(mode: ViewportMode): string {
+		switch (mode) {
+			case 'desktop':
+				return '100%';
+			case 'tablet':
+				return '768px';
+			case 'mobile':
+				return '375px';
+			default:
+				return '100%';
+		}
 	}
 
 	function formatDate(dateString: string) {
@@ -120,6 +182,100 @@
 			hour: '2-digit',
 			minute: '2-digit'
 		});
+	}
+
+	function renderBlocksPreview(content: string): string {
+		if (!content) return '';
+		
+		try {
+			const blocksData: BlocksData = JSON.parse(content);
+			if (!blocksData.blocks) return content; // Fallback to raw content if not blocks format
+			
+			return blocksData.blocks.map(block => {
+				switch (block.type) {
+					case 'paragraph':
+						return `<p>${block.content}</p>`;
+					case 'heading':
+						return `<h${block.level}>${block.content}</h${block.level}>`;
+					case 'image':
+						return `<img src="${block.src}" alt="${block.alt}" ${block.caption ? `title="${block.caption}"` : ''} />`;
+					case 'list':
+						const tag = block.style === 'ordered' ? 'ol' : 'ul';
+						const items = block.items.map(item => `<li>${item}</li>`).join('');
+						return `<${tag}>${items}</${tag}>`;
+					case 'quote':
+						return `<blockquote>${block.content}${block.author ? `<cite>— ${block.author}</cite>` : ''}</blockquote>`;
+					case 'code':
+						return `<pre><code${block.language ? ` class="language-${block.language}"` : ''}>${block.content}</code></pre>`;
+					case 'map':
+						return `<div class="bg-gray-100 p-4 rounded-lg text-center">
+							<div class="text-gray-600 mb-2">📍 카카오 지도</div>
+							${block.title ? `<div class="font-medium">${block.title}</div>` : ''}
+							${block.address ? `<div class="text-sm text-gray-500">${block.address}</div>` : ''}
+							<div class="text-xs text-gray-400 mt-1">${block.width || 400}px × ${block.height || 300}px</div>
+						</div>`;
+					case 'grid':
+						const gridColumns = block.columns.map(col => {
+							const columnBlocks = col.blocks.map(columnBlock => {
+								// 재귀적으로 컬럼 내 블록들 렌더링
+								switch (columnBlock.type) {
+									case 'paragraph':
+										return `<p>${columnBlock.content}</p>`;
+									case 'heading':
+										return `<h${columnBlock.level}>${columnBlock.content}</h${columnBlock.level}>`;
+									case 'image':
+										return `<img src="${columnBlock.src}" alt="${columnBlock.alt}" style="max-width: 100%;" />`;
+									default:
+										return `<div class="text-gray-500">[${columnBlock.type} 블록]</div>`;
+								}
+							}).join('');
+							return `<div class="border border-gray-200 p-2 rounded">${columnBlocks || '<div class="text-gray-400 text-sm">빈 컬럼</div>'}</div>`;
+						}).join('');
+						return `<div class="bg-gray-50 p-3 rounded-lg">
+							<div class="text-sm text-gray-600 mb-2">📊 그리드 레이아웃 (${block.columns.length}컬럼)</div>
+							<div class="grid gap-2" style="grid-template-columns: ${block.columns.map(col => `${col.width}fr`).join(' ')}">${gridColumns}</div>
+						</div>`;
+					case 'post-list':
+						return `<div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+							<div class="text-blue-800 font-medium mb-2">📄 ${block.title || '포스트 목록'}</div>
+							<div class="text-sm text-blue-600 space-y-1">
+								<div>게시판: ${block.boardType || 'community'}</div>
+								${block.category ? `<div>카테고리: ${block.category}</div>` : ''}
+								<div>정렬: ${block.sortBy === 'recent' ? '최신순' : block.sortBy === 'popular' ? '인기순' : '좋아요순'} • ${block.limit}개</div>
+								<div>레이아웃: ${block.layout === 'list' ? '목록형' : block.layout === 'card' ? '카드형' : '심플형'}</div>
+							</div>
+						</div>`;
+					case 'divider':
+						return '<hr />';
+					case 'html':
+						return block.content;
+					default:
+						return '';
+				}
+			}).join('');
+		} catch (e) {
+			// If parsing fails, return as is (backward compatibility)
+			return content;
+		}
+	}
+
+	function handleTemplateSelect(template: PageTemplate) {
+		if (template.blocks.length === 0) {
+			// 빈 페이지 템플릿
+			formData.content = '';
+		} else {
+			// 템플릿 블록을 JSON으로 변환
+			const blocksData: BlocksData = {
+				blocks: template.blocks,
+				version: '1.0'
+			};
+			formData.content = JSON.stringify(blocksData);
+		}
+		
+		// 제목이 비어있으면 템플릿 이름으로 설정
+		if (!formData.title.trim()) {
+			formData.title = template.name;
+		}
 	}
 </script>
 
@@ -142,10 +298,79 @@
 				</div>
 			</div>
 			<div class="flex gap-2">
-				<Button variant="outline" onclick={handlePreview}>
-					<Eye class="mr-2 h-4 w-4" />
-					{showPreview ? '편집' : '미리보기'}
-				</Button>
+				<Dialog bind:open={previewModalOpen}>
+					<DialogTrigger>
+						<Button variant="outline" onclick={handlePreview}>
+							<Eye class="mr-2 h-4 w-4" />
+							미리보기
+						</Button>
+					</DialogTrigger>
+					<DialogContent class="sm:max-w-[95vw] sm:w-[95vw] sm:max-h-[90vh]  overflow-hidden">
+						<DialogHeader class="flex flex-row items-center justify-between">
+							<DialogTitle class="flex items-center gap-2">
+								<Eye class="h-5 w-5" />
+								미리보기
+							</DialogTitle>
+							<div class="flex gap-1 rounded-lg border p-1">
+								<Button
+									variant={viewportMode === 'desktop' ? 'default' : 'ghost'}
+									size="sm"
+									onclick={() => viewportMode = 'desktop'}
+								>
+									<Monitor class="h-4 w-4" />
+								</Button>
+								<Button
+									variant={viewportMode === 'tablet' ? 'default' : 'ghost'}
+									size="sm"
+									onclick={() => viewportMode = 'tablet'}
+								>
+									<Tablet class="h-4 w-4" />
+								</Button>
+								<Button
+									variant={viewportMode === 'mobile' ? 'default' : 'ghost'}
+									size="sm"
+									onclick={() => viewportMode = 'mobile'}
+								>
+									<Smartphone class="h-4 w-4" />
+								</Button>
+							</div>
+						</DialogHeader>
+						
+						<div class="flex items-center justify-center gap-2 text-sm text-gray-600 border-b pb-3">
+							<span>현재 뷰포트:</span>
+							<Badge variant="outline">
+								{viewportMode === 'desktop' ? '데스크톱' : viewportMode === 'tablet' ? '태블릿' : '모바일'}
+								({getViewportWidth(viewportMode)})
+							</Badge>
+						</div>
+
+						<div class="bg-gray-100 p-4 rounded-lg overflow-auto flex-1">
+							<div 
+								class={getViewportClass(viewportMode)}
+								style="max-width: {getViewportWidth(viewportMode)}; transition: all 0.3s ease; margin: 0 auto;"
+							>
+								<Card class="bg-white shadow-lg">
+									<CardContent class="p-6">
+										<div class="prose max-w-none">
+											<h1>{formData.title || '제목을 입력하세요'}</h1>
+											{#if formData.excerpt}
+												<p class="text-lg text-gray-600">{formData.excerpt}</p>
+											{/if}
+											<div class="mt-6">
+												{#if formData.content}
+													{@html renderBlocksPreview(formData.content)}
+												{:else}
+													내용을 입력하세요
+												{/if}
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
+				
 				<Button variant="outline" onclick={() => handleSave(false)} disabled={saving}>
 					<Save class="mr-2 h-4 w-4" />
 					임시저장
@@ -157,34 +382,35 @@
 			</div>
 		</div>
 
-		{#if showPreview}
-			<!-- 미리보기 모드 -->
-			<Card>
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Eye class="h-5 w-5" />
-						미리보기
-					</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div class="prose max-w-none">
-						<h1>{formData.title || '제목을 입력하세요'}</h1>
-						{#if formData.excerpt}
-							<p class="text-lg text-gray-600">{formData.excerpt}</p>
+		<!-- 편집 모드 -->
+		<div class="grid grid-cols-1 gap-6 xl:grid-cols-4">
+			<!-- 메인 편집 영역 -->
+			<div class="space-y-6 xl:col-span-3">
+					<!-- 블록 에디터 -->
+				<Card>
+					<CardHeader>
+						<CardTitle>페이지 내용</CardTitle>
+						<CardDescription>블록을 추가하여 페이지 내용을 작성하세요</CardDescription>
+					</CardHeader>
+					<CardContent>
+						{#if !loading}
+							<BlockEditor
+								value={formData.content}
+								placeholder="블록을 추가하여 페이지 내용을 작성하세요"
+								onchange={(newValue) => formData.content = newValue}
+							/>
 						{/if}
-						<div class="mt-6">
-							{formData.content || '내용을 입력하세요'}
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-		{:else}
-			<!-- 편집 모드 -->
-			<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-				<!-- 메인 편집 영역 -->
-				<div class="space-y-6 lg:col-span-2">
-					<!-- 기본 정보 -->
-					<Card>
+					</CardContent>
+				</Card>
+			</div>
+
+			<!-- 사이드바 -->
+			<div class="space-y-6">
+				<!-- 템플릿 선택기 -->
+				<TemplateSelector onTemplateSelect={handleTemplateSelect} />
+
+				<!-- 기본 정보 -->
+				<Card>
 						<CardHeader>
 							<CardTitle>기본 정보</CardTitle>
 							<CardDescription>페이지의 기본적인 정보를 수정하세요</CardDescription>
@@ -225,28 +451,11 @@
 									id="excerpt"
 									bind:value={formData.excerpt}
 									placeholder="페이지 요약을 입력하세요"
-									rows="3"
-								/>
-							</div>
-
-							<div>
-								<label for="content" class="mb-1 block text-sm font-medium text-gray-700">
-									내용 <span class="text-red-500">*</span>
-								</label>
-								<Textarea
-									id="content"
-									bind:value={formData.content}
-									placeholder="페이지 내용을 입력하세요"
-									rows="15"
-									required
+									rows={3}
 								/>
 							</div>
 						</CardContent>
 					</Card>
-				</div>
-
-				<!-- 사이드바 -->
-				<div class="space-y-6">
 					<!-- 발행 설정 -->
 					<Card>
 						<CardHeader>
@@ -359,8 +568,7 @@
 							{/if}
 						</CardContent>
 					</Card>
-				</div>
 			</div>
-		{/if}
+		</div>
 	</div>
 {/if}

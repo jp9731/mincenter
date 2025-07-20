@@ -80,6 +80,9 @@ struct PostDetailRaw {
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
     pub user_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub depth: Option<i32>,
+    pub reply_count: Option<i32>,
     pub title: String,
     pub content: String,
     pub views: Option<i32>,
@@ -677,8 +680,9 @@ pub async fn get_posts(
     // 게시글 목록 조회
     let mut sql = r#"
         SELECT 
-            p.id, p.board_id, p.category_id, p.user_id, p.title, p.content, 
-            p.views, p.likes, p.is_notice, p.status::text as status, p.created_at, p.updated_at,
+            p.id, p.board_id, p.category_id, p.user_id, p.parent_id, p.depth, p.reply_count,
+            p.title, p.content, p.views, p.likes, p.is_notice, p.status::text as status, 
+            p.created_at, p.updated_at,
             u.name as user_name,
             b.name as board_name,
             c.name as category_name,
@@ -758,30 +762,90 @@ pub async fn get_posts(
     println!("[DEBUG] Fetched posts count: {}", posts_raw.len());
 
     // PostDetailRaw를 PostDetail로 변환
-    let posts: Vec<PostDetail> = posts_raw.into_iter().map(|post_raw| PostDetail {
-        id: post_raw.id,
-        board_id: post_raw.board_id,
-        category_id: post_raw.category_id,
-        user_id: post_raw.user_id,
-        title: post_raw.title,
-        content: post_raw.content,
-        views: post_raw.views,
-        likes: post_raw.likes,
-        dislikes: None, // 기본값
-        is_notice: post_raw.is_notice,
-        status: post_raw.status.and_then(|s| PostStatus::from_str(&s).ok()),
-        created_at: post_raw.created_at,
-        updated_at: post_raw.updated_at,
-        user_name: post_raw.user_name,
-        user_email: None, // 기본값
-        board_name: post_raw.board_name,
-        board_slug: None, // admin에서는 board_slug가 필요하지 않음
-        category_name: post_raw.category_name,
-        comment_count: post_raw.comment_count,
-        attached_files: None,
-        thumbnail_urls: None, // 기본값
-        is_liked: None, // 관리자 API에서는 좋아요 상태가 필요하지 않음
-    }).collect();
+    let mut posts: Vec<PostDetail> = Vec::new();
+    for post_raw in posts_raw {
+        // 첨부파일 조회
+        let attached_files = sqlx::query_as!(
+            crate::models::site::community::AttachedFile,
+            r#"
+            SELECT f.id, f.original_name, f.file_path, f.file_size, f.mime_type, 
+                   fe.file_purpose as "file_purpose: _", 
+                   fe.display_order
+            FROM file_entities fe
+            JOIN files f ON fe.file_id = f.id
+            WHERE fe.entity_type = 'post' AND fe.entity_id = $1 AND f.status = 'published'
+            ORDER BY fe.display_order, f.created_at
+            "#,
+            post_raw.id
+        )
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+        
+        // 첨부파일의 file_path를 상대 경로로 변환
+        let attached_files_with_urls: Vec<crate::models::site::community::AttachedFile> = attached_files
+            .into_iter()
+            .map(|mut file| {
+                file.file_path = format!("/uploads/{}", file.file_path.trim_start_matches("static/uploads/"));
+                file
+            })
+            .collect();
+            
+        let attached_files_option = if attached_files_with_urls.is_empty() { None } else { Some(attached_files_with_urls) };
+
+        // 썸네일 URL 생성 (첨부 이미지가 있으면)
+        let thumbnail_urls = if let Some(ref files) = attached_files_option {
+            let image_files: Vec<_> = files
+                .iter()
+                .filter(|f| f.mime_type.starts_with("image/"))
+                .collect();
+            
+            if !image_files.is_empty() {
+                // 첫 번째 이미지 파일로 썸네일 생성
+                let first_image = &image_files[0];
+                
+                // 썸네일 URL 생성 (실제 파일 경로 사용)
+                Some(crate::models::site::community::ThumbnailUrls {
+                    thumb: Some(first_image.file_path.clone()),
+                    card: Some(first_image.file_path.clone()),
+                    large: Some(first_image.file_path.clone()),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let post = PostDetail {
+            id: post_raw.id,
+            board_id: post_raw.board_id,
+            category_id: post_raw.category_id,
+            user_id: post_raw.user_id,
+            parent_id: post_raw.parent_id,
+            title: post_raw.title,
+            content: post_raw.content,
+            views: post_raw.views,
+            likes: post_raw.likes,
+            dislikes: None,
+            is_notice: post_raw.is_notice,
+            status: post_raw.status.and_then(|s| PostStatus::from_str(&s).ok()),
+            created_at: post_raw.created_at,
+            updated_at: post_raw.updated_at,
+            depth: post_raw.depth,
+            reply_count: post_raw.reply_count,
+            user_name: post_raw.user_name,
+            user_email: None,
+            board_name: post_raw.board_name,
+            board_slug: None,
+            category_name: post_raw.category_name,
+            comment_count: post_raw.comment_count,
+            attached_files: attached_files_option,
+            thumbnail_urls,
+            is_liked: None,
+        };
+        posts.push(post);
+    }
 
     // 페이지네이션 정보 계산
     let total_pages = (total + limit - 1) / limit;
@@ -811,8 +875,9 @@ pub async fn get_post(
     let post_raw = match sqlx::query_as::<_, PostDetailRaw>(
         r#"
         SELECT 
-            p.id, p.board_id, p.category_id, p.user_id, p.title, p.content, 
-            p.views, p.likes, p.is_notice, p.status::text as status, p.created_at, p.updated_at,
+            p.id, p.board_id, p.category_id, p.user_id, p.parent_id, p.depth, p.reply_count,
+            p.title, p.content, p.views, p.likes, p.is_notice, p.status::text as status, 
+            p.created_at, p.updated_at,
             u.name as user_name, b.name as board_name, c.name as category_name,
             COALESCE(comment_count.count, 0) as comment_count
         FROM posts p
@@ -842,29 +907,85 @@ pub async fn get_post(
     };
 
     // PostDetailRaw를 PostDetail로 변환
+    // 첨부파일 조회
+    let attached_files = sqlx::query_as!(
+        crate::models::site::community::AttachedFile,
+        r#"
+        SELECT f.id, f.original_name, f.file_path, f.file_size, f.mime_type, 
+               fe.file_purpose as "file_purpose: _", 
+               fe.display_order
+        FROM file_entities fe
+        JOIN files f ON fe.file_id = f.id
+        WHERE fe.entity_type = 'post' AND fe.entity_id = $1 AND f.status = 'published'
+        ORDER BY fe.display_order, f.created_at
+        "#,
+        post_raw.id
+    )
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+    
+    // 첨부파일의 file_path를 상대 경로로 변환
+    let attached_files_with_urls: Vec<crate::models::site::community::AttachedFile> = attached_files
+        .into_iter()
+        .map(|mut file| {
+            file.file_path = format!("/uploads/{}", file.file_path.trim_start_matches("static/uploads/"));
+            file
+        })
+        .collect();
+        
+    let attached_files_option = if attached_files_with_urls.is_empty() { None } else { Some(attached_files_with_urls) };
+
+    // 썸네일 URL 생성 (첨부 이미지가 있으면)
+    let thumbnail_urls = if let Some(ref files) = attached_files_option {
+        let image_files: Vec<_> = files
+            .iter()
+            .filter(|f| f.mime_type.starts_with("image/"))
+            .collect();
+        
+        if !image_files.is_empty() {
+            // 첫 번째 이미지 파일로 썸네일 생성
+            let first_image = &image_files[0];
+            
+            // 썸네일 URL 생성 (실제 파일 경로 사용)
+            Some(crate::models::site::community::ThumbnailUrls {
+                thumb: Some(first_image.file_path.clone()),
+                card: Some(first_image.file_path.clone()),
+                large: Some(first_image.file_path.clone()),
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let post = PostDetail {
         id: post_raw.id,
         board_id: post_raw.board_id,
         category_id: post_raw.category_id,
         user_id: post_raw.user_id,
+        parent_id: post_raw.parent_id,
         title: post_raw.title,
         content: post_raw.content,
         views: post_raw.views,
         likes: post_raw.likes,
-        dislikes: None, // 기본값
+        dislikes: None,
         is_notice: post_raw.is_notice,
         status: post_raw.status.and_then(|s| PostStatus::from_str(&s).ok()),
         created_at: post_raw.created_at,
         updated_at: post_raw.updated_at,
+        depth: post_raw.depth,
+        reply_count: post_raw.reply_count,
         user_name: post_raw.user_name,
-        user_email: None, // 기본값
+        user_email: None,
         board_name: post_raw.board_name,
-        board_slug: None, // admin에서는 board_slug가 필요하지 않을 수 있음
+        board_slug: None,
         category_name: post_raw.category_name,
         comment_count: post_raw.comment_count,
-        attached_files: None,
-        thumbnail_urls: None, // 기본값
-        is_liked: None, // 관리자 API에서는 좋아요 상태가 필요하지 않음
+        attached_files: attached_files_option,
+        thumbnail_urls,
+        is_liked: None,
     };
 
     println!("[DEBUG] Found post: {:?}", post);
@@ -1123,7 +1244,7 @@ pub async fn update_post(
     updates.push("updated_at = NOW()".to_string());
     param_count += 1;
     let sql = format!(
-        "UPDATE posts SET {} WHERE id = ${} RETURNING id, board_id, category_id, user_id, title, content, views, likes, is_notice, status::text as status, created_at, updated_at,\n         (SELECT name FROM users WHERE id = user_id) as user_name,\n         (SELECT name FROM boards WHERE id = board_id) as board_name,\n         (SELECT name FROM categories WHERE id = category_id) as category_name,\n         (SELECT COUNT(*)::bigint FROM comments WHERE post_id = posts.id AND status = 'active') as comment_count",
+        "UPDATE posts SET {} WHERE id = ${} RETURNING id, board_id, category_id, user_id, parent_id, depth, reply_count, title, content, views, likes, is_notice, status::text as status, created_at, updated_at,\n         (SELECT name FROM users WHERE id = user_id) as user_name,\n         (SELECT name FROM boards WHERE id = board_id) as board_name,\n         (SELECT name FROM categories WHERE id = category_id) as category_name,\n         (SELECT COUNT(*)::bigint FROM comments WHERE post_id = posts.id AND status = 'active') as comment_count",
         updates.join(", "),
         param_count
     );
@@ -1160,6 +1281,9 @@ pub async fn update_post(
         board_id: updated_post_raw.board_id,
         category_id: updated_post_raw.category_id,
         user_id: updated_post_raw.user_id,
+        parent_id: updated_post_raw.parent_id,
+        depth: updated_post_raw.depth,
+        reply_count: updated_post_raw.reply_count,
         title: updated_post_raw.title,
         content: updated_post_raw.content,
         views: updated_post_raw.views,

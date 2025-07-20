@@ -8,6 +8,7 @@ pub struct Config {
     pub access_token_expiry: i64,  // minutes
     pub refresh_token_expiry: i64, // days
     pub api_port: u16,
+    pub api_base_url: String,
 }
 
 impl Config {
@@ -31,6 +32,8 @@ impl Config {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .expect("API_PORT must be a number"),
+            api_base_url: env::var("API_BASE_URL")
+                .unwrap_or_else(|_| "http://localhost:8080".to_string()),
         }
     }
 } 

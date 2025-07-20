@@ -261,93 +261,138 @@ pub async fn update_page(
         }
     }
 
-    // 업데이트할 필드들
-    let mut update_fields = Vec::new();
-    let mut params: Vec<String> = vec![];
+    // 개별 필드 업데이트를 통한 타입 안전성 확보
+    let mut query = sqlx::query_as::<_, Page>("SELECT * FROM pages WHERE id = $1")
+        .bind(page_id);
+    
+    let mut update_sql = "UPDATE pages SET ".to_string();
+    let mut updates = Vec::new();
     let mut param_count = 1;
 
-    if let Some(ref slug) = page_data.slug {
-        update_fields.push(format!("slug = ${}", param_count));
-        params.push(slug.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref title) = page_data.title {
-        update_fields.push(format!("title = ${}", param_count));
-        params.push(title.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref content) = page_data.content {
-        update_fields.push(format!("content = ${}", param_count));
-        params.push(content.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref excerpt) = page_data.excerpt {
-        update_fields.push(format!("excerpt = ${}", param_count));
-        params.push(excerpt.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref meta_title) = page_data.meta_title {
-        update_fields.push(format!("meta_title = ${}", param_count));
-        params.push(meta_title.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref meta_description) = page_data.meta_description {
-        update_fields.push(format!("meta_description = ${}", param_count));
-        params.push(meta_description.clone());
-        param_count += 1;
-    }
-
-    if let Some(ref status) = page_data.status {
-        update_fields.push(format!("status = ${}", param_count));
-        params.push(status.clone());
-        param_count += 1;
-    }
-
-    if let Some(is_published) = page_data.is_published {
-        update_fields.push(format!("is_published = ${}", param_count));
-        params.push(is_published.to_string());
-        param_count += 1;
-
-        // 발행 상태가 변경되는 경우 published_at 업데이트
-        if is_published {
-            update_fields.push(format!("published_at = ${}", param_count));
-            params.push(Utc::now().to_rfc3339());
+    // 동적으로 쿼리 구성
+    if page_data.slug.is_some() || page_data.title.is_some() || page_data.content.is_some() || 
+       page_data.excerpt.is_some() || page_data.meta_title.is_some() || page_data.meta_description.is_some() ||
+       page_data.status.is_some() || page_data.is_published.is_some() || page_data.sort_order.is_some() {
+        
+        if let Some(ref slug) = page_data.slug {
+            updates.push(format!("slug = ${}", param_count));
             param_count += 1;
         }
-    }
-
-    if let Some(sort_order) = page_data.sort_order {
-        update_fields.push(format!("sort_order = ${}", param_count));
-        params.push(sort_order.to_string());
+        
+        if let Some(ref title) = page_data.title {
+            updates.push(format!("title = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if let Some(ref content) = page_data.content {
+            // JSON 유효성 검사
+            if let Err(e) = serde_json::from_str::<serde_json::Value>(content) {
+                eprintln!("Invalid JSON content: {:?}", e);
+                return Err(ApiError::BadRequest("유효하지 않은 JSON 형식입니다.".to_string()));
+            }
+            
+            // 컨텐츠 크기 제한 (2MB)
+            if content.len() > 2 * 1024 * 1024 {
+                return Err(ApiError::BadRequest("컨텐츠 크기가 너무 큽니다. (최대 2MB)".to_string()));
+            }
+            
+            updates.push(format!("content = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if let Some(ref excerpt) = page_data.excerpt {
+            updates.push(format!("excerpt = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if let Some(ref meta_title) = page_data.meta_title {
+            updates.push(format!("meta_title = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if let Some(ref meta_description) = page_data.meta_description {
+            updates.push(format!("meta_description = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if let Some(ref status) = page_data.status {
+            updates.push(format!("status = ${}", param_count));
+            param_count += 1;
+        }
+        
+        if page_data.is_published.is_some() {
+            updates.push(format!("is_published = ${}", param_count));
+            param_count += 1;
+            
+            // 발행 상태가 true인 경우 published_at도 업데이트
+            if page_data.is_published == Some(true) {
+                updates.push(format!("published_at = ${}", param_count));
+                param_count += 1;
+            }
+        }
+        
+        if page_data.sort_order.is_some() {
+            updates.push(format!("sort_order = ${}", param_count));
+            param_count += 1;
+        }
+        
+        // updated_by 추가
+        updates.push(format!("updated_by = ${}", param_count));
         param_count += 1;
-    }
-
-    // updated_by 추가
-    update_fields.push(format!("updated_by = ${}", param_count));
-    params.push(claims.sub.to_string());
-
-    if update_fields.is_empty() {
+    } else {
         return Err(ApiError::BadRequest("업데이트할 내용이 없습니다.".to_string()));
     }
 
-    let update_sql = format!(
-        "UPDATE pages SET {} WHERE id = ${} RETURNING *",
-        update_fields.join(", "),
-        param_count + 1
-    );
+    update_sql.push_str(&updates.join(", "));
+    update_sql.push_str(&format!(" WHERE id = ${} RETURNING *", param_count));
 
     let mut query_builder = sqlx::query_as::<_, Page>(&update_sql);
-    for param in params {
-        query_builder = query_builder.bind(param);
+    
+    // 순서대로 바인딩
+    if let Some(ref slug) = page_data.slug {
+        query_builder = query_builder.bind(slug);
     }
+    if let Some(ref title) = page_data.title {
+        query_builder = query_builder.bind(title);
+    }
+    if let Some(ref content) = page_data.content {
+        query_builder = query_builder.bind(content);
+    }
+    if let Some(ref excerpt) = page_data.excerpt {
+        query_builder = query_builder.bind(excerpt);
+    }
+    if let Some(ref meta_title) = page_data.meta_title {
+        query_builder = query_builder.bind(meta_title);
+    }
+    if let Some(ref meta_description) = page_data.meta_description {
+        query_builder = query_builder.bind(meta_description);
+    }
+    if let Some(ref status) = page_data.status {
+        query_builder = query_builder.bind(status);
+    }
+    if let Some(is_published) = page_data.is_published {
+        query_builder = query_builder.bind(is_published);
+        if is_published {
+            query_builder = query_builder.bind(Utc::now());
+        }
+    }
+    if let Some(sort_order) = page_data.sort_order {
+        query_builder = query_builder.bind(sort_order);
+    }
+    
+    // updated_by와 page_id 바인딩
+    query_builder = query_builder.bind(claims.sub);
     query_builder = query_builder.bind(page_id);
 
-    let updated_page = query_builder.fetch_one(&db).await?;
+    let updated_page = query_builder.fetch_one(&db).await.map_err(|e| {
+        eprintln!("Database error updating page {}: {:?}", page_id, e);
+        eprintln!("Update SQL: {}", update_sql);
+        eprintln!("Param count: {}", param_count);
+        if let Some(content) = &page_data.content {
+            eprintln!("Content length: {}", content.len());
+        }
+        ApiError::Internal("페이지 업데이트 중 오류가 발생했습니다.".to_string())
+    })?;
 
     Ok((
         StatusCode::OK,

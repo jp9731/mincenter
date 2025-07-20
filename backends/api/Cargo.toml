@@ -25,3 +25,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "webp"] }
 ammonia = "3"
+urlencoding = "2.1"

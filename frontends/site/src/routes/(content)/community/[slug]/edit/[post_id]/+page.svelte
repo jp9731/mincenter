@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
+	import { Download } from 'lucide-svelte';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
 	import FileUpload from '$lib/components/upload/FileUpload.svelte';
 	import {
@@ -67,7 +68,7 @@
 		}
 	});
 	
-	// Quill 에디터 옵션
+	// Quill 에디터 옵션 (SSR 안전)
 	const quillOptions = {
 		theme: 'snow',
 		plainclipboard: true,
@@ -90,6 +91,12 @@
 						const quill = this.quill || getQuillInstance();
 						if (!quill) {
 							console.error('Quill 인스턴스를 찾을 수 없음');
+							return;
+						}
+						
+						// SSR 안전하게 document 체크
+						if (typeof document === 'undefined') {
+							console.error('document가 정의되지 않음 (SSR 환경)');
 							return;
 						}
 						
@@ -124,7 +131,9 @@
 									console.error('이미지 업로드 오류:', error);
 									alert('이미지 업로드에 실패했습니다.');
 								} finally {
-									document.body.removeChild(input);
+									if (document.body.contains(input)) {
+										document.body.removeChild(input);
+									}
 								}
 							}
 						};
@@ -151,10 +160,28 @@
 	// Svelte 5 runes 방식으로 스토어 구독
 	let currentUser = $derived(user);
 	let currentAuth = $derived(isAuthenticated);
+	
+	// 사용자 정보가 로드될 때까지 대기하는 함수
+	async function waitForUser(): Promise<any> {
+		let attempts = 0;
+		while (!currentUser && attempts < 10) {
+			await new Promise(resolve => setTimeout(resolve, 100));
+			attempts++;
+		}
+		return currentUser;
+	}
 
 	onMount(async () => {
-		// 인증 확인
-		if (!currentUser) {
+		// 사용자 정보 직접 가져오기
+		let userData = get(user);
+		if (!userData) {
+			console.log('사용자 정보가 없음, 잠시 대기...');
+			// 잠시 대기 후 다시 시도
+			await new Promise(resolve => setTimeout(resolve, 500));
+			userData = get(user);
+		}
+		
+		if (!userData) {
 			alert('로그인이 필요합니다.');
 			goto('/auth/login');
 			return;
@@ -172,14 +199,22 @@
 			}
 
 			// 권한 확인 (작성자만 수정 가능)
+			const canEdit = String(post.user_id) === String(userData.id);
 			
-			// 문자열로 변환하여 비교 (타입 불일치 문제 해결)
-			const canEdit = String(post.user_id) === String(currentUser?.id);
+			console.log('=== 두 번째 수정 페이지 권한 체크 ===');
+			console.log('게시글 작성자 ID:', post.user_id);
+			console.log('현재 사용자 ID:', userData.id);
+			console.log('사용자 정보 전체:', userData);
+			console.log('권한 체크 결과:', canEdit);
+			console.log('=====================================');
 			
 			if (!canEdit) {
+				console.log('권한 없음 - 리다이렉트 실행');
 				alert('수정 권한이 없습니다.');
 				goto(`/community/${data.slug}/${data.postId}`);
 				return;
+			} else {
+				console.log('권한 있음 - 수정 페이지 계속');
 			}
 
 			// 기존 데이터로 폼 초기화
@@ -321,6 +356,24 @@
 	function getFileName(fileUrl: string): string {
 		const parts = fileUrl.split('/');
 		return parts[parts.length - 1] || '파일';
+	}
+
+	// 파일 ID 추출 (UUID 부분)
+	function getFileId(fileUrl: string): string {
+		const parts = fileUrl.split('/');
+		const filename = parts[parts.length - 1] || '';
+		const filenameParts = filename.split('_');
+		
+		if (filenameParts.length >= 2) {
+			const uuidPart = filenameParts[0];
+			// UUID 형식인지 확인 (36자리)
+			if (uuidPart.length === 36) {
+				return uuidPart;
+			}
+		}
+		
+		// UUID를 추출할 수 없는 경우 파일명 전체 반환
+		return filename;
 	}
 
 	// 첨부파일 삭제 함수
@@ -484,9 +537,25 @@
 						{#each uploadedFiles as file, index}
 							<div class="border rounded-lg p-3 bg-gray-50">
 								{#if file.match(/\.(jpe?g|png|gif|webp)$/i)}
-									<!-- 이미지 파일 -->
-									<div class="relative">
-										<img src={getFileUrl(file)} alt="첨부 이미지" class="w-full h-32 object-cover rounded" />
+									<!-- 이미지 파일 (썸네일 사용) -->
+									<div class="relative group">
+										<img 
+											src={getFileUrl(file)} 
+											alt="첨부 이미지" 
+											class="w-full h-32 object-cover rounded cursor-pointer hover:opacity-90 transition-opacity" 
+											onclick={() => window.open(getFileUrl(file), '_blank')}
+										/>
+										<!-- 다운로드 버튼 (마우스 오버 시 표시) -->
+										<div class="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+											<a 
+												href={`/api/upload/files/${getFileId(file)}/download`}
+												download={getFileName(file)}
+												class="bg-black bg-opacity-75 text-white p-1 rounded-full hover:bg-opacity-90 transition-all"
+												title="원본 다운로드"
+											>
+												<Download class="h-3 w-3" />
+											</a>
+										</div>
 										<button
 											type="button"
 											onclick={() => removeFile(index)}

@@ -9,6 +9,7 @@
 	import {
 		createPost,
 		createPostBySlug,
+		updatePost,
 		uploadFile,
 		categories,
 		boards,
@@ -18,7 +19,8 @@
 		error
 	} from '$lib/stores/community';
 	import { uploadFile as uploadFileApi } from '$lib/api/community';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { isAuthenticated, user } from '$lib/stores/auth';
+	import { canWritePost, canListBoard } from '$lib/utils/permissions';
 	import type { Board, Category } from '$lib/types/community.ts';
 	import { get } from 'svelte/store';
 	import { Editor } from '@tadashi/svelte-editor-quill';
@@ -53,6 +55,10 @@
 	const categoriesList = $derived($categories);
 	const boardSettings = $derived(boardsList.find((b: Board) => b.slug === selectedSlug) || null);
 	const boardName = $derived(boardSettings?.name || '게시판');
+	
+	// 권한 체크
+	const canWrite = $derived(boardSettings ? canWritePost(boardSettings, $user) : false);
+	const canList = $derived(boardSettings ? canListBoard(boardSettings, $user) : false);
 	
 	// Quill 에디터 옵션
 	const quillOptions = {
@@ -149,6 +155,13 @@
 			goto('/auth/login');
 			return;
 		}
+		
+		// 권한 확인
+		if (!canWrite) {
+			alert('이 게시판에 글을 작성할 권한이 없습니다.');
+			goto(`/community/${selectedSlug}`);
+			return;
+		}
 
 		// 게시판 목록 새로 로드
 		await loadBoards();
@@ -174,6 +187,12 @@
 		if (!authenticated) {
 			alert('로그인이 필요합니다.');
 			goto('/auth/login');
+			return;
+		}
+		
+		// 권한 재확인
+		if (!canWrite) {
+			alert('이 게시판에 글을 작성할 권한이 없습니다.');
 			return;
 		}
 
@@ -284,7 +303,21 @@
 	<div class="mx-auto max-w-4xl">
 		<h1 class="mb-8 text-3xl font-bold">{boardName} {isEditMode ? '수정' : '글쓰기'}</h1>
 
-		<form onsubmit={handleSubmit} class="space-y-6">
+		{#if !canWrite}
+			<div class="rounded-md bg-red-50 p-4">
+				<div class="flex">
+					<div class="ml-3">
+						<h3 class="text-sm font-medium text-red-800">
+							권한이 없습니다
+						</h3>
+						<div class="mt-2 text-sm text-red-700">
+							<p>이 게시판에 글을 작성할 권한이 없습니다.</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else}
+			<form onsubmit={handleSubmit} class="space-y-6">
 			<div>
 				<label for="title" class="mb-1 block text-sm font-medium text-gray-700">제목</label>
 				<Input id="title" bind:value={title} required placeholder="제목을 입력하세요" />
@@ -393,6 +426,7 @@
 				</Button>
 			</div>
 		</form>
+		{/if}
 	</div>
 </div>
 

@@ -20,6 +20,17 @@
 	let loading = true;
 	let error = '';
 
+	// API URL 가져오기
+	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+	// 완전한 파일 URL 생성 (site와 동일한 방식)
+	function getFullFileUrl(fileUrl: string): string {
+		if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+			return fileUrl;
+		}
+		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+	}
+
 	onMount(async () => {
 		const postId = $page.params.id;
 		try {
@@ -127,6 +138,67 @@
 				</div>
 			</CardContent>
 		</Card>
+
+		<!-- 첨부파일 섹션 -->
+		{#if post.attached_files && post.attached_files.length > 0}
+			<Card>
+				<CardHeader>
+					<CardTitle>첨부파일 ({post.attached_files.length}개)</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<div class="space-y-4">
+						{#each post.attached_files as file}
+							<div class="border rounded-lg p-4">
+								{#if file.mime_type.startsWith('image/')}
+									<!-- 이미지 미리보기 -->
+									<div class="mb-3">
+										<img 
+											src={getFullFileUrl(file.file_path)} 
+											alt={file.original_name} 
+											class="max-w-md rounded shadow cursor-pointer hover:opacity-90 transition-opacity" 
+											onclick={() => window.open(getFullFileUrl(file.file_path), '_blank')}
+										/>
+									</div>
+								{:else if file.mime_type === 'application/pdf'}
+									<!-- PDF 미리보기 -->
+									<div class="mb-3">
+										<iframe src={getFullFileUrl(file.file_path)} class="w-full h-96 border rounded" title="첨부 PDF"></iframe>
+									</div>
+								{/if}
+								
+								<!-- 파일 정보 및 다운로드 -->
+								<div class="flex items-center justify-between">
+									<div class="flex items-center space-x-3">
+										<div class="flex h-10 w-10 items-center justify-center rounded bg-gray-100">
+											{#if file.mime_type.startsWith('image/')}
+												📷
+											{:else if file.mime_type === 'application/pdf'}
+												📄
+											{:else}
+												📎
+											{/if}
+										</div>
+										<div>
+											<div class="font-medium text-gray-900">{file.original_name}</div>
+											<div class="text-sm text-gray-500">
+												{(file.file_size / 1024).toFixed(1)} KB
+											</div>
+										</div>
+									</div>
+									<a 
+										href={getFullFileUrl(file.file_path)} 
+										download={file.original_name}
+										class="text-blue-600 hover:text-blue-800 underline"
+									>
+										다운로드
+									</a>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</CardContent>
+			</Card>
+		{/if}
 
 		<!-- 댓글 목록 -->
 		<Card>

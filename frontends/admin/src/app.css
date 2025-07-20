@@ -183,3 +183,13 @@
 .admin-alert-info {
   @apply bg-blue-50 border-blue-200 text-blue-700;
 }
+
+/* 스크롤바 숨김 */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}

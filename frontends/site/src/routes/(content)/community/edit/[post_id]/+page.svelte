@@ -115,9 +115,28 @@
 		uploadedFiles = [...uploadedFiles, url];
 	}
 
-	// 권한 확인
-	$: if ($currentPost && $user && !canEditPost($currentPost)) {
-		goto('/community');
+	// 권한 확인 - 데이터가 모두 로드된 후에만 체크
+	$: if ($currentPost && $user && !$isLoading) {
+		console.log('=== 권한 체크 디버깅 ===');
+		console.log('현재 사용자:', $user);
+		console.log('게시글 정보:', $currentPost);
+		console.log('사용자 ID 타입:', typeof $user.id, '값:', $user.id);
+		console.log('게시글 작성자 ID 타입:', typeof $currentPost.user_id, '값:', $currentPost.user_id);
+		console.log('ID 비교:', String($user.id) === String($currentPost.user_id));
+		console.log('사용자 역할:', $user.role);
+		console.log('권한 체크 결과:', canEditPost($currentPost, $user));
+		console.log('======================');
+		
+		const hasPermission = canEditPost($currentPost, $user);
+		console.log('최종 권한 확인:', hasPermission);
+		
+		if (!hasPermission) {
+			console.log('권한 없음 - 리다이렉트 실행');
+			alert('수정 권한이 없습니다.');
+			goto('/community');
+		} else {
+			console.log('권한 있음 - 수정 페이지 계속');
+		}
 	}
 </script>
 

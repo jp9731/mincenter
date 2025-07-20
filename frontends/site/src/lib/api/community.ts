@@ -1,10 +1,33 @@
-import type { Board, Category, Post, PostDetail, Comment, CommentDetail, BoardStats, ApiResponse } from '../types/community.js';
+import type { Board, Category, Post, PostDetail, Comment, CommentDetail, BoardStats, ApiResponse, CreateReplyRequest } from '../types/community.js';
 
-const API_BASE = import.meta.env.VITE_API_URL;
+// 업로드 응답 타입 정의
+interface UploadResponse {
+  filename: string;
+  url: string;
+  size: number;
+  mime_type: string;
+  file_info: {
+    id: string;
+    original_name: string;
+    file_path: string;
+    file_size: number;
+    mime_type: string;
+    file_type: string;
+    url: string;
+  };
+  thumbnail_url?: string;
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // 인증 토큰 가져오기
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+  console.log('🔐 인증 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
+  if (token) {
+    console.log('🔐 토큰 길이:', token.length);
+    console.log('🔐 토큰 시작 부분:', token.substring(0, 20) + '...');
+  }
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
@@ -100,12 +123,29 @@ export async function updatePost(post_id: string, data: Partial<Board>): Promise
 }
 
 export async function deletePost(post_id: string): Promise<void> {
+  console.log('🗑️ 게시글 삭제 시작:', post_id);
+  console.log('🌐 API URL:', `${API_BASE}/api/community/posts/${post_id}`);
+  
+  const headers = getAuthHeaders();
+  console.log('🔐 요청 헤더:', headers);
+  
   const res = await fetch(`${API_BASE}/api/community/posts/${post_id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders()
+    headers
   });
+  
+  console.log('📡 응답 상태:', res.status, res.statusText);
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('❌ 삭제 실패:', errorText);
+    throw new Error(`삭제 실패: ${res.status} ${res.statusText}`);
+  }
+  
   const json: ApiResponse<null> = await res.json();
   if (!json.success) throw new Error(json.message);
+  
+  console.log('✅ 게시글 삭제 성공');
 }
 
 export async function fetchComments(post_id: string): Promise<CommentDetail[]> {
@@ -200,8 +240,161 @@ export async function createPostBySlug(slug: string, data: Partial<Post>): Promi
   return json.data;
 }
 
-// 파일 업로드 API 함수
+// 답글 생성
+export async function createReplyBySlug(slug: string, data: CreateReplyRequest): Promise<PostDetail> {
+  const res = await fetch(`${API_BASE}/api/community/boards/${slug}/replies`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<PostDetail> = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json.data;
+}
+
+// 게시글 상세 조회
+export async function getPostDetail(postId: string): Promise<PostDetail> {
+  const res = await fetch(`${API_BASE}/api/community/posts/${postId}`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+  const json: ApiResponse<PostDetail> = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json.data;
+}
+
+// 게시판 상세 조회 (slug 기반)
+export async function getBoardBySlug(slug: string): Promise<Board> {
+  const res = await fetch(`${API_BASE}/api/community/boards/${slug}`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+  const json: ApiResponse<Board> = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json.data;
+}
+
+// 파일 업로드 API 함수 (청크 단위 업로드)
 export async function uploadFile(file: File, type: 'posts' | 'profiles' | 'site' = 'posts', purpose?: string): Promise<string> {
+  // 파일 크기 제한 (50MB)
+  const MAX_FILE_SIZE = 50 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`파일 크기가 너무 큽니다. 최대 ${formatFileSize(MAX_FILE_SIZE)}까지 업로드 가능합니다.`);
+  }
+  
+  console.log(`파일 업로드 시작: ${file.name} (${formatFileSize(file.size)})`);
+  
+  // 1MB 이상 파일은 청크 단위로 업로드
+  if (file.size > 1024 * 1024) {
+    return uploadFileInChunks(file, type, purpose);
+  }
+  
+  // 작은 파일은 기존 방식 사용
+  return uploadFileSimple(file, type, purpose);
+}
+
+// 파일 크기 포맷팅 함수
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 청크 단위 업로드 함수
+async function uploadFileInChunks(file: File, type: 'posts' | 'profiles' | 'site' = 'posts', purpose?: string): Promise<string> {
+  const CHUNK_SIZE = 512 * 1024; // 512KB 청크
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  
+  console.log(`청크 업로드 시작: ${file.name} (${totalChunks}개 청크, 각 ${formatFileSize(CHUNK_SIZE)})`);
+  
+  // 임시 파일 ID 생성
+  const tempFileId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    
+    const formData = new FormData();
+    formData.append('file', chunk, file.name);
+    formData.append('chunkIndex', chunkIndex.toString());
+    formData.append('totalChunks', totalChunks.toString());
+    formData.append('tempFileId', tempFileId);
+    formData.append('originalSize', file.size.toString());
+    formData.append('originalName', file.name);
+    
+    let endpoint = '';
+    switch (type) {
+      case 'posts':
+        endpoint = '/api/upload/posts/chunk';
+        break;
+      case 'profiles':
+        endpoint = '/api/upload/profiles/chunk';
+        break;
+      case 'site':
+        endpoint = '/api/upload/site/chunk';
+        break;
+    }
+
+    console.log(`청크 ${chunkIndex + 1}/${totalChunks} 업로드 중... (${formatFileSize(chunk.size)})`);
+    console.log(`요청 URL: ${API_BASE}${endpoint}`);
+    console.log(`FormData 내용:`, {
+      chunkIndex,
+      totalChunks,
+      tempFileId,
+      originalSize: file.size,
+      originalName: file.name,
+      chunkSize: chunk.size
+    });
+    
+    try {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData
+      });
+
+      console.log(`응답 상태: ${res.status} ${res.statusText}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`서버 오류: ${errorText}`);
+        throw new Error(`청크 업로드 실패: ${res.status} ${errorText}`);
+      }
+
+      const json: ApiResponse<UploadResponse> = await res.json();
+      console.log(`서버 응답:`, json);
+      
+      if (!json.success) throw new Error(json.message);
+      
+      // 마지막 청크인 경우 URL 반환 (URL이 있고 빈 문자열이 아닌 경우)
+      if (json.data.url && json.data.url.trim() !== '') {
+        console.log(`청크 업로드 완료: ${file.name}`);
+        return json.data.url;
+      }
+      
+      console.log(`청크 ${chunkIndex + 1} 완료, 다음 청크 대기 중...`);
+      
+    } catch (error) {
+      console.error(`청크 ${chunkIndex + 1} 업로드 실패:`, error);
+      throw error;
+    }
+    
+    // 청크 간 짧은 대기 (서버 부하 방지)
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  console.error(`모든 청크 업로드 완료했지만 최종 URL을 받지 못함`);
+  throw new Error('청크 업로드가 완료되지 않았습니다.');
+}
+
+// 기존 단순 업로드 함수
+async function uploadFileSimple(file: File, type: 'posts' | 'profiles' | 'site' = 'posts', purpose?: string): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
   
@@ -218,21 +411,38 @@ export async function uploadFile(file: File, type: 'posts' | 'profiles' | 'site'
       break;
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: formData
-  });
+  // 타임아웃 설정 (5분)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Upload failed: ${res.status} ${errorText}`);
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Upload failed: ${res.status} ${errorText}`);
+    }
+
+    const json: ApiResponse<{ url: string }> = await res.json();
+    if (!json.success) throw new Error(json.message);
+    return json.data.url;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Upload timeout: 파일 업로드가 시간 초과되었습니다.');
+    }
+    throw error;
   }
-
-  const json: ApiResponse<{ url: string }> = await res.json();
-  if (!json.success) throw new Error(json.message);
-  return json.data.url;
 }
+
+
 
 // 파일 삭제 API
 export async function deleteFile(fileId: string): Promise<void> {
@@ -252,6 +462,22 @@ export async function deletePostAttachment(postId: string, fileId: string): Prom
   });
   const json: ApiResponse<null> = await res.json();
   if (!json.success) throw new Error(json.message);
+}
+
+// 썸네일 상태 확인
+export async function checkThumbnailStatus(fileId: string): Promise<{
+  has_thumbnail: boolean;
+  thumbnail_url?: string;
+  processing_status?: string;
+}> {
+  const res = await fetch(`${API_BASE}/api/upload/files/${fileId}/thumbnail-status`);
+  const json: ApiResponse<{
+    has_thumbnail: boolean;
+    thumbnail_url?: string;
+    processing_status?: string;
+  }> = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json.data;
 }
 
 // 좋아요 관련 API 함수들

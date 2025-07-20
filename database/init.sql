@@ -217,7 +217,9 @@ CREATE TABLE public.comments (
     likes integer DEFAULT 0,
     status character varying(20) DEFAULT 'active',
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    depth integer DEFAULT 0, -- 대댓글 깊이 (0: 일반 댓글, 1: 1차 대댓글, 2: 2차 대댓글 등)
+    is_deleted boolean DEFAULT false -- 댓글 삭제 여부
 );
 
 CREATE TABLE public.drafts (
@@ -402,6 +404,7 @@ CREATE TABLE public.posts (
     board_id uuid NOT NULL,
     category_id uuid,
     user_id uuid NOT NULL,
+    parent_id uuid, -- 답글의 경우 부모 게시글 ID
     title character varying(200) NOT NULL,
     content text,
     views integer DEFAULT 0,
@@ -418,7 +421,9 @@ CREATE TABLE public.posts (
     reading_time integer,
     comment_count integer DEFAULT 0,
     attached_files text,
-    thumbnail_urls text
+    thumbnail_urls text,
+    depth integer DEFAULT 0, -- 답글 깊이 (0: 원글, 1: 1차 답글, 2: 2차 답글 등)
+    reply_count integer DEFAULT 0 -- 답글 수
 );
 
 CREATE TABLE public.refresh_tokens (
@@ -768,6 +773,9 @@ ALTER TABLE ONLY public.posts
 
 ALTER TABLE ONLY public.posts
     ADD CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.posts
+    ADD CONSTRAINT posts_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.posts(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY public.refresh_tokens
     ADD CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;

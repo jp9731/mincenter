@@ -123,7 +123,17 @@ export function canEditPost(post: PostDetail, currentUser: User | null): boolean
   if (currentUser.role === 'admin') return true;
 
   // 작성자는 자신의 게시글만 수정 가능
-  return String(currentUser.id) === String(post.user_id);
+  const currentUserId = String(currentUser.id);
+  const postUserId = String(post.user_id);
+  
+  console.log('권한 체크 상세:', {
+    currentUserId,
+    postUserId,
+    isEqual: currentUserId === postUserId,
+    currentUserRole: currentUser.role
+  });
+  
+  return currentUserId === postUserId;
 }
 
 // 게시글 삭제 권한 확인
@@ -189,7 +199,7 @@ export function canListBoard(board: Board, currentUser: User | null): boolean {
     case 'member':
       return !!currentUser; // 로그인한 사용자만
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return true;
   }
@@ -204,7 +214,7 @@ export function canReadPost(board: Board, currentUser: User | null): boolean {
     case 'member':
       return !!currentUser;
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return true;
   }
@@ -224,7 +234,7 @@ export function canWritePost(board: Board, currentUser: User | null): boolean {
     case 'member':
       return !!currentUser;
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return !!currentUser;
   }
@@ -239,7 +249,7 @@ export function canReplyPost(board: Board, currentUser: User | null): boolean {
     case 'member':
       return !!currentUser;
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return !!currentUser;
   }
@@ -259,7 +269,26 @@ export function canCreateCommentInBoard(board: Board, currentUser: User | null):
     case 'member':
       return !!currentUser;
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
+    default:
+      return !!currentUser;
+  }
+}
+
+// 답글 생성 권한 확인 (게시판 기반)
+export function canCreateReplyInBoard(board: Board, currentUser: User | null): boolean {
+  // 답글 생성 권한은 reply_permission을 사용
+  const permission = board.reply_permission || 'member';
+  
+
+  
+  switch (permission) {
+    case 'guest':
+      return true;
+    case 'member':
+      return !!currentUser;
+    case 'admin':
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return !!currentUser;
   }
@@ -274,7 +303,7 @@ export function canDownloadFile(board: Board, currentUser: User | null): boolean
     case 'member':
       return !!currentUser;
     case 'admin':
-      return currentUser?.role === 'admin';
+      return currentUser?.role === 'admin' || currentUser?.role === 'Admin';
     default:
       return !!currentUser;
   }

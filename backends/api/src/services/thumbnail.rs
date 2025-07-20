@@ -47,8 +47,25 @@ impl ThumbnailService {
             return Err("Not an image file".into());
         }
 
-        // 원본 이미지 로드
-        let img = image::open(original_path)?;
+        // 파일이 존재하고 읽을 수 있는지 확인
+        if !Path::new(original_path).exists() {
+            return Err("File does not exist".into());
+        }
+
+        // 파일 크기 확인 (최소 1KB 이상이어야 유효한 이미지)
+        let metadata = fs::metadata(original_path)?;
+        if metadata.len() < 1024 {
+            return Err("File too small to be a valid image".into());
+        }
+
+        // 원본 이미지 로드 (파일 손상 여부 확인)
+        let img = match image::open(original_path) {
+            Ok(img) => img,
+            Err(e) => {
+                eprintln!("Failed to open image file: {:?}", e);
+                return Err(format!("Invalid or corrupted image file: {}", e).into());
+            }
+        };
         let original_dir = Path::new(original_path).parent()
             .ok_or("Invalid file path")?;
         

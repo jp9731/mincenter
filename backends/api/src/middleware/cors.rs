@@ -21,7 +21,7 @@ pub fn cors_middleware() -> CorsLayer {
 /// 환경변수에서 허용된 CORS 도메인 목록을 가져옵니다.
 /// CORS_ALLOWED_ORIGINS 환경변수가 설정되어 있지 않으면 기본값을 사용합니다.
 fn get_allowed_origins() -> Vec<String> {
-    let default_origins = "https://mincenter.kr,https://www.mincenter.kr,http://localhost:5173,http://localhost:3000";
+    let default_origins = "https://mincenter.kr,https://www.mincenter.kr,http://localhost:5173,http://localhost:5174,http://localhost:3000";
     
     std::env::var("CORS_ALLOWED_ORIGINS")
         .unwrap_or_else(|_| default_origins.to_string())

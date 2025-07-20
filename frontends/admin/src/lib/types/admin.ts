@@ -55,6 +55,26 @@ export interface Post {
   comment_count: number;
   is_notice: boolean;
   status: 'published' | 'draft' | 'hidden';
+  attached_files?: AttachedFile[];
+  thumbnail_urls?: ThumbnailUrls;
+}
+
+// 첨부파일 타입
+export interface AttachedFile {
+  id: string;
+  original_name: string;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  file_purpose: string;
+  display_order: number;
+}
+
+// 썸네일 URL 타입
+export interface ThumbnailUrls {
+  thumb?: string;
+  card?: string;
+  large?: string;
 }
 
 // 게시판 관리 타입

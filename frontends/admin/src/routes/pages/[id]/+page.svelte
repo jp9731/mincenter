@@ -13,6 +13,7 @@
 	import { ArrowLeft, Edit, Trash2, Calendar, User, Eye, Globe, ExternalLink } from 'lucide-svelte';
 	import { getPage, deletePage } from '$lib/api/admin';
 	import { goto } from '$app/navigation';
+	import BlockRenderer from '$lib/components/BlockRenderer.svelte';
 
 	let loading = true;
 	let pageData: any = null;
@@ -51,13 +52,13 @@
 
 	function getStatusBadge(status: string, isPublished: boolean) {
 		if (isPublished && status === 'published') {
-			return { variant: 'default', text: '발행됨' };
+			return { variant: 'default' as const, text: '발행됨' };
 		} else if (status === 'draft') {
-			return { variant: 'secondary', text: '임시저장' };
+			return { variant: 'secondary' as const, text: '임시저장' };
 		} else if (status === 'archived') {
-			return { variant: 'destructive', text: '보관됨' };
+			return { variant: 'destructive' as const, text: '보관됨' };
 		} else {
-			return { variant: 'outline', text: '미발행' };
+			return { variant: 'outline' as const, text: '미발행' };
 		}
 	}
 
@@ -116,9 +117,7 @@
 								<p class="text-lg text-gray-700">{pageData.excerpt}</p>
 							</div>
 						{/if}
-						<div class="prose max-w-none">
-							{pageData.content}
-						</div>
+						<BlockRenderer content={pageData.content || ''} />
 					</CardContent>
 				</Card>
 

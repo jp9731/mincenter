@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { getPageBySlug, type Page } from '$lib/api/site.js';
 	import type { ApiResponse } from '$lib/types/community.js';
+	import BlockRenderer from '$lib/components/BlockRenderer.svelte';
 
 	export let data;
 	let page: Page | null = null;
@@ -65,8 +66,8 @@
 			</header>
 
 			<!-- 페이지 내용 -->
-			<div class="prose prose-lg max-w-none whitespace-pre-wrap">
-				{@html page.content}
+			<div class="prose prose-lg max-w-none">
+				<BlockRenderer content={page.content} />
 			</div>
 
 			<!-- 메타 정보 -->
