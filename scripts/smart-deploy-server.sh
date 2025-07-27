@@ -128,9 +128,14 @@ if [ "$API_CHANGED" = true ]; then
     echo "🚀 API 백엔드 빌드 및 배포..."
     
     # API 디렉토리로 이동
-    cd backends/api
+    cd backends/api || {
+        echo "❌ backends/api 디렉토리를 찾을 수 없습니다."
+        DEPLOY_SUCCESS=false
+        return
+    }
     
     echo "📦 API 빌드 중..."
+    echo "현재 디렉토리: $(pwd)"
     
     # Rust 도구체인 확인
     echo "🔧 Rust 도구체인 확인..."
@@ -148,15 +153,23 @@ if [ "$API_CHANGED" = true ]; then
         return
     fi
     
-    # 환경변수 설정
-    export DATABASE_URL="postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@localhost:15432/${POSTGRES_DB:-mincenter}"
+    # Cargo.toml 파일 확인
+    if [ ! -f "Cargo.toml" ]; then
+        echo "❌ Cargo.toml 파일을 찾을 수 없습니다."
+        DEPLOY_SUCCESS=false
+        cd ../..
+        return
+    fi
+    
+    # 환경변수 설정 (서버 실제 정보)
+    export DATABASE_URL="postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter"
     export REDIS_URL="redis://:${REDIS_PASSWORD:-tnekwoddl}@localhost:6379"
     export JWT_SECRET="${JWT_SECRET:-default_jwt_secret}"
     export RUST_LOG="${RUST_LOG_LEVEL:-info}"
     
     # 데이터베이스 연결 확인
     echo "🔍 데이터베이스 연결 확인..."
-    if ! pg_isready -h localhost -p 15432 -U ${POSTGRES_USER:-postgres} >/dev/null 2>&1; then
+    if ! pg_isready -h localhost -p 15432 -U mincenter >/dev/null 2>&1; then
         echo "❌ PostgreSQL 연결 실패"
         DEPLOY_SUCCESS=false
         cd ../..
