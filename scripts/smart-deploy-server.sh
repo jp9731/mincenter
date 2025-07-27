@@ -180,8 +180,17 @@ if [ "$API_CHANGED" = true ]; then
     echo "- JWT_SECRET: ${JWT_SECRET:0:10}..."
     echo "- RUST_LOG: $RUST_LOG"
     
-    # SQLx 오프라인 모드 활성화
-    export SQLX_OFFLINE=true
+    # SQLx 오프라인 모드 비활성화 (서버에서 빌드 시)
+    # export SQLX_OFFLINE=true
+    
+    # SQLx prepare 실행 (쿼리 메타데이터 업데이트)
+    echo "🔧 SQLx prepare 실행 중..."
+    if cargo sqlx prepare --check; then
+        echo "✅ SQLx prepare 성공"
+    else
+        echo "⚠️ SQLx prepare 실패, 오프라인 모드로 진행"
+        export SQLX_OFFLINE=true
+    fi
     
     if cargo build --release; then
         # 새 프로세스 시작

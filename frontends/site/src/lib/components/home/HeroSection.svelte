@@ -32,7 +32,7 @@
 					variant="outline"
 					class="bg-white/10 hover:bg-white/20"
 				>
-					후원하기
+					청기후원신청하기
 				</Button>
 			</div>
 		</div>
