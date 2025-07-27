@@ -138,6 +138,11 @@ jobs:
           ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             cd $DEPLOY_PATH
             
+            echo '🔍 Checking environment...'
+            pwd
+            ls -la docker-compose*.yml
+            ls -la .env*
+            
             echo '🔄 Loading Docker images...'
             docker load < site-image.tar.gz
             docker load < admin-image.tar.gz
@@ -193,12 +198,12 @@ jobs:
             # 실패한 경우 상세 로그 출력
             if [ \"\$SITE_STATUS\" != \"200\" ]; then
               echo '❌ Site service failed, checking logs:'
-              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml logs --tail=50 site || echo 'No site logs available'
+              cd $DEPLOY_PATH && docker-compose -f docker-compose.prod.yml logs --tail=50 site || echo 'No site logs available'
             fi
             
             if [ \"\$ADMIN_STATUS\" != \"200\" ]; then
               echo '❌ Admin service failed, checking logs:'
-              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml logs --tail=50 admin || echo 'No admin logs available'
+              cd $DEPLOY_PATH && docker-compose -f docker-compose.prod.yml logs --tail=50 admin || echo 'No admin logs available'
             fi
             
             if [ \"\$SITE_STATUS\" = \"200\" ] && [ \"\$ADMIN_STATUS\" = \"200\" ]; then
@@ -206,7 +211,7 @@ jobs:
             else
               echo '❌ Some services may have issues'
               echo 'Container status:'
-              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml ps
+              cd $DEPLOY_PATH && docker-compose -f docker-compose.prod.yml ps
               exit 1
             fi
           "
