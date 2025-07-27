@@ -148,6 +148,13 @@ jobs:
             echo '🚀 Starting new containers...'
             docker-compose -f docker-compose.prod.yml up -d site admin
             
+            echo '📋 Checking container status...'
+            docker-compose -f docker-compose.prod.yml ps
+            
+            echo '📋 Container logs (last 20 lines):'
+            docker-compose -f docker-compose.prod.yml logs --tail=20 site || true
+            docker-compose -f docker-compose.prod.yml logs --tail=20 admin || true
+            
             echo '🧹 Cleaning up image files...'
             rm -f site-image.tar.gz admin-image.tar.gz
             
@@ -167,19 +174,39 @@ jobs:
           
           ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             # 컨테이너 상태 확인
+            echo '📋 All containers:'
             docker ps --filter 'name=mincenter' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
             
-            # 서비스 응답 확인
+            echo '📋 Site and Admin containers specifically:'
+            docker ps --filter 'name=site' --filter 'name=admin' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || echo 'No site/admin containers found'
+            
+            # 서비스 응답 확인 (더 많은 대기 시간)
+            echo '⏳ Waiting 60 seconds for services to start...'
+            sleep 60
+            
             SITE_STATUS=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:13000 || echo '000')
             ADMIN_STATUS=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:13001 || echo '000')
             
-            echo 'Site Status: \$SITE_STATUS'
-            echo 'Admin Status: \$ADMIN_STATUS'
+            echo \"Site Status: \$SITE_STATUS\"
+            echo \"Admin Status: \$ADMIN_STATUS\"
+            
+            # 실패한 경우 상세 로그 출력
+            if [ \"\$SITE_STATUS\" != \"200\" ]; then
+              echo '❌ Site service failed, checking logs:'
+              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml logs --tail=50 site || echo 'No site logs available'
+            fi
+            
+            if [ \"\$ADMIN_STATUS\" != \"200\" ]; then
+              echo '❌ Admin service failed, checking logs:'
+              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml logs --tail=50 admin || echo 'No admin logs available'
+            fi
             
             if [ \"\$SITE_STATUS\" = \"200\" ] && [ \"\$ADMIN_STATUS\" = \"200\" ]; then
               echo '✅ All services are running successfully!'
             else
               echo '❌ Some services may have issues'
+              echo 'Container status:'
+              docker-compose -f $DEPLOY_PATH/docker-compose.prod.yml ps
               exit 1
             fi
           "
