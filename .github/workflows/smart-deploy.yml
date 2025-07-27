@@ -74,45 +74,41 @@ jobs:
             ls -la $DEPLOY_PATH || echo 'Directory does not exist'
           "
           
-          # 서버에 스마트 배포 스크립트 실행 (서버의 .env 파일 사용)
-          ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
+          # Docker 정리 단계
+          echo "🔍 Running Docker cleanup..."
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
+            cd $DEPLOY_PATH
+            
+            # Docker 정리 스크립트 실행
+            if [ -f scripts/quick-docker-cleanup.sh ]; then
+              chmod +x scripts/quick-docker-cleanup.sh
+              ./scripts/quick-docker-cleanup.sh
+            else
+              docker system prune -a -f --volumes || true
+              docker builder prune -a -f || true
+            fi
+          " || {
+            echo "⚠️ Docker cleanup failed, but continuing..."
+          }
+          
+          # 배포 단계
+          echo "🚀 Starting deployment..."
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "
             cd $DEPLOY_PATH
             
             echo 'Current working directory: \$(pwd)'
-            echo 'Files in directory:'
-            ls -la
             
             # .env 파일이 있는지 확인
             if [ ! -f .env ]; then
               echo '❌ .env file not found on server'
-              echo 'Available files:'
-              ls -la
               exit 1
             fi
             
             echo '✅ Using existing .env file on server'
             
-            # Docker 디스크 공간 정리 (배포 전 필수)
-            echo '🔍 Running Docker cleanup before deployment...'
-            
-            # 빠른 Docker 정리 스크립트 실행
-            if [ -f scripts/quick-docker-cleanup.sh ]; then
-              echo 'Running quick Docker cleanup...'
-              chmod +x scripts/quick-docker-cleanup.sh
-              ./scripts/quick-docker-cleanup.sh
-            else
-              echo 'Running basic Docker cleanup...'
-              docker system prune -a -f --volumes || true
-              docker builder prune -a -f || true
-            fi
-            
-            echo '✅ Docker cleanup completed'
-            
             # 스크립트 파일 확인
             if [ ! -f scripts/smart-deploy-server.sh ]; then
               echo '❌ smart-deploy-server.sh not found'
-              echo 'Available scripts:'
-              ls -la scripts/ || echo 'scripts directory does not exist'
               exit 1
             fi
             

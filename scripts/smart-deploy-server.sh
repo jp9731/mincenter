@@ -65,11 +65,13 @@ if [ "$SITE_CHANGED" = true ]; then
     echo "🌐 Site 프론트엔드 빌드 및 배포..."
     
     # Docker Compose로 Site만 재빌드 및 재시작 (.env 파일 자동 사용)
+    echo "📦 Site 이미지 빌드 중..."
     docker-compose -f docker-compose.prod.yml build site || {
         echo "❌ Site Docker 빌드 실패"
         exit 1
     }
     
+    echo "🚀 Site 컨테이너 시작 중..."
     docker-compose -f docker-compose.prod.yml up -d site || {
         echo "❌ Site 컨테이너 실행 실패"
         exit 1
@@ -83,11 +85,13 @@ if [ "$ADMIN_CHANGED" = true ]; then
     echo "⚡ Admin 프론트엔드 빌드 및 배포..."
     
     # Docker Compose로 Admin만 재빌드 및 재시작 (.env 파일 자동 사용)
+    echo "📦 Admin 이미지 빌드 중..."
     docker-compose -f docker-compose.prod.yml build admin || {
         echo "❌ Admin Docker 빌드 실패"
         exit 1
     }
     
+    echo "🚀 Admin 컨테이너 시작 중..."
     docker-compose -f docker-compose.prod.yml up -d admin || {
         echo "❌ Admin 컨테이너 실행 실패"
         exit 1
@@ -101,11 +105,13 @@ if [ "$API_CHANGED" = true ]; then
     echo "🚀 API 백엔드 빌드 및 배포..."
     
     # Docker Compose로 API만 재빌드 및 재시작 (.env 파일 자동 사용)
+    echo "📦 API 이미지 빌드 중..."
     docker-compose -f docker-compose.prod.yml build api || {
         echo "❌ API Docker 빌드 실패"
         exit 1
     }
     
+    echo "🚀 API 컨테이너 시작 중..."
     docker-compose -f docker-compose.prod.yml up -d api || {
         echo "❌ API 컨테이너 실행 실패"
         exit 1
