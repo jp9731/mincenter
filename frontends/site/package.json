@@ -11,7 +11,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
-		"postinstall": "patch-package"
+		"postinstall": "patch-package || echo 'No patches to apply'"
 	},
 	"files": [
 		"dist",
@@ -53,7 +53,6 @@
 		"globals": "^16.0.0",
 		"mode-watcher": "^1.0.7",
 		"paneforge": "^1.0.0-next.5",
-		"patch-package": "^8.0.0",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.11",
@@ -94,6 +93,7 @@
 		"@tiptap/pm": "^2.22.0",
 		"@tiptap/starter-kit": "^2.22.0",
 		"lucide-svelte": "^0.513.0",
+		"patch-package": "^8.0.0",
 		"svelte-hero-icons": "^5.2.0",
 		"svelte-pdf": "^1.0.28",
 		"tailwindcss-animate": "^1.0.7"
