@@ -86,7 +86,7 @@ services:
         - API_URL=${API_URL}
         - NODE_ENV=${NODE_ENV:-production}
       cache_from:
-        - node:18-alpine
+        - node:20-alpine
       no_cache: false
       pull: true
     container_name: ${APP_NAME:-mincenter}_site
@@ -128,7 +128,7 @@ services:
         - API_URL=${API_URL}
         - NODE_ENV=${NODE_ENV:-production}
       cache_from:
-        - node:18-alpine
+        - node:20-alpine
       no_cache: false
       pull: true
     container_name: ${APP_NAME:-mincenter}_admin

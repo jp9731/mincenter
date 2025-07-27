@@ -1,5 +1,5 @@
 # SvelteKit Admin Dockerfile
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -43,7 +43,7 @@ RUN if [ -n "${VITE_API_URL}" ]; then \
 RUN npm run build
 
 # 프로덕션 이미지
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
