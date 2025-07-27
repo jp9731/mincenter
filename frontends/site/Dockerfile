@@ -1,5 +1,5 @@
 # SvelteKit Site Dockerfile
-FROM node:20-alpine AS builder
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ RUN echo "VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}" > .env.product
 RUN npm run build
 
 # 프로덕션 이미지
-FROM node:20-alpine AS production
+FROM node:18-alpine AS production
 
 WORKDIR /app
 
