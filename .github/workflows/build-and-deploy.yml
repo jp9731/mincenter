@@ -1,8 +1,8 @@
 name: Build and Deploy with Pre-built Images
 
 on:
-  push:
-    branches: [ main ]
+  # push:
+  #   branches: [ main ]  # 비활성화: smart-deploy.yml과 충돌 방지
   workflow_dispatch:
     inputs:
       reason:

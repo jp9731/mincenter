@@ -26,18 +26,17 @@ RUN npm run prepare
 COPY src ./src
 COPY static ./static
 
-# 환경변수 파일 복사 (.env.production 우선 사용)
-COPY .env.production .env ./
+# 환경변수 파일 복사 (.env.production이 있으면 우선 사용)
+COPY .env* ./
 
-# 환경변수 확인 및 설정 (ARG 값이 있으면 덮어쓰기)
-RUN if [ -n "${VITE_API_URL}" ]; then \
-      echo "# Docker Build Override" > .env.build && \
-      echo "VITE_API_URL=${VITE_API_URL}" >> .env.build && \
-      echo "PUBLIC_API_URL=${PUBLIC_API_URL:-${VITE_API_URL}}" >> .env.build && \
-      echo "API_URL=${API_URL:-${VITE_API_URL}}" >> .env.build && \
-      echo "NODE_ENV=${NODE_ENV:-production}" >> .env.build && \
-      cp .env.build .env.production; \
-    fi
+# 안전한 환경변수 생성 (민감정보는 GitHub Secrets 사용)
+RUN echo "# Production Environment (Generated)" > .env.production && \
+    echo "VITE_API_URL=${VITE_API_URL:-https://api.mincenter.kr}" >> .env.production && \
+    echo "PUBLIC_API_URL=${PUBLIC_API_URL:-https://api.mincenter.kr}" >> .env.production && \
+    echo "API_URL=${API_URL:-https://api.mincenter.kr}" >> .env.production && \
+    echo "NODE_ENV=${NODE_ENV:-production}" >> .env.production && \
+    echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}" >> .env.production && \
+    echo "VITE_KAKAO_CLIENT_ID=${VITE_KAKAO_CLIENT_ID:-}" >> .env.production
 
 # 빌드
 RUN npm run build

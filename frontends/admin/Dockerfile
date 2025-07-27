@@ -26,8 +26,8 @@ RUN npm run prepare
 COPY src ./src
 COPY static ./static
 
-# 환경변수 파일 복사 (.env.production 우선 사용)
-COPY .env.production .env ./
+# 환경변수 파일 복사 (.env.production이 있으면 우선 사용)
+COPY .env* ./
 
 # 환경변수 확인 및 설정 (ARG 값이 있으면 덮어쓰기)
 RUN if [ -n "${VITE_API_URL}" ]; then \
