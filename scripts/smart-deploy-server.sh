@@ -131,11 +131,38 @@ if [ "$API_CHANGED" = true ]; then
     cd backends/api
     
     echo "📦 API 빌드 중..."
+    
+    # Rust 도구체인 확인
+    echo "🔧 Rust 도구체인 확인..."
+    if ! command -v rustc &> /dev/null; then
+        echo "❌ Rust가 설치되지 않았습니다."
+        DEPLOY_SUCCESS=false
+        cd ../..
+        return
+    fi
+    
+    if ! command -v cargo &> /dev/null; then
+        echo "❌ Cargo가 설치되지 않았습니다."
+        DEPLOY_SUCCESS=false
+        cd ../..
+        return
+    fi
+    
     # 환경변수 설정
     export DATABASE_URL="postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@localhost:15432/${POSTGRES_DB:-mincenter}"
     export REDIS_URL="redis://:${REDIS_PASSWORD:-tnekwoddl}@localhost:6379"
     export JWT_SECRET="${JWT_SECRET:-default_jwt_secret}"
     export RUST_LOG="${RUST_LOG_LEVEL:-info}"
+    
+    # 데이터베이스 연결 확인
+    echo "🔍 데이터베이스 연결 확인..."
+    if ! pg_isready -h localhost -p 15432 -U ${POSTGRES_USER:-postgres} >/dev/null 2>&1; then
+        echo "❌ PostgreSQL 연결 실패"
+        DEPLOY_SUCCESS=false
+        cd ../..
+        return
+    fi
+    echo "✅ PostgreSQL 연결 성공"
     
     # 기존 프로세스 중지
     echo "🛑 기존 API 프로세스 중지 중..."
@@ -144,6 +171,18 @@ if [ "$API_CHANGED" = true ]; then
     
     # Rust 빌드
     echo "🔨 Rust 빌드 중..."
+    echo "Rust 버전: $(rustc --version)"
+    echo "Cargo 버전: $(cargo --version)"
+    echo "현재 디렉토리: $(pwd)"
+    echo "환경변수 확인:"
+    echo "- DATABASE_URL: ${DATABASE_URL:0:50}..."
+    echo "- REDIS_URL: ${REDIS_URL:0:30}..."
+    echo "- JWT_SECRET: ${JWT_SECRET:0:10}..."
+    echo "- RUST_LOG: $RUST_LOG"
+    
+    # SQLx 오프라인 모드 활성화
+    export SQLX_OFFLINE=true
+    
     if cargo build --release; then
         # 새 프로세스 시작
         echo "🚀 API 프로세스 시작 중..."
@@ -156,10 +195,14 @@ if [ "$API_CHANGED" = true ]; then
             echo "✅ API 백엔드 배포 완료 (PID: $API_PID)"
         else
             echo "❌ API 프로세스 시작 실패"
+            echo "API 로그 확인:"
+            tail -20 api.log || echo "로그 파일이 없습니다."
             DEPLOY_SUCCESS=false
         fi
     else
         echo "❌ API 빌드 실패"
+        echo "빌드 에러 상세 정보:"
+        cargo build --release 2>&1 | tail -50
         DEPLOY_SUCCESS=false
     fi
     
