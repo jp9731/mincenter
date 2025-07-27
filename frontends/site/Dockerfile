@@ -17,7 +17,7 @@ COPY tsconfig.json ./
 COPY tailwind.config.js ./
 
 # 의존성 설치 (빌드 시 devDependencies 포함)
-RUN npm ci
+RUN npm ci --include=dev
 
 # SvelteKit 동기화 (npm run 스크립트 사용)
 RUN npm run prepare

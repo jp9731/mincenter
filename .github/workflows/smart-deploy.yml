@@ -1,8 +1,8 @@
 name: Smart Deploy
 
 on:
-  push:
-    branches: [ main ]
+  # push:
+  #   branches: [ main ]  # 비활성화: build-and-deploy.yml 사용
   workflow_dispatch:
     inputs:
       reason:
