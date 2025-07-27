@@ -19,6 +19,9 @@ COPY tailwind.config.js ./
 # 의존성 설치
 RUN npm ci --silent
 
+# SvelteKit 동기화
+RUN npx svelte-kit sync
+
 # 소스 코드 복사
 COPY src ./src
 COPY static ./static

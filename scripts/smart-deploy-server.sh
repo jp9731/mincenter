@@ -128,14 +128,20 @@ if [ "$API_CHANGED" = true ]; then
     echo "🚀 API 백엔드 빌드 및 배포..."
     
     # API 디렉토리로 이동
+    echo "🔍 API 디렉토리 확인..."
+    echo "현재 디렉토리: $(pwd)"
+    echo "backends/api 존재 여부: $([ -d "backends/api" ] && echo "✅" || echo "❌")"
+    
     cd backends/api || {
         echo "❌ backends/api 디렉토리를 찾을 수 없습니다."
+        echo "현재 디렉토리 내용:"
+        ls -la
         DEPLOY_SUCCESS=false
-        return
+        exit 1
     }
     
     echo "📦 API 빌드 중..."
-    echo "현재 디렉토리: $(pwd)"
+    echo "이동 후 디렉토리: $(pwd)"
     
     # Rust 도구체인 확인
     echo "🔧 Rust 도구체인 확인..."
@@ -143,14 +149,14 @@ if [ "$API_CHANGED" = true ]; then
         echo "❌ Rust가 설치되지 않았습니다."
         DEPLOY_SUCCESS=false
         cd ../..
-        return
+        exit 1
     fi
     
     if ! command -v cargo &> /dev/null; then
         echo "❌ Cargo가 설치되지 않았습니다."
         DEPLOY_SUCCESS=false
         cd ../..
-        return
+        exit 1
     fi
     
     # Cargo.toml 파일 확인
@@ -158,7 +164,7 @@ if [ "$API_CHANGED" = true ]; then
         echo "❌ Cargo.toml 파일을 찾을 수 없습니다."
         DEPLOY_SUCCESS=false
         cd ../..
-        return
+        exit 1
     fi
     
     # 환경변수 설정 (서버 실제 정보)
@@ -169,13 +175,18 @@ if [ "$API_CHANGED" = true ]; then
     
     # 데이터베이스 연결 확인
     echo "🔍 데이터베이스 연결 확인..."
-    if ! pg_isready -h localhost -p 15432 -U mincenter >/dev/null 2>&1; then
-        echo "❌ PostgreSQL 연결 실패"
-        DEPLOY_SUCCESS=false
-        cd ../..
-        return
+    if command -v pg_isready >/dev/null 2>&1; then
+        if ! pg_isready -h localhost -p 15432 -U mincenter >/dev/null 2>&1; then
+            echo "❌ PostgreSQL 연결 실패 (pg_isready)"
+            DEPLOY_SUCCESS=false
+            cd ../..
+            exit 1
+        fi
+        echo "✅ PostgreSQL 연결 성공 (pg_isready)"
+    else
+        echo "⚠️ pg_isready 명령어가 없습니다. 연결 확인을 건너뜁니다."
+        echo "CentOS 7에서는 PostgreSQL 클라이언트가 설치되지 않을 수 있습니다."
     fi
-    echo "✅ PostgreSQL 연결 성공"
     
     # 기존 프로세스 중지
     echo "🛑 기존 API 프로세스 중지 중..."
@@ -259,7 +270,14 @@ if [ "$API_CHANGED" = true ] || [ "$SITE_CHANGED" = true ] || [ "$ADMIN_CHANGED"
     
     # Docker Compose 서비스 상태 (프론트엔드만)
     if [ "$SITE_CHANGED" = true ] || [ "$ADMIN_CHANGED" = true ]; then
-        docker-compose -f docker-compose.prod.yml ps
+        if [ -f "docker-compose.prod.yml" ]; then
+            docker-compose -f docker-compose.prod.yml ps
+        else
+            echo "⚠️ docker-compose.prod.yml 파일을 찾을 수 없습니다."
+            echo "현재 디렉토리: $(pwd)"
+            echo "파일 목록:"
+            ls -la *.yml 2>/dev/null || echo "YAML 파일이 없습니다."
+        fi
     fi
     
     # API 상태 확인 (직접 실행)
