@@ -3,6 +3,9 @@
 # 서버에서 실행하는 스마트 배포 스크립트
 echo "=== 스마트 배포 시작 ==="
 
+# 배포 마커 파일 경로
+DEPLOY_MARKER_FILE=".deploy_marker"
+
 # 현재 커밋 해시 저장
 CURRENT_COMMIT=$(git rev-parse HEAD)
 echo "현재 커밋: $CURRENT_COMMIT"
@@ -16,19 +19,30 @@ git pull origin main
 NEW_COMMIT=$(git rev-parse HEAD)
 echo "새로운 커밋: $NEW_COMMIT"
 
-# 변경사항이 없으면 종료
-if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
+# 2. 마지막 성공한 배포 커밋 확인
+LAST_DEPLOYED_COMMIT=""
+if [ -f "$DEPLOY_MARKER_FILE" ]; then
+    LAST_DEPLOYED_COMMIT=$(cat "$DEPLOY_MARKER_FILE")
+    echo "마지막 성공한 배포 커밋: $LAST_DEPLOYED_COMMIT"
+else
+    echo "마커 파일이 없습니다. 전체 변경사항을 확인합니다."
+    # 마커 파일이 없으면 최근 10개 커밋을 확인
+    LAST_DEPLOYED_COMMIT=$(git rev-parse HEAD~10 2>/dev/null || git rev-list --max-parents=0 HEAD | head -1)
+fi
+
+# 3. 변경사항 확인 (마지막 성공한 배포 이후의 모든 변경사항)
+echo "🔍 변경된 파일 확인..."
+if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ] && [ "$CURRENT_COMMIT" = "$LAST_DEPLOYED_COMMIT" ]; then
     echo "ℹ️ 변경사항이 없습니다."
     exit 0
 fi
 
-# 2. 변경된 파일 확인
-echo "🔍 변경된 파일 확인..."
-CHANGED_FILES=$(git diff --name-only $CURRENT_COMMIT..$NEW_COMMIT)
-echo "변경된 파일들:"
+# 마지막 성공한 배포 이후의 모든 변경사항 확인
+CHANGED_FILES=$(git diff --name-only $LAST_DEPLOYED_COMMIT..$NEW_COMMIT)
+echo "변경된 파일들 (마지막 성공 배포 이후):"
 echo "$CHANGED_FILES"
 
-# 3. 각 컴포넌트 변경사항 확인
+# 4. 각 컴포넌트 변경사항 확인
 SITE_CHANGED=false
 ADMIN_CHANGED=false
 API_CHANGED=false
@@ -48,7 +62,13 @@ if echo "$CHANGED_FILES" | grep -E "backends/api/|Cargo\.toml|Cargo\.lock"; then
     echo "✅ API 백엔드 변경됨"
 fi
 
-# 4. .env 파일 확인
+# 변경사항이 없으면 종료
+if [ "$SITE_CHANGED" = false ] && [ "$ADMIN_CHANGED" = false ] && [ "$API_CHANGED" = false ]; then
+    echo "ℹ️ 배포할 변경사항이 없습니다."
+    exit 0
+fi
+
+# 5. .env 파일 확인
 echo "🔧 환경변수 설정..."
 if [ -f .env ]; then
     echo "✅ .env 파일 발견, Docker Compose가 자동으로 사용합니다"
@@ -57,8 +77,11 @@ else
     exit 1
 fi
 
-# 5. 선택적 빌드 및 배포
+# 6. 선택적 빌드 및 배포
 echo "🚀 선택적 배포 시작..."
+
+# 배포 성공 여부 추적
+DEPLOY_SUCCESS=true
 
 # Site 프론트엔드 배포 (Docker Compose)
 if [ "$SITE_CHANGED" = true ]; then
@@ -66,18 +89,18 @@ if [ "$SITE_CHANGED" = true ]; then
     
     # Docker Compose로 Site만 재빌드 및 재시작 (.env 파일 자동 사용)
     echo "📦 Site 이미지 빌드 중..."
-    docker-compose -f docker-compose.prod.yml build site || {
+    if docker-compose -f docker-compose.prod.yml build site; then
+        echo "🚀 Site 컨테이너 시작 중..."
+        if docker-compose -f docker-compose.prod.yml up -d site; then
+            echo "✅ Site 프론트엔드 배포 완료"
+        else
+            echo "❌ Site 컨테이너 실행 실패"
+            DEPLOY_SUCCESS=false
+        fi
+    else
         echo "❌ Site Docker 빌드 실패"
-        exit 1
-    }
-    
-    echo "🚀 Site 컨테이너 시작 중..."
-    docker-compose -f docker-compose.prod.yml up -d site || {
-        echo "❌ Site 컨테이너 실행 실패"
-        exit 1
-    }
-    
-    echo "✅ Site 프론트엔드 배포 완료"
+        DEPLOY_SUCCESS=false
+    fi
 fi
 
 # Admin 프론트엔드 배포 (Docker Compose)
@@ -86,60 +109,103 @@ if [ "$ADMIN_CHANGED" = true ]; then
     
     # Docker Compose로 Admin만 재빌드 및 재시작 (.env 파일 자동 사용)
     echo "📦 Admin 이미지 빌드 중..."
-    docker-compose -f docker-compose.prod.yml build admin || {
+    if docker-compose -f docker-compose.prod.yml build admin; then
+        echo "🚀 Admin 컨테이너 시작 중..."
+        if docker-compose -f docker-compose.prod.yml up -d admin; then
+            echo "✅ Admin 프론트엔드 배포 완료"
+        else
+            echo "❌ Admin 컨테이너 실행 실패"
+            DEPLOY_SUCCESS=false
+        fi
+    else
         echo "❌ Admin Docker 빌드 실패"
-        exit 1
-    }
-    
-    echo "🚀 Admin 컨테이너 시작 중..."
-    docker-compose -f docker-compose.prod.yml up -d admin || {
-        echo "❌ Admin 컨테이너 실행 실패"
-        exit 1
-    }
-    
-    echo "✅ Admin 프론트엔드 배포 완료"
+        DEPLOY_SUCCESS=false
+    fi
 fi
 
-# API 백엔드 배포 (Docker Compose)
+# API 백엔드 배포 (직접 빌드/실행)
 if [ "$API_CHANGED" = true ]; then
     echo "🚀 API 백엔드 빌드 및 배포..."
     
-    # Docker Compose로 API만 재빌드 및 재시작 (.env 파일 자동 사용)
-    echo "📦 API 이미지 빌드 중..."
-    docker-compose -f docker-compose.prod.yml build api || {
-        echo "❌ API Docker 빌드 실패"
-        exit 1
-    }
+    # API 디렉토리로 이동
+    cd backends/api
     
-    echo "🚀 API 컨테이너 시작 중..."
-    docker-compose -f docker-compose.prod.yml up -d api || {
-        echo "❌ API 컨테이너 실행 실패"
-        exit 1
-    }
+    echo "📦 API 빌드 중..."
+    # 환경변수 설정
+    export DATABASE_URL="postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@localhost:15432/${POSTGRES_DB:-mincenter}"
+    export REDIS_URL="redis://:${REDIS_PASSWORD:-tnekwoddl}@localhost:6379"
+    export JWT_SECRET="${JWT_SECRET:-default_jwt_secret}"
+    export RUST_LOG="${RUST_LOG_LEVEL:-info}"
     
-    echo "✅ API 백엔드 배포 완료"
+    # 기존 프로세스 중지
+    echo "🛑 기존 API 프로세스 중지 중..."
+    pkill -f "mincenter-api" || true
+    sleep 2
+    
+    # Rust 빌드
+    echo "🔨 Rust 빌드 중..."
+    if cargo build --release; then
+        # 새 프로세스 시작
+        echo "🚀 API 프로세스 시작 중..."
+        nohup ./target/release/mincenter-api > api.log 2>&1 &
+        API_PID=$!
+        
+        # 프로세스 시작 확인
+        sleep 3
+        if kill -0 $API_PID 2>/dev/null; then
+            echo "✅ API 백엔드 배포 완료 (PID: $API_PID)"
+        else
+            echo "❌ API 프로세스 시작 실패"
+            DEPLOY_SUCCESS=false
+        fi
+    else
+        echo "❌ API 빌드 실패"
+        DEPLOY_SUCCESS=false
+    fi
+    
+    # 원래 디렉토리로 복귀
+    cd ../..
 fi
 
-# 6. 배포 결과 요약
+# 7. 배포 성공 시 마커 파일 업데이트
+if [ "$DEPLOY_SUCCESS" = true ]; then
+    echo "$NEW_COMMIT" > "$DEPLOY_MARKER_FILE"
+    echo "✅ 배포 마커 파일 업데이트: $NEW_COMMIT"
+else
+    echo "❌ 배포 실패 - 마커 파일 업데이트하지 않음"
+    echo "다음 배포 시 이번 변경사항들이 다시 포함됩니다."
+fi
+
+# 8. 배포 결과 요약
 echo ""
 echo "📊 배포 결과 요약:"
 echo "- Site 프론트엔드: $([ "$SITE_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
 echo "- Admin 프론트엔드: $([ "$ADMIN_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
 echo "- API 백엔드: $([ "$API_CHANGED" = true ] && echo "✅ 배포됨" || echo "➖ 변경 없음")"
+echo "- 전체 배포: $([ "$DEPLOY_SUCCESS" = true ] && echo "✅ 성공" || echo "❌ 실패")"
 
-# 7. 서비스 상태 확인
+# 9. 서비스 상태 확인
 echo ""
 echo "🔍 서비스 상태 확인..."
 
-# Docker Compose 서비스 상태 확인
+# 서비스 상태 확인
 if [ "$API_CHANGED" = true ] || [ "$SITE_CHANGED" = true ] || [ "$ADMIN_CHANGED" = true ]; then
-    sleep 10  # 컨테이너 시작 대기
+    sleep 10  # 서비스 시작 대기
     
-    # Docker Compose 서비스 상태
-    docker-compose -f docker-compose.prod.yml ps
+    # Docker Compose 서비스 상태 (프론트엔드만)
+    if [ "$SITE_CHANGED" = true ] || [ "$ADMIN_CHANGED" = true ]; then
+        docker-compose -f docker-compose.prod.yml ps
+    fi
     
-    # API 상태 확인
+    # API 상태 확인 (직접 실행)
     if [ "$API_CHANGED" = true ]; then
+        API_PID=$(pgrep -f "mincenter-api" || echo "")
+        if [ -n "$API_PID" ]; then
+            echo "- API 프로세스: ✅ 실행 중 (PID: $API_PID)"
+        else
+            echo "- API 프로세스: ❌ 실행되지 않음"
+        fi
+        
         API_STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/api/health || echo '000')
         echo "- API 상태: $API_STATUS $([ "$API_STATUS" = "200" ] && echo "✅" || echo "❌")"
     fi
@@ -157,4 +223,9 @@ if [ "$API_CHANGED" = true ] || [ "$SITE_CHANGED" = true ] || [ "$ADMIN_CHANGED"
 fi
 
 echo ""
-echo "🎉 스마트 배포 완료!"
+if [ "$DEPLOY_SUCCESS" = true ]; then
+    echo "🎉 스마트 배포 완료!"
+else
+    echo "⚠️ 배포 중 오류가 발생했습니다. 로그를 확인하세요."
+    exit 1
+fi
