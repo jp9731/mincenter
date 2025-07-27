@@ -92,6 +92,22 @@ jobs:
             
             echo '✅ Using existing .env file on server'
             
+            # Docker 디스크 공간 정리 (배포 전 필수)
+            echo '🔍 Running Docker cleanup before deployment...'
+            
+            # 빠른 Docker 정리 스크립트 실행
+            if [ -f scripts/quick-docker-cleanup.sh ]; then
+              echo 'Running quick Docker cleanup...'
+              chmod +x scripts/quick-docker-cleanup.sh
+              ./scripts/quick-docker-cleanup.sh
+            else
+              echo 'Running basic Docker cleanup...'
+              docker system prune -a -f --volumes || true
+              docker builder prune -a -f || true
+            fi
+            
+            echo '✅ Docker cleanup completed'
+            
             # 스크립트 파일 확인
             if [ ! -f scripts/smart-deploy-server.sh ]; then
               echo '❌ smart-deploy-server.sh not found'
