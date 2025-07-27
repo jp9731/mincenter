@@ -49,7 +49,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22000 }}
         run: |
           echo "🚀 Starting Smart Deploy..."
           echo "Trigger: ${{ github.event_name }}"
