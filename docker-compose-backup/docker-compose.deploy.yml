@@ -37,9 +37,7 @@ services:
       retries: 5
 
   site:
-    build:
-      context: ./frontends/site
-      dockerfile: Dockerfile
+    image: ghcr.io/jp9731/mincenter/site:latest
     container_name: mincenter-site
     restart: unless-stopped
     depends_on:
@@ -51,8 +49,8 @@ services:
       - "13000:3000"
     environment:
       - NODE_ENV=production
-      - PUBLIC_API_URL=http://api.mincenter.kr
-      - PUBLIC_DOMAIN=localhost
+      - PUBLIC_API_URL=https://api.mincenter.kr
+      - PUBLIC_DOMAIN=mincenter.kr
       - PUBLIC_NODE_ENV=production
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
