@@ -1,0 +1,49 @@
+name: Test SSH Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Test SSH Connection
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== SSH 연결 테스트 ==="
+            echo "호스트: $(hostname)"
+            echo "IP 주소: $(hostname -I | awk '{print $1}')"
+            echo "사용자: $(whoami)"
+            echo "현재 경로: $(pwd)"
+            echo "현재 시간: $(date)"
+            echo "========================"
+            
+            # 배포 경로 확인
+            if [ -d "${{ secrets.DEPLOY_PATH }}" ]; then
+              echo "✅ 배포 경로 존재: ${{ secrets.DEPLOY_PATH }}"
+              ls -la "${{ secrets.DEPLOY_PATH }}"
+            else
+              echo "❌ 배포 경로 없음: ${{ secrets.DEPLOY_PATH }}"
+            fi
+            
+            # Docker 확인
+            if command -v docker &> /dev/null; then
+              echo "✅ Docker 설치됨"
+              docker --version
+            else
+              echo "❌ Docker 설치되지 않음"
+            fi
+            
+            # Docker Compose 확인
+            if command -v docker-compose &> /dev/null; then
+              echo "✅ Docker Compose 설치됨"
+              docker-compose --version
+            else
+              echo "❌ Docker Compose 설치되지 않음"
+            fi 

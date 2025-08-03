@@ -1,260 +1,191 @@
 # GitHub Secrets 설정 가이드
 
-## 🔑 SSH 키 생성 및 GitHub Secrets 설정
+## 🔧 GitHub Secrets 설정
 
-### **1. SSH 키 생성**
+GitHub 저장소의 Settings → Secrets and variables → Actions에서 다음 시크릿을 설정하세요:
 
-#### **로컬에서 SSH 키 생성**
+### **필수 시크릿**
+
+| 시크릿 이름 | 설명 | 예시 값 |
+|------------|------|---------|
+| `DEPLOY_HOST` | 서버 IP 주소 | `49.247.4.194` |
+| `DEPLOY_USER` | 서버 사용자명 | `admin` |
+| `DEPLOY_SSH_KEY` | SSH 개인키 (전체 내용) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `DEPLOY_PATH` | 서버의 프로젝트 디렉토리 | `/home/admin/projects/mincenter` |
+
+### **SSH 키 설정 방법**
+
+1. **로컬에서 SSH 키 생성** (이미 있다면 생략):
+   ```bash
+   ssh-keygen -t rsa -b 4096 -C "github-actions@mincenter.kr"
+   ```
+
+2. **서버에 공개키 등록**:
+   ```bash
+   ssh-copy-id -i ~/.ssh/id_rsa.pub admin@49.247.4.194
+   ```
+
+3. **GitHub에 개인키 등록**:
+   - `~/.ssh/id_rsa` 파일의 전체 내용을 복사
+   - GitHub Secrets의 `DEPLOY_SSH_KEY`에 붙여넣기
+
+## 🚀 워크플로우 설명
+
+### **1. 자동 배포 (`deploy.yml`)**
+
+**트리거 조건:**
+- `main` 브랜치에 push
+- PR이 `main` 브랜치에 머지됨
+
+**동작 방식:**
+1. **변경 감지**: Git diff로 변경된 파일 분석
+2. **선택적 배포**: 변경된 컴포넌트만 배포
+3. **헬스체크**: 배포 후 서비스 상태 확인
+
+### **2. 테스트 (`test.yml`)**
+
+**트리거 조건:**
+- PR 생성/수정
+- `main`, `develop` 브랜치에 push
+
+**동작 방식:**
+1. **프론트엔드 테스트**: Site, Admin 각각 테스트
+2. **백엔드 테스트**: API 테스트 및 빌드
+3. **보안 검사**: Trivy로 취약점 스캔
+
+### **3. 수동 배포 (`manual-deploy.yml`)**
+
+**사용 방법:**
+1. GitHub 저장소 → Actions 탭
+2. "Manual Deploy" 워크플로우 선택
+3. "Run workflow" 클릭
+4. 배포 대상 및 환경 선택
+
+### **4. SSH 연결 테스트 (`test-ssh.yml`)**
+
+**사용 방법:**
+1. GitHub 저장소 → Actions 탭
+2. "Test SSH Connection" 워크플로우 선택
+3. "Run workflow" 클릭
+
+**확인 사항:**
+- SSH 연결 성공 여부
+- 서버 정보 (호스트명, IP, 사용자)
+- 배포 경로 존재 여부
+- Docker 및 Docker Compose 설치 여부
+
+## 🔍 문제 해결
+
+### **SSH 연결 실패 시**
+
+#### **1. SSH 키 확인**
 ```bash
-# SSH 키 생성 (GitHub Actions용)
-ssh-keygen -t rsa -b 4096 -C "github-actions@your-domain.com" -f ~/.ssh/github_actions
-
-# 키 생성 시 질문들:
-# Enter passphrase (empty for no passphrase): [엔터] (패스프레이즈 없음)
-# Enter same passphrase again: [엔터]
-```
-
-#### **생성된 키 확인**
-```bash
-# 프라이빗 키 확인
-cat ~/.ssh/github_actions
-# 출력 예시:
-# -----BEGIN OPENSSH PRIVATE KEY-----
-# b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
-# ... (긴 키 내용)
-# -----END OPENSSH PRIVATE KEY-----
-
-# 퍼블릭 키 확인
-cat ~/.ssh/github_actions.pub
-# 출력 예시:
-# ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC... github-actions@your-domain.com
-```
-
-### **2. 서버에 공개키 등록**
-
-#### **SSH를 통한 등록 (포트 22000 사용)**
-```bash
-# 방법 1: ssh-copy-id 사용
-ssh-copy-id -i ~/.ssh/github_actions.pub -p 22000 your-username@your-server-ip
-
-# 방법 2: 수동 등록
-cat ~/.ssh/github_actions.pub | ssh -p 22000 your-username@your-server-ip "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
-
-# 방법 3: 직접 복사
-scp -P 22000 ~/.ssh/github_actions.pub your-username@your-server-ip:~/
-ssh -p 22000 your-username@your-server-ip "mkdir -p ~/.ssh && cat ~/github_actions.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-```
-
-#### **서버에서 권한 설정**
-```bash
-# 서버에 SSH 접속
-ssh -p 22000 your-username@your-server-ip
-
-# 권한 설정
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-
-# 설정 확인
+# 로컬에서 SSH 키 확인
 ls -la ~/.ssh/
+cat ~/.ssh/id_rsa.pub
+
+# 서버에서 authorized_keys 확인
+ssh admin@49.247.4.194 "cat ~/.ssh/authorized_keys"
 ```
 
-### **3. GitHub Secrets 설정**
-
-#### **GitHub 저장소에서 Secrets 설정**
-1. GitHub 저장소로 이동
-2. **Settings** 탭 클릭
-3. 왼쪽 메뉴에서 **Secrets and variables** > **Actions** 클릭
-4. **New repository secret** 버튼 클릭
-
-#### **필요한 Secrets 목록**
-
-##### **DEPLOY_SSH_KEY**
-- **Name**: `DEPLOY_SSH_KEY`
-- **Value**: 프라이빗 키 전체 내용 (BEGIN/END 라인 포함)
-```
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
-NhAAAAAAABAAAAAgAAAAEAAABIAAAAEAAAAAAAABAAAAAgAAAAIAAAAEAAAAAgAAAAEAAAA
-... (전체 키 내용)
------END OPENSSH PRIVATE KEY-----
-```
-
-##### **DEPLOY_HOST**
-- **Name**: `DEPLOY_HOST`
-- **Value**: 서버 IP 주소 또는 도메인
-```
-192.168.1.100
-또는
-your-server-domain.com
-```
-
-##### **DEPLOY_USER**
-- **Name**: `DEPLOY_USER`
-- **Value**: 서버 사용자명
-```
-centos
-또는
-your-username
-```
-
-##### **DEPLOY_PATH**
-- **Name**: `DEPLOY_PATH`
-- **Value**: 프로젝트 경로
-```
-/home/centos/mincenter
-또는
-/var/www/mincenter
-```
-
-### **4. 포트 설정 정보**
-
-실제 .env 파일을 기반으로 한 포트 설정:
-
+#### **2. SSH 연결 테스트**
 ```bash
-# API 서버
-API_PORT=18080
-
-# 프론트엔드 서버
-SITE_PORT=3000      # 메인 사이트
-ADMIN_PORT=13001    # 관리자 페이지
-
-# 데이터베이스
-POSTGRES_PORT=15432
-
-# Redis
-REDIS_PORT=6379
-
-# HTTP/HTTPS (Nginx)
-HTTP_PORT=80
-HTTPS_PORT=443
-```
-
-### **5. SSH 연결 테스트**
-
-#### **로컬에서 테스트**
-```bash
-# SSH 연결 테스트
-ssh -p 22000 -i ~/.ssh/github_actions your-username@your-server-ip
+# 로컬에서 직접 SSH 연결 테스트
+ssh -i ~/.ssh/id_rsa admin@49.247.4.194
 
 # 연결 성공 시 서버에 접속됨
 # 연결 실패 시 오류 메시지 확인
 ```
 
-#### **GitHub Actions에서 테스트**
-```yaml
-# .github/workflows/test-ssh.yml
-name: Test SSH Connection
+#### **3. GitHub Secrets 재설정**
+1. GitHub 저장소 → Settings → Secrets and variables → Actions
+2. 기존 시크릿 삭제
+3. 새로운 시크릿 생성
+4. SSH 키 전체 내용 복사 (BEGIN/END 라인 포함)
 
-on:
-  workflow_dispatch:
-
-jobs:
-  test-ssh:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Debug SSH Key
-      run: |
-        echo "DEPLOY_SSH_KEY 길이: ${#DEPLOY_SSH_KEY}"
-        if [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
-          echo "❌ DEPLOY_SSH_KEY가 비어있습니다!"
-          exit 1
-        else
-          echo "✅ DEPLOY_SSH_KEY가 설정되어 있습니다."
-        fi
-        
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-        log-public-key: true
-        
-    - name: Test SSH Connection
-      run: |
-        ssh -p 22000 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "echo 'SSH 연결 성공!'"
-```
-
-### **6. 문제 해결**
-
-#### **DEPLOY_SSH_KEY가 비어있는 경우**
+#### **4. 서버 SSH 설정 확인**
 ```bash
-# 1. 프라이빗 키 내용 확인
-cat ~/.ssh/github_actions
-
-# 2. GitHub Secrets에서 다시 설정
-# - BEGIN/END 라인 포함
-# - 줄바꿈 문자 포함
-# - 공백이나 특수문자 확인
-```
-
-#### **SSH 연결 실패**
-```bash
-# 1. 서버 SSH 설정 확인
-sudo vim /etc/ssh/sshd_config
-
-# 포트 설정 확인
-Port 22000
+# 서버에서 SSH 설정 확인
+sudo cat /etc/ssh/sshd_config | grep -E "(Port|PasswordAuthentication|PubkeyAuthentication)"
 
 # SSH 서비스 재시작
 sudo systemctl restart sshd
-
-# 2. 방화벽 설정 확인
-sudo firewall-cmd --list-all
-sudo firewall-cmd --add-port=22000/tcp --permanent
-sudo firewall-cmd --reload
-
-# 3. SELinux 설정 확인
-sudo semanage port -l | grep ssh
-sudo semanage port -a -t ssh_port_t -p tcp 22000
 ```
 
-#### **권한 문제**
+### **배포 경로 문제**
+
+#### **1. 경로 존재 확인**
 ```bash
-# 서버에서 권한 확인
-ls -la ~/.ssh/
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-chmod 644 ~/.ssh/authorized_keys
+# 서버에서 배포 경로 확인
+ls -la /home/admin/projects/mincenter
+
+# 경로가 없으면 생성
+mkdir -p /home/admin/projects/mincenter
 ```
 
-### **7. 보안 고려사항**
+#### **2. 권한 확인**
+```bash
+# 디렉토리 권한 확인
+ls -la /home/admin/projects/
 
-1. **SSH 키 보안**
-   - 프라이빗 키는 절대 공개하지 마세요
-   - GitHub Secrets에만 저장
-   - 로컬에서도 안전하게 보관
+# 권한 수정 (필요시)
+chmod 755 /home/admin/projects/mincenter
+```
 
-2. **서버 보안**
-   - 기본 SSH 포트(22) 대신 22000 사용
-   - 패스워드 인증 비활성화
-   - 키 기반 인증만 사용
+## 📊 배포 시나리오
 
-3. **정기 관리**
-   - SSH 키 정기 교체
-   - 서버 로그 모니터링
-   - 불필요한 사용자 계정 제거
+### **시나리오 1: 사이트 UI 수정**
+```bash
+# frontends/site/src/routes/+page.svelte 수정 후
+git add .
+git commit -m "feat: 사이트 UI 개선"
+git push origin main
+```
 
-### **8. 완료 확인**
+**결과:**
+- `detect-changes` 작업에서 `site-changed=true` 감지
+- `deploy-site` 작업만 실행
+- 사이트 컨테이너만 재시작
 
-모든 설정이 완료되면:
+### **시나리오 2: API 로직 수정**
+```bash
+# backends/api/src/handlers/user.rs 수정 후
+git add .
+git commit -m "fix: 사용자 인증 로직 수정"
+git push origin main
+```
 
-1. **GitHub Actions 실행**
-   - GitHub 저장소 > Actions 탭
-   - "Test SSH Connection" 워크플로우 먼저 실행
-   - "Deploy to Production" 워크플로우 실행
+**결과:**
+- `detect-changes` 작업에서 `api-changed=true` 감지
+- `deploy-api` 작업만 실행
+- API 빌드 및 컨테이너 재시작
 
-2. **로그 확인**
-   - 각 단계별 성공/실패 확인
-   - SSH 연결 성공 메시지 확인
+### **시나리오 3: 환경변수 변경**
+```bash
+# .env 파일 수정 후
+git add .
+git commit -m "chore: 환경변수 업데이트"
+git push origin main
+```
 
-3. **배포 확인**
-   - 서버에서 서비스 정상 동작 확인
-   - 웹사이트 접속 테스트:
-     - 메인 사이트: http://your-server-ip:3000
-     - 관리자 페이지: http://your-server-ip:13001
-     - API: http://your-server-ip:18080
+**결과:**
+- `detect-changes` 작업에서 `env-changed=true` 감지
+- `deploy-env` 작업만 실행
+- 모든 컨테이너 재시작
 
-이제 GitHub Actions를 통해 CentOS 7 서버로 자동 배포가 가능합니다! 🚀 
+## 🚨 주의사항
+
+### **1. SSH 키 보안**
+- SSH 키는 절대 공개 저장소에 커밋하지 마세요
+- GitHub Secrets에만 저장하세요
+- 정기적으로 SSH 키를 교체하세요
+
+### **2. 배포 경로**
+- `DEPLOY_PATH`는 서버의 실제 경로와 일치해야 합니다
+- 경로에 공백이나 특수문자가 없어야 합니다
+- 사용자가 해당 경로에 쓰기 권한이 있어야 합니다
+
+### **3. 서버 상태**
+- 배포 전 서버가 정상 작동하는지 확인하세요
+- 충분한 디스크 공간이 있는지 확인하세요
+- Docker 서비스가 실행 중인지 확인하세요 
