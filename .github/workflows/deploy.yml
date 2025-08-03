@@ -110,31 +110,36 @@ jobs:
           cd frontends/site
           npm run build
       
+      - name: Setup SSH Key
+        run: |
+          echo "=== SSH 키 설정 ==="
+          mkdir -p ~/.ssh
+          echo '${{ secrets.DEPLOY_SSH_KEY }}' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "SSH 키 설정 완료"
+      
       - name: Prepare server directory
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # 서버 정보 출력
-            echo "=== 서버 정보 ==="
-            echo "호스트: $(hostname)"
-            echo "IP 주소: $(hostname -I | awk '{print $1}')"
-            echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
-            echo "현재 시간: $(date)"
-            echo "=================="
-            
-            # 사이트 디렉토리 준비
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/site
-            
-            # SSH 연결 확인
-            echo "=== SSH 연결 확인 ==="
-            echo "현재 사용자: $(whoami)"
-            echo "현재 경로: $(pwd)"
-            echo "서버 호스트: $(hostname)"
-            echo "====================="
+        run: |
+          echo "=== 서버 정보 출력 ==="
+          
+          # SSH 연결 테스트
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "echo '=== 서버 정보 ==='; \
+               echo '호스트: \$(hostname)'; \
+               echo 'IP 주소: \$(hostname -I | awk \"{print \\\$1}\")'; \
+               echo '배포 경로: ${{ secrets.DEPLOY_PATH }}'; \
+               echo '현재 시간: \$(date)'; \
+               echo '=================='; \
+               echo '=== SSH 연결 확인 ==='; \
+               echo '현재 사용자: \$(whoami)'; \
+               echo '현재 경로: \$(pwd)'; \
+               echo '서버 호스트: \$(hostname)'; \
+               echo '====================='; \
+               mkdir -p ${{ secrets.DEPLOY_PATH }}/site; \
+               echo '사이트 디렉토리 준비 완료'"
       
       - name: Prepare site files
         run: |
