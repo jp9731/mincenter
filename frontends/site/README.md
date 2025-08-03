@@ -62,3 +62,4 @@ npm publish
 # Test commit for improved deployment detection
 # Test commit for fixed deployment workflow
 # Test commit for rsync-based deployment
+# Test commit for scp-based deployment

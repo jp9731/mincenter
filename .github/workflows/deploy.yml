@@ -115,11 +115,26 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart site
       
-      - name: Sync site files
+      - name: Prepare site files
         run: |
-          rsync -avz --delete --exclude='node_modules' --exclude='.svelte-kit' \
-            frontends/site/ \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/site/
+          cd frontends/site
+          # 불필요한 파일 제거
+          rm -rf node_modules .svelte-kit
+          # 빌드 결과물만 유지
+          find . -name "*.log" -delete
+          find . -name "*.tmp" -delete
+      
+      - name: Upload site files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "frontends/site/*"
+          target: "${{ secrets.DEPLOY_PATH }}/site/"
+          strip_components: 0
+          overwrite: true
 
   # 관리자 배포
   deploy-admin:
@@ -161,11 +176,26 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart admin
       
-      - name: Sync admin files
+      - name: Prepare admin files
         run: |
-          rsync -avz --delete --exclude='node_modules' --exclude='.svelte-kit' \
-            frontends/admin/ \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/admin/
+          cd frontends/admin
+          # 불필요한 파일 제거
+          rm -rf node_modules .svelte-kit
+          # 빌드 결과물만 유지
+          find . -name "*.log" -delete
+          find . -name "*.tmp" -delete
+      
+      - name: Upload admin files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "frontends/admin/*"
+          target: "${{ secrets.DEPLOY_PATH }}/admin/"
+          strip_components: 0
+          overwrite: true
 
   # API 배포
   deploy-api:
@@ -213,11 +243,26 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart api
       
-      - name: Sync API files
+      - name: Prepare API files
         run: |
-          rsync -avz --delete --exclude='target' \
-            backends/api/ \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/api/
+          cd backends/api
+          # 불필요한 파일 제거
+          rm -rf target
+          # 빌드 결과물만 유지
+          find . -name "*.log" -delete
+          find . -name "*.tmp" -delete
+      
+      - name: Upload API files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "backends/api/*"
+          target: "${{ secrets.DEPLOY_PATH }}/api/"
+          strip_components: 0
+          overwrite: true
 
   # 환경 설정 배포
   deploy-env:
