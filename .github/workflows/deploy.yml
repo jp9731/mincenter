@@ -108,6 +108,14 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
+            # 서버 정보 출력
+            echo "=== 서버 정보 ==="
+            echo "호스트: $(hostname)"
+            echo "IP 주소: $(hostname -I | awk '{print $1}')"
+            echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
+            echo "현재 시간: $(date)"
+            echo "=================="
+            
             # 사이트 디렉토리 준비
             mkdir -p ${{ secrets.DEPLOY_PATH }}/site
       
@@ -140,9 +148,25 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # 컨테이너 재시작
+            # 컨테이너 상태 확인 및 재시작
             cd ${{ secrets.DEPLOY_PATH }}
+            echo "=== 배포 전 컨테이너 상태 ==="
+            docker compose ps
+            echo "============================="
+            
+            # 컨테이너 재시작
             docker compose restart site
+            
+            # 재시작 후 상태 확인
+            echo "=== 배포 후 컨테이너 상태 ==="
+            sleep 3
+            docker compose ps
+            echo "============================="
+            
+            # 사이트 파일 변경 확인
+            echo "=== 사이트 파일 변경 확인 ==="
+            ls -la site/ | head -10
+            echo "============================="
 
   # 관리자 배포
   deploy-admin:
@@ -322,7 +346,8 @@ jobs:
             
             # API Configuration
             API_PORT=18080
-            API_URL=http://mincenter-api:8080
+            API_URL=http://localhost:18080
+            API_BASE_URL=http://mincenter-api:8080
             PUBLIC_API_URL=https://api.mincenter.kr
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             REFRESH_SECRET=${{ secrets.REFRESH_SECRET }}
@@ -360,6 +385,13 @@ jobs:
             
             # 권한 설정 (소유자만 읽기/쓰기)
             chmod 600 ${{ secrets.DEPLOY_PATH }}/.env
+            
+            # 환경변수 확인
+            echo "=== .env 파일 확인 ==="
+            echo "파일 크기: $(stat -c%s ${{ secrets.DEPLOY_PATH }}/.env) bytes"
+            echo "파일 권한: $(ls -la ${{ secrets.DEPLOY_PATH }}/.env)"
+            echo "API_BASE_URL 확인: $(grep API_BASE_URL ${{ secrets.DEPLOY_PATH }}/.env || echo 'API_BASE_URL not found')"
+            echo "========================="
             
             # 모든 컨테이너 재시작 (환경변수 변경)
             cd ${{ secrets.DEPLOY_PATH }}

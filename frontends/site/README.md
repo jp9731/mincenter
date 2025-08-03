@@ -64,3 +64,4 @@ npm publish
 # Test commit for rsync-based deployment
 # Test commit for scp-based deployment
 # Test commit for corrected deployment order
+# Test commit for server info and env fix - #오후
