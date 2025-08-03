@@ -15,7 +15,7 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             database_url: env::var("DATABASE_URL")
-                .expect("DATABASE_URL must be set"),
+                .unwrap_or_else(|_| "postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter".to_string()),
             jwt_secret: env::var("JWT_SECRET")
                 .unwrap_or_else(|_| "your-secret-key".to_string()),
             refresh_secret: env::var("REFRESH_SECRET")

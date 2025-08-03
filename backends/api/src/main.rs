@@ -38,6 +38,29 @@ async fn main() {
     // 환경 변수 로드
     dotenv::dotenv().ok();
     
+    // 환경 변수가 없으면 기본값 설정
+    if std::env::var("DATABASE_URL").is_err() {
+        std::env::set_var("DATABASE_URL", "postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter");
+    }
+    if std::env::var("REDIS_URL").is_err() {
+        std::env::set_var("REDIS_URL", "redis://:tnekwoddl@localhost:16379");
+    }
+    if std::env::var("JWT_SECRET").is_err() {
+        std::env::set_var("JWT_SECRET", "y4WiGMHXVN2BwluiRJj9TGt7Fh/B1pPZM24xzQtCnD8=");
+    }
+    if std::env::var("REFRESH_SECRET").is_err() {
+        std::env::set_var("REFRESH_SECRET", "ASH2HiFHXbIHfkFxWUOcC07QUodLMJBBIPkNKQ/GKcQ=");
+    }
+    if std::env::var("API_PORT").is_err() {
+        std::env::set_var("API_PORT", "18080");
+    }
+    if std::env::var("RUST_LOG_LEVEL").is_err() {
+        std::env::set_var("RUST_LOG_LEVEL", "info");
+    }
+    if std::env::var("CORS_ORIGIN").is_err() {
+        std::env::set_var("CORS_ORIGIN", "https://mincenter.kr,https://admin.mincenter.kr");
+    }
+    
     // 로깅 초기화
     tracing_subscriber::fmt::init();
     

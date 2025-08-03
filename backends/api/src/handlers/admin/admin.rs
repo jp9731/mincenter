@@ -84,7 +84,7 @@ struct PostDetailRaw {
     pub depth: Option<i32>,
     pub reply_count: Option<i32>,
     pub title: String,
-    pub content: String,
+    pub content: String, // NOT NULL로 변경됨
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub is_notice: Option<bool>,

@@ -42,6 +42,7 @@ pub fn admin_routes(state: AppState) -> Router<AppState> {
         .route("/api/admin/comments", get(handlers::admin::get_comments))
         // 메뉴 관리
         .route("/api/admin/menus", get(handlers::menu::get_menus))
+        .route("/api/admin/menus", post(handlers::menu::create_menu))
         .route("/api/admin/menus", put(handlers::menu::update_menus))
         // 페이지 관리
         .route("/api/admin/pages", get(handlers::page::get_pages))

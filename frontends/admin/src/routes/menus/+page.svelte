@@ -33,7 +33,7 @@
 		AlertDialogTrigger
 	} from '$lib/components/ui/alert-dialog';
 	import { PlusIcon, EditIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-svelte';
-	import { getMenus, saveMenus, getBoards, getPages } from '$lib/api/admin';
+	import { getMenus, saveMenus, createMenu, getBoards, getPages } from '$lib/api/admin';
 
 	interface Menu {
 		id: string;
@@ -189,15 +189,17 @@
 				);
 				await saveMenus(updatedMenus);
 			} else {
-				// 추가 로직 - 새 메뉴를 배열에 추가
-				const newMenu: Menu = {
-					id: crypto.randomUUID(), // UUID 생성
-					...formData,
-					parent_id: formData.parent_id || undefined,
-					target_id: formData.target_id || undefined
-				};
-				const updatedMenus = [...menus, newMenu];
-				await saveMenus(updatedMenus);
+				// 추가 로직 - API에서 UUID 생성
+				await createMenu({
+					name: formData.name,
+					description: formData.description,
+					menu_type: formData.menu_type,
+					target_id: formData.target_id || undefined,
+					url: formData.url,
+					display_order: formData.display_order,
+					is_active: formData.is_active,
+					parent_id: formData.parent_id || undefined
+				});
 			}
 
 			await loadMenus();

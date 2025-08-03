@@ -1,0 +1,143 @@
+name: Database Synchronization
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_type:
+        description: '동기화 유형'
+        required: true
+        default: 'schema'
+        type: choice
+        options:
+        - schema
+        - data
+        - full
+      backup:
+        description: '동기화 전 백업'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
+
+jobs:
+  db-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      
+      - name: Database backup (if requested)
+        if: github.event.inputs.backup == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 데이터베이스 백업 시작 ==="
+            
+            # 백업 디렉토리 생성
+            mkdir -p ${{ secrets.DEPLOY_PATH }}/backups
+            
+            # 타임스탬프
+            TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+            BACKUP_FILE="${{ secrets.DEPLOY_PATH }}/backups/mincenter_backup_${TIMESTAMP}.sql"
+            
+            # PostgreSQL 백업
+            docker exec mincenter-postgres pg_dump -U mincenter -d mincenter > "$BACKUP_FILE"
+            
+            # 압축
+            gzip "$BACKUP_FILE"
+            
+            echo "백업 완료: ${BACKUP_FILE}.gz"
+            
+            # 오래된 백업 정리 (7일 이상)
+            find ${{ secrets.DEPLOY_PATH }}/backups -name "*.sql.gz" -mtime +7 -delete
+            
+            echo "=== 백업 완료 ==="
+      
+      - name: Schema synchronization
+        if: github.event.inputs.sync_type == 'schema' || github.event.inputs.sync_type == 'full'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 스키마 동기화 시작 ==="
+            
+            # 스키마 파일 전송
+            scp ${{ github.workspace }}/database/sync_server_schema.sql ${{ secrets.DEPLOY_PATH }}/database/
+            
+            # 스키마 적용
+            docker exec -i mincenter-postgres psql -U mincenter -d mincenter < ${{ secrets.DEPLOY_PATH }}/database/sync_server_schema.sql
+            
+            echo "=== 스키마 동기화 완료 ==="
+      
+      - name: Data synchronization
+        if: github.event.inputs.sync_type == 'data' || github.event.inputs.sync_type == 'full'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 데이터 동기화 시작 ==="
+            
+            # 데이터 파일들 전송
+            scp ${{ github.workspace }}/database/seed.sql ${{ secrets.DEPLOY_PATH }}/database/
+            scp ${{ github.workspace }}/database_data_dump.sql ${{ secrets.DEPLOY_PATH }}/database/
+            
+            # 데이터 적용 (기존 데이터 백업 후)
+            docker exec -i mincenter-postgres psql -U mincenter -d mincenter < ${{ secrets.DEPLOY_PATH }}/database/seed.sql
+            
+            echo "=== 데이터 동기화 완료 ==="
+      
+      - name: Verify database
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 데이터베이스 검증 ==="
+            
+            # 테이블 목록 확인
+            echo "테이블 목록:"
+            docker exec mincenter-postgres psql -U mincenter -d mincenter -c "\dt"
+            
+            # 레코드 수 확인
+            echo "주요 테이블 레코드 수:"
+            docker exec mincenter-postgres psql -U mincenter -d mincenter -c "SELECT 'users' as table_name, COUNT(*) as count FROM users UNION ALL SELECT 'posts', COUNT(*) FROM posts UNION ALL SELECT 'files', COUNT(*) FROM files;"
+            
+            echo "=== 검증 완료 ==="
+      
+      - name: Restart API (if schema changed)
+        if: github.event.inputs.sync_type == 'schema' || github.event.inputs.sync_type == 'full'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== API 재시작 (스키마 변경으로 인해) ==="
+            
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose restart api
+            
+            # API 헬스체크
+            sleep 10
+            curl -f http://localhost:18080/health || echo "API 서비스 오류"
+            
+            echo "=== API 재시작 완료 ===" 

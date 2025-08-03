@@ -1019,7 +1019,7 @@ pub async fn delete_file(
     }
 
     // 썸네일 파일들도 삭제 (이미지인 경우)
-    if file.mime_type.starts_with("image/") {
+            if file.mime_type.starts_with("image/") {
         let thumbnail_service = ThumbnailService::new();
         if let Err(e) = thumbnail_service.delete_thumbnails(&file.file_path).await {
             eprintln!("Failed to delete thumbnails: {:?}", e);

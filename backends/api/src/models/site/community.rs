@@ -50,7 +50,7 @@ pub struct Post {
     pub user_id: Uuid,
     pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
     pub title: String,
-    pub content: String,
+    pub content: String, // NOT NULL로 변경됨
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub is_notice: Option<bool>,
@@ -68,7 +68,7 @@ pub struct AttachedFile {
     pub original_name: String,
     pub file_path: String,
     pub file_size: i64,
-    pub mime_type: String,
+    pub mime_type: String, // NOT NULL로 변경됨
     pub file_purpose: Option<FilePurpose>,
     pub display_order: Option<i32>,
 }
@@ -82,7 +82,7 @@ pub struct PostDetail {
     pub user_id: Uuid,
     pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
     pub title: String,
-    pub content: String,
+    pub content: String, // NOT NULL로 변경됨
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub dislikes: Option<i32>,
@@ -253,14 +253,14 @@ pub struct PostSummaryDb {
     pub category_name: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub comment_count: Option<i64>,
-    pub content: Option<String>,
+    pub content: String, // NOT NULL로 변경됨
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub is_notice: Option<bool>,
     pub parent_id: Option<Uuid>, // 답글의 경우 부모 게시글 ID
     pub depth: Option<i32>, // 답글 깊이
     pub reply_count: Option<i32>, // 답글 수
-    pub thumbnail_urls: Option<serde_json::Value>, // 썸네일 URL들
+    pub thumbnail_urls: Option<serde_json::Value>, // jsonb로 변경됨
 }
 
 // 게시글 간단 요약 (API 응답용)
@@ -275,7 +275,7 @@ pub struct PostSummary {
     pub category_name: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
     pub comment_count: Option<i64>,
-    pub content: Option<String>,
+    pub content: String, // NOT NULL로 변경됨
     pub views: Option<i32>,
     pub likes: Option<i32>,
     pub is_notice: Option<bool>,

@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 // 메뉴 타입
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone)]
 #[sqlx(type_name = "menu_type", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum MenuType {
     Page,    // 안내페이지
     Board,   // 게시판

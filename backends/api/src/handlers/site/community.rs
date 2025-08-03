@@ -155,7 +155,7 @@ struct BoardRaw {
 struct PostDetailRaw {
     pub id: Uuid,
     pub title: String,
-    pub content: String,
+    pub content: String, // NOT NULL로 변경됨
     pub user_id: Uuid,
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,

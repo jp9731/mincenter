@@ -387,13 +387,33 @@ export async function getMenus(fetchFn?: typeof fetch): Promise<any[]> {
   return json.data;
 }
 
-// 메뉴 저장
+// 메뉴 저장 (전체 배열 업데이트)
 export async function saveMenus(data: any[]): Promise<any[]> {
   const res = await authenticatedAdminFetch('/api/admin/menus', {
     method: 'PUT',
     body: JSON.stringify(data)
   });
   const json: ApiResponse<any[]> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data;
+}
+
+// 개별 메뉴 생성
+export async function createMenu(data: {
+  name: string;
+  description?: string;
+  menu_type: string;
+  target_id?: string;
+  url?: string;
+  display_order: number;
+  is_active: boolean;
+  parent_id?: string;
+}): Promise<any> {
+  const res = await authenticatedAdminFetch('/api/admin/menus', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   return json.data;
 }

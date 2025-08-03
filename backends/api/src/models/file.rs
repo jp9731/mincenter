@@ -13,7 +13,7 @@ pub struct File {
     pub file_path: String,
     pub file_size: i64,
     pub original_size: Option<i64>,
-    pub mime_type: String,
+    pub mime_type: String, // NOT NULL로 변경됨
     pub file_type: FileType,
     pub status: FileStatus,
     pub compression_ratio: Option<f64>,
@@ -112,7 +112,7 @@ pub struct FileInfo {
     pub original_name: String,
     pub file_path: String,
     pub file_size: i64,
-    pub mime_type: String,
+    pub mime_type: String, // NOT NULL로 변경됨
     pub file_type: FileType,
     pub url: String,
 } 
