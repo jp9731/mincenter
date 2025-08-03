@@ -68,3 +68,4 @@ npm publish
 # Test deployment after SSH connection success - #오후
 # SSH 연결 테스트 - #오후
 # SSH 변수 확장 테스트 - #오후
+# SSH 서버 정보 디버깅 - #오후

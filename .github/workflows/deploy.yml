@@ -122,7 +122,7 @@ jobs:
         run: |
           echo "=== 서버 정보 출력 ==="
           
-          # SSH 연결 테스트 (변수 확장 문제 해결)
+          # SSH 연결 테스트 (서버 정보 강제 출력)
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -138,6 +138,10 @@ jobs:
                echo "현재 경로: $(pwd)"; \
                echo "서버 호스트: $(hostname)"; \
                echo "====================="; \
+               echo "=== 추가 정보 ==="; \
+               echo "환경변수: \$SSH_CONNECTION"; \
+               echo "프로세스: \$(ps -p \$\$)"; \
+               echo "================="; \
                mkdir -p ${{ secrets.DEPLOY_PATH }}/site; \
                echo "사이트 디렉토리 준비 완료"'
       
