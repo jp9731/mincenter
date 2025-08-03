@@ -345,7 +345,11 @@ jobs:
             echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
             echo "현재 시간: $(date)"
             echo "=================="
+            
+            # 배포 디렉토리 생성 및 이동
+            mkdir -p ${{ secrets.DEPLOY_PATH }}
             cd ${{ secrets.DEPLOY_PATH }}
+            echo "배포 디렉토리 확인: $(pwd)"
             echo "=== 파일 확인 ==="
             ls -la docker-compose*
             echo "=================="
@@ -459,10 +463,24 @@ jobs:
             EOF
             echo "=== Docker Compose 파일 업데이트 완료 ==="
             echo "=== 기존 컨테이너 완전 제거 ==="
-            docker compose down site
-            docker compose rm -f site
+            # 모든 관련 컨테이너 중지 및 제거
+            docker compose down || echo "Docker compose down 실행 완료"
+            
+            # 개별 컨테이너 강제 제거 (이름 기반)
+            docker stop ${{ secrets.PROJECT_NAME }}-site ${{ secrets.PROJECT_NAME }}-postgres ${{ secrets.PROJECT_NAME }}-redis || echo "컨테이너 중지 완료"
+            docker rm -f ${{ secrets.PROJECT_NAME }}-site ${{ secrets.PROJECT_NAME }}-postgres ${{ secrets.PROJECT_NAME }}-redis || echo "컨테이너 제거 완료"
+            
+            # 잠시 대기
+            sleep 2
             echo "=== 기존 컨테이너 제거 완료 ==="
+            
             echo "=== 새 컨테이너 생성 ==="
+            # dependencies 순서로 시작 (postgres, redis 먼저)
+            docker compose up -d postgres redis
+            sleep 10
+            echo "=== 데이터베이스 서비스 시작 완료 ==="
+            
+            # site 서비스 시작
             docker compose up -d site
             echo "=== 새 컨테이너 생성 완료 ==="
             sleep 5
