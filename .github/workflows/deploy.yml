@@ -100,6 +100,11 @@ jobs:
           cd frontends/site
           npm run build
       
+      - name: Prepare site files
+        run: |
+          cd frontends/site
+          tar -czf site-build.tar.gz --exclude='node_modules' --exclude='.svelte-kit' .
+      
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -108,14 +113,25 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # 사이트 파일 전송 (로컬에서 rsync 실행)
-            rsync -avz --delete --exclude='node_modules' --exclude='.svelte-kit' \
-              ${{ github.workspace }}/frontends/site/ \
-              ${{ secrets.DEPLOY_PATH }}/site/
+            # 사이트 파일 전송 및 압축 해제
+            mkdir -p ${{ secrets.DEPLOY_PATH }}/site
+            cd ${{ secrets.DEPLOY_PATH }}/site
+            tar -xzf site-build.tar.gz --strip-components=0
+            rm -f site-build.tar.gz
             
             # 컨테이너 재시작
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart site
+      
+      - name: Upload site files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "frontends/site/site-build.tar.gz"
+          target: "${{ secrets.DEPLOY_PATH }}/site/"
 
   # 관리자 배포
   deploy-admin:
@@ -142,6 +158,11 @@ jobs:
           cd frontends/admin
           npm run build
       
+      - name: Prepare admin files
+        run: |
+          cd frontends/admin
+          tar -czf admin-build.tar.gz --exclude='node_modules' --exclude='.svelte-kit' .
+      
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -150,14 +171,25 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # 관리자 파일 전송
-            rsync -avz --delete --exclude='node_modules' --exclude='.svelte-kit' \
-              ${{ github.workspace }}/frontends/admin/ \
-              ${{ secrets.DEPLOY_PATH }}/admin/
+            # 관리자 파일 전송 및 압축 해제
+            mkdir -p ${{ secrets.DEPLOY_PATH }}/admin
+            cd ${{ secrets.DEPLOY_PATH }}/admin
+            tar -xzf admin-build.tar.gz --strip-components=0
+            rm -f admin-build.tar.gz
             
             # 컨테이너 재시작
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart admin
+      
+      - name: Upload admin files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "frontends/admin/admin-build.tar.gz"
+          target: "${{ secrets.DEPLOY_PATH }}/admin/"
 
   # API 배포
   deploy-api:
@@ -182,6 +214,11 @@ jobs:
             backends/api/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Prepare API files
+        run: |
+          cd backends/api
+          tar -czf api-source.tar.gz --exclude='target' .
+      
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -190,13 +227,13 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # API 소스 전송
-            rsync -avz --delete \
-              ${{ github.workspace }}/backends/api/ \
-              ${{ secrets.DEPLOY_PATH }}/api/
+            # API 소스 전송 및 압축 해제
+            mkdir -p ${{ secrets.DEPLOY_PATH }}/api
+            cd ${{ secrets.DEPLOY_PATH }}/api
+            tar -xzf api-source.tar.gz --strip-components=0
+            rm -f api-source.tar.gz
             
             # 서버에서 Rust 빌드
-            cd ${{ secrets.DEPLOY_PATH }}/api
             cargo build --release
             
             # 바이너리 복사 및 권한 설정
@@ -206,6 +243,16 @@ jobs:
             # 컨테이너 재시작
             cd ${{ secrets.DEPLOY_PATH }}
             docker compose restart api
+      
+      - name: Upload API files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "backends/api/api-source.tar.gz"
+          target: "${{ secrets.DEPLOY_PATH }}/api/"
 
   # 환경 설정 배포
   deploy-env:
