@@ -272,7 +272,7 @@ jobs:
                volumes:
                  postgres_data:
                  redis_data:
-EOF
+               EOF
                echo \"=== Docker Compose 파일 업데이트 완료 ===\"; \
                echo \"=== 기존 컨테이너 완전 제거 ===\"; \
                docker compose down site; \
