@@ -366,7 +366,6 @@ jobs:
             echo
             echo "=== Docker Compose 파일 업데이트 (변수화됨) ==="
             cat > docker-compose.yml << EOF
-            version: '3.8'
             
             networks:
               default:
@@ -470,14 +469,16 @@ jobs:
             echo "=== 배포 후 컨테이너 상태 ==="
             docker compose ps
             echo "============================="
-            echo "=== 환경변수 확인 ==="
-            docker compose exec -T site env | grep -E "(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)" || echo "환경변수 확인 실패"
-            echo "============================="
-            echo "=== 컨테이너 로그 확인 ==="
-            docker compose logs --tail=20 site || echo "로그 확인 실패"
-            echo "============================="
+            echo "=== 컨테이너 상태 상세 확인 ==="
+            docker compose ps site
+            echo "=== Site 컨테이너 로그 확인 (상세) ==="
+            docker compose logs --tail=50 site || echo "로그 확인 실패"
+            echo "=== Site 컨테이너 상태 검사 ==="
+            docker inspect ${{ secrets.PROJECT_NAME }}-site --format='{{.State.Status}}' || echo "컨테이너 상태 확인 실패"
             echo "=== Docker Compose 파일 내용 확인 ==="
-            grep -A 10 "site:" docker-compose.yml
+            grep -A 15 "site:" docker-compose.yml
+            echo "=== 네트워크 연결 확인 ==="
+            docker network ls | grep proxy
             echo "===================================="
 
   # 관리자 배포 (Docker 이미지 방식)
