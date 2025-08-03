@@ -58,19 +58,40 @@ jobs:
             backends/api/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Setup SSH tunnel for database
+        run: |
+          echo "=== SSH 키 설정 ==="
+          mkdir -p ~/.ssh
+          echo '${{ secrets.DEPLOY_SSH_KEY }}' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+          
+          echo "=== SSH 터널 생성 ==="
+          ssh -i ~/.ssh/deploy_key -f -N -L 5432:localhost:15432 ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          
+          echo "=== 터널 연결 확인 ==="
+          sleep 5
+          netstat -tlnp | grep 5432 || echo "터널 연결 실패"
+
       - name: Run tests
         env:
-          SQLX_OFFLINE: true
+          DATABASE_URL: postgresql://mincenter:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/mincenter
         run: |
           cd backends/api
           cargo test
       
       - name: Build
         env:
-          SQLX_OFFLINE: true  
+          DATABASE_URL: postgresql://mincenter:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/mincenter
         run: |
           cd backends/api
           cargo build --release
+      
+      - name: Cleanup SSH tunnel
+        if: always()
+        run: |
+          echo "=== SSH 터널 정리 ==="
+          pkill -f "ssh.*${{ secrets.DEPLOY_HOST }}" || echo "터널 정리 완료"
 
   # 보안 검사
   security-check:
