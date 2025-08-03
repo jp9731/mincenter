@@ -122,24 +122,24 @@ jobs:
         run: |
           echo "=== 서버 정보 출력 ==="
           
-          # SSH 연결 테스트
+          # SSH 연결 테스트 (변수 확장 문제 해결)
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "echo '=== 서버 정보 ==='; \
-               echo '호스트: \$(hostname)'; \
-               echo 'IP 주소: \$(hostname -I | awk \"{print \\\$1}\")'; \
-               echo '배포 경로: ${{ secrets.DEPLOY_PATH }}'; \
-               echo '현재 시간: \$(date)'; \
-               echo '=================='; \
-               echo '=== SSH 연결 확인 ==='; \
-               echo '현재 사용자: \$(whoami)'; \
-               echo '현재 경로: \$(pwd)'; \
-               echo '서버 호스트: \$(hostname)'; \
-               echo '====================='; \
+              'echo "=== 서버 정보 ==="; \
+               echo "호스트: $(hostname)"; \
+               echo "IP 주소: $(hostname -I | awk "{print \$1}")"; \
+               echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"; \
+               echo "현재 시간: $(date)"; \
+               echo "=================="; \
+               echo "=== SSH 연결 확인 ==="; \
+               echo "현재 사용자: $(whoami)"; \
+               echo "현재 경로: $(pwd)"; \
+               echo "서버 호스트: $(hostname)"; \
+               echo "====================="; \
                mkdir -p ${{ secrets.DEPLOY_PATH }}/site; \
-               echo '사이트 디렉토리 준비 완료'"
+               echo "사이트 디렉토리 준비 완료"'
       
       - name: Prepare site files
         run: |
