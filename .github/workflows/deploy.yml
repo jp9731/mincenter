@@ -139,333 +139,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
-      - name: Setup SSH Key
-        run: |
-          echo "=== SSH 키 설정 ==="
-          mkdir -p ~/.ssh
-          echo '${{ secrets.DEPLOY_SSH_KEY }}' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "SSH 키 설정 완료"
-      
-      - name: Upload Docker Compose file
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: "docker-compose-backup/docker-compose.deploy.yml"
-          target: "${{ secrets.DEPLOY_PATH }}/docker-compose-backup/"
-          strip_components: 0
-          overwrite: true
-      
-      - name: Deploy to server
-        run: |
-          echo "=== 서버 배포 시작 ==="
-          ssh -i ~/.ssh/deploy_key \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "echo \"=== 서버 정보 ===\"; \
-               echo \"호스트: \$(hostname)\"; \
-               echo \"IP 주소: \$(hostname -I | awk '{print \$1}')\"; \
-               echo \"배포 경로: ${{ secrets.DEPLOY_PATH }}\"; \
-               echo \"현재 시간: \$(date)\"; \
-               echo \"==================\"; \
-               cd ${{ secrets.DEPLOY_PATH }}; \
-               echo \"=== 파일 확인 ===\"; \
-               ls -la docker-compose*; \
-               echo \"==================\"; \
-               echo \"=== 기존 컨테이너 상태 ===\"; \
-               docker compose ps; \
-               echo \"=========================\"; \
-               echo \"=== 새 이미지 pull ===\"; \
-               docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}; \
-               echo \"=== 이미지 pull 완료 ===\"; \
-               echo \"=== Docker Compose 파일 업데이트 ===\"; \
-               cat > docker-compose.yml << EOF"
-               version: '3.8'
-               
-               services:
-                 postgres:
-                   image: postgres:13-alpine
-                   container_name: mincenter-postgres
-                   restart: unless-stopped
-                   environment:
-                     POSTGRES_DB: mincenter
-                     POSTGRES_USER: mincenter
-                     POSTGRES_PASSWORD: "!@swjp0209^^"
-                   volumes:
-                     - postgres_data:/var/lib/postgresql/data
-                     - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-                     - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
-                   ports:
-                     - "15432:5432"
-                   healthcheck:
-                     test: ["CMD-SHELL", "pg_isready -U mincenter"]
-                     interval: 10s
-                     timeout: 5s
-                     retries: 5
-               
-                 redis:
-                   image: redis:7-alpine
-                   container_name: mincenter-redis
-                   restart: unless-stopped
-                   command: redis-server --requirepass tnekwoddl
-                   volumes:
-                     - redis_data:/data
-                   ports:
-                     - "16379:6379"
-                   healthcheck:
-                     test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-                     interval: 10s
-                     timeout: 5s
-                     retries: 5
-               
-                 site:
-                   image: ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
-                   container_name: mincenter-site
-                   restart: unless-stopped
-                   depends_on:
-                     postgres:
-                       condition: service_healthy
-                     redis:
-                       condition: service_healthy
-                   ports:
-                     - "13000:3000"
-                   environment:
-                     - NODE_ENV=production
-                     - PUBLIC_API_URL=https://api.mincenter.kr
-                     - API_BASE_URL=https://api.mincenter.kr
-                     - PUBLIC_DOMAIN=mincenter.kr
-                     - PUBLIC_NODE_ENV=production
-                   healthcheck:
-                     test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
-                     interval: 30s
-                     timeout: 10s
-                     retries: 3
-               
-                 admin:
-                   build:
-                     context: ./frontends/admin
-                     dockerfile: Dockerfile
-                   container_name: mincenter-admin
-                   restart: unless-stopped
-                   depends_on:
-                     postgres:
-                       condition: service_healthy
-                     redis:
-                       condition: service_healthy
-                   ports:
-                     - "13001:3000"
-                   environment:
-                     - NODE_ENV=production
-                     - PUBLIC_API_URL=http://api.mincenter.kr
-                     - PUBLIC_DOMAIN=localhost
-                     - PUBLIC_NODE_ENV=production
-                   healthcheck:
-                     test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
-                     interval: 30s
-                     timeout: 10s
-                     retries: 3
-               
-               volumes:
-                 postgres_data:
-                 redis_data:
-               EOF
-               echo \"=== Docker Compose 파일 업데이트 완료 ===\"; \
-               echo \"=== 기존 컨테이너 완전 제거 ===\"; \
-               docker compose down site; \
-               docker compose rm -f site; \
-               echo \"=== 기존 컨테이너 제거 완료 ===\"; \
-               echo \"=== 새 컨테이너 생성 ===\"; \
-               docker compose up -d site; \
-               echo \"=== 새 컨테이너 생성 완료 ===\"; \
-               sleep 5; \
-               echo \"=== 배포 후 컨테이너 상태 ===\"; \
-               docker compose ps; \
-               echo \"=============================\"; \
-               echo \"=== 환경변수 확인 ===\"; \
-               docker compose exec -T site env | grep -E \"(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)\" || echo \"환경변수 확인 실패\"; \
-               echo \"=============================\"; \
-               echo \"=== 컨테이너 로그 확인 ===\"; \
-               docker compose logs --tail=20 site || echo \"로그 확인 실패\"; \
-               echo \"=============================\"; \
-               echo \"=== Docker Compose 파일 내용 확인 ===\"; \
-               grep -A 10 \"site:\" docker-compose.yml; \
-               echo \"=====================================\""
-
-  # 관리자 배포
-  deploy-admin:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.admin-changed == 'true'
-    runs-on: ubuntu-latest
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontends/admin/package-lock.json
-      
-      - name: Install dependencies
-        run: |
-          cd frontends/admin
-          npm ci
-      
-      - name: Build admin
-        run: |
-          cd frontends/admin
-          npm run build
-      
-      - name: Prepare server directory
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # 관리자 디렉토리 준비
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/admin
-      
-      - name: Prepare admin files
-        run: |
-          cd frontends/admin
-          # 불필요한 파일 제거
-          rm -rf node_modules .svelte-kit
-          # 빌드 결과물만 유지
-          find . -name "*.log" -delete
-          find . -name "*.tmp" -delete
-          
-          # 환경변수 설정 (GitHub Actions 환경용)
-          export API_BASE_URL=http://mincenter-api:8080
-          export NODE_ENV=production
-      
-      - name: Upload admin files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: "frontends/admin/*"
-          target: "${{ secrets.DEPLOY_PATH }}/admin/"
-          strip_components: 0
-          overwrite: true
-      
-      - name: Restart admin container
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # 컨테이너 재시작
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart admin
-
-  # API 배포
-  deploy-api:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.api-changed == 'true'
-    runs-on: ubuntu-latest
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-gnu
-      
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            backends/api/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Prepare server directory
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # API 디렉토리 준비
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/api
-      
-      - name: Prepare API files
-        run: |
-          cd backends/api
-          # 불필요한 파일 제거
-          rm -rf target
-          # 빌드 결과물만 유지
-          find . -name "*.log" -delete
-          find . -name "*.tmp" -delete
-      
-      - name: Upload API files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: "backends/api/*"
-          target: "${{ secrets.DEPLOY_PATH }}/api/"
-          strip_components: 0
-          overwrite: true
-      
-      - name: Build and restart API
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # 서버에서 Rust 빌드
-            cd ${{ secrets.DEPLOY_PATH }}/api
-            cargo build --release
-            
-            # 바이너리 복사 및 권한 설정
-            cp target/release/mincenter-api mincenter-api
-            chmod +x mincenter-api
-            
-            # 컨테이너 재시작
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart api
-
-  # 환경 설정 배포
-  deploy-env:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.env-changed == 'true'
-    runs-on: ubuntu-latest
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-    steps:
-      - uses: actions/checkout@v4
-      
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -474,201 +147,131 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # GitHub Secrets 기반 .env 파일 생성
-            echo "=== GitHub Secrets 기반 .env 파일 생성 ==="
-            
-            # GitHub Secrets에서 .env 파일 생성
-            cat > ${{ secrets.DEPLOY_PATH }}/.env << 'EOF'
-            # Application Configuration
-            APP_NAME=mincenter
-            NODE_ENV=production
-            DOMAIN=mincenter.kr
-            
-            # Database Configuration
-            POSTGRES_DB=mincenter
-            POSTGRES_USER=mincenter
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_PORT=15432
-            
-            # API Configuration
-            API_PORT=18080
-            API_URL=http://localhost:18080
-            API_BASE_URL=http://mincenter-api:8080
-            PUBLIC_API_URL=https://api.mincenter.kr
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            REFRESH_SECRET=${{ secrets.REFRESH_SECRET }}
-            RUST_LOG_LEVEL=info
-            CORS_ORIGIN=https://mincenter.kr,https://admin.mincenter.kr
-            
-            # Site Configuration
-            SITE_PORT=13000
-            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
-            
-            # Admin Configuration
-            ADMIN_PORT=13001
-            ADMIN_SESSION_SECRET=${{ secrets.ADMIN_SESSION_SECRET }}
-            ADMIN_EMAIL=admin@mincenter.kr
-            
-            # Redis Configuration
-            REDIS_PORT=6379
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-            
-            # Nginx Configuration
-            HTTP_PORT=80
-            HTTPS_PORT=443
-            
-            # SSL Configuration
-            SSL_EMAIL=ssl@mincenter.kr
-            
-            # Backup Configuration
-            BACKUP_SCHEDULE=0 2 * * *
-            BACKUP_RETENTION_DAYS=7
-            
-            # Monitoring Configuration
-            MONITORING_ENABLED=true
-            LOG_LEVEL=info
-            EOF
-            
-            # 권한 설정 (소유자만 읽기/쓰기)
-            chmod 600 ${{ secrets.DEPLOY_PATH }}/.env
-            
-            # 환경변수 확인
-            echo "=== .env 파일 확인 ==="
-            echo "파일 크기: $(stat -c%s ${{ secrets.DEPLOY_PATH }}/.env) bytes"
-            echo "파일 권한: $(ls -la ${{ secrets.DEPLOY_PATH }}/.env)"
-            echo "API_BASE_URL 확인: $(grep API_BASE_URL ${{ secrets.DEPLOY_PATH }}/.env || echo 'API_BASE_URL not found')"
-            echo "========================="
-            
-            # 모든 컨테이너 재시작 (환경변수 변경)
+            echo "=== 서버 정보 ==="
+            echo "호스트: $(hostname)"
+            echo "IP 주소: $(hostname -I | awk '{print $1}')"
+            echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
+            echo "현재 시간: $(date)"
+            echo "=================="
             cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart
-            
-            echo "=== GitHub Secrets 기반 .env 파일 생성 완료 ==="
-
-  # 데이터베이스 동기화
-  deploy-db:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.db-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-      
-      - name: Database backup
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            echo "=== 데이터베이스 백업 시작 ==="
-            
-            # 백업 디렉토리 생성
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/backups
-            
-            # 타임스탬프
-            TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-            BACKUP_FILE="${{ secrets.DEPLOY_PATH }}/backups/mincenter_backup_${TIMESTAMP}.sql"
-            
-            # PostgreSQL 백업
-            docker exec mincenter-postgres pg_dump -U mincenter -d mincenter > "$BACKUP_FILE"
-            
-            # 압축
-            gzip "$BACKUP_FILE"
-            
-            echo "백업 완료: ${BACKUP_FILE}.gz"
-            
-            # 오래된 백업 정리 (7일 이상)
-            find ${{ secrets.DEPLOY_PATH }}/backups -name "*.sql.gz" -mtime +7 -delete
-            
-            echo "=== 백업 완료 ==="
-      
-      - name: Database synchronization
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            echo "=== 데이터베이스 동기화 시작 ==="
-            
-            # SQLx 마이그레이션 파일들 전송
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/api/database/migrations
-            scp ${{ github.workspace }}/backends/api/database/migrations/*.sql ${{ secrets.DEPLOY_PATH }}/api/database/migrations/
-            
-            # SQLx 마이그레이션 실행
-            cd ${{ secrets.DEPLOY_PATH }}/api
-            sqlx migrate run --source database/migrations --database-url "postgresql://mincenter:!@swjp0209^^@postgres:5432/mincenter"
-            
-            # 기존 마이그레이션 파일들도 전송 (하위 호환성)
-            mkdir -p ${{ secrets.DEPLOY_PATH }}/database/migrations
-            scp ${{ github.workspace }}/database/migrations/*.sql ${{ secrets.DEPLOY_PATH }}/database/migrations/
-            
-            # 기존 마이그레이션 파일들을 순서대로 적용
-            for migration_file in ${{ secrets.DEPLOY_PATH }}/database/migrations/*.sql; do
-              if [ -f "$migration_file" ]; then
-                echo "적용 중: $(basename "$migration_file")"
-                docker exec -i mincenter-postgres psql -U mincenter -d mincenter < "$migration_file"
-              fi
-            done
-            
-            # 기존 파일들도 전송 (하위 호환성)
-            scp ${{ github.workspace }}/database/seed.sql ${{ secrets.DEPLOY_PATH }}/database/
-            scp ${{ github.workspace }}/database_data_dump.sql ${{ secrets.DEPLOY_PATH }}/database/
-            
-            echo "=== 데이터베이스 동기화 완료 ==="
-      
-      - name: Restart API after DB sync
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            echo "=== API 재시작 (DB 변경으로 인해) ==="
-            
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart api
-            
-            # API 헬스체크
-            sleep 10
-            curl -f http://localhost:18080/health || echo "API 서비스 오류"
-            
-            echo "=== API 재시작 완료 ==="
-
-  # 상태 확인
-  health-check:
-    needs: [deploy-site, deploy-admin, deploy-api, deploy-env, deploy-db]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Health check
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            echo "=== 서비스 상태 확인 ==="
-            
-            # 컨테이너 상태
-            cd ${{ secrets.DEPLOY_PATH }}
+            echo "=== 파일 확인 ==="
+            ls -la docker-compose*
+            echo "=================="
+            echo "=== 기존 컨테이너 상태 ==="
             docker compose ps
+            echo "========================="
+            echo "=== 새 이미지 pull ==="
+            docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
+            echo "=== 이미지 pull 완료 ==="
+            echo "=== Docker Compose 파일 업데이트 ==="
+            cat > docker-compose.yml << 'EOF'
+            version: '3.8'
             
-            # 헬스체크
-            echo "API Health Check:"
-            curl -f http://localhost:18080/health || echo "API 서비스 오류"
+            services:
+              postgres:
+                image: postgres:13-alpine
+                container_name: mincenter-postgres
+                restart: unless-stopped
+                environment:
+                  POSTGRES_DB: mincenter
+                  POSTGRES_USER: mincenter
+                  POSTGRES_PASSWORD: "!@swjp0209^^"
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                  - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+                  - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+                ports:
+                  - "15432:5432"
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U mincenter"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
             
-            echo "Site Health Check:"
-            curl -f http://localhost:13000 || echo "Site 서비스 오류"
+              redis:
+                image: redis:7-alpine
+                container_name: mincenter-redis
+                restart: unless-stopped
+                command: redis-server --requirepass tnekwoddl
+                volumes:
+                  - redis_data:/data
+                ports:
+                  - "16379:6379"
+                healthcheck:
+                  test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
             
-            echo "Admin Health Check:"
-            curl -f http://localhost:13001 || echo "Admin 서비스 오류" 
+              site:
+                image: ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
+                container_name: mincenter-site
+                restart: unless-stopped
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                ports:
+                  - "13000:3000"
+                environment:
+                  - NODE_ENV=production
+                  - PUBLIC_API_URL=https://api.mincenter.kr
+                  - API_BASE_URL=https://api.mincenter.kr
+                  - PUBLIC_DOMAIN=mincenter.kr
+                  - PUBLIC_NODE_ENV=production
+                healthcheck:
+                  test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+            
+              admin:
+                build:
+                  context: ./frontends/admin
+                  dockerfile: Dockerfile
+                container_name: mincenter-admin
+                restart: unless-stopped
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                ports:
+                  - "13001:3000"
+                environment:
+                  - NODE_ENV=production
+                  - PUBLIC_API_URL=http://api.mincenter.kr
+                  - PUBLIC_DOMAIN=localhost
+                  - PUBLIC_NODE_ENV=production
+                healthcheck:
+                  test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+            
+            volumes:
+              postgres_data:
+              redis_data:
+            EOF
+            echo "=== Docker Compose 파일 업데이트 완료 ==="
+            echo "=== 기존 컨테이너 완전 제거 ==="
+            docker compose down site
+            docker compose rm -f site
+            echo "=== 기존 컨테이너 제거 완료 ==="
+            echo "=== 새 컨테이너 생성 ==="
+            docker compose up -d site
+            echo "=== 새 컨테이너 생성 완료 ==="
+            sleep 5
+            echo "=== 배포 후 컨테이너 상태 ==="
+            docker compose ps
+            echo "============================="
+            echo "=== 환경변수 확인 ==="
+            docker compose exec -T site env | grep -E "(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)" || echo "환경변수 확인 실패"
+            echo "============================="
+            echo "=== 컨테이너 로그 확인 ==="
+            docker compose logs --tail=20 site || echo "로그 확인 실패"
+            echo "============================="
+            echo "=== Docker Compose 파일 내용 확인 ==="
+            grep -A 10 "site:" docker-compose.yml
+            echo "===================================="
