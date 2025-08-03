@@ -166,24 +166,24 @@ jobs:
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              '               echo "=== 서버 정보 ==="; \
-               echo "호스트: $(hostname)"; \
-               echo "IP 주소: $(hostname -I | awk "{print \$1}")"; \
-               echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"; \
-               echo "현재 시간: $(date)"; \
-               echo "=================="; \
+              "echo \"=== 서버 정보 ===\"; \
+               echo \"호스트: \$(hostname)\"; \
+               echo \"IP 주소: \$(hostname -I | awk '{print \$1}')\"; \
+               echo \"배포 경로: ${{ secrets.DEPLOY_PATH }}\"; \
+               echo \"현재 시간: \$(date)\"; \
+               echo \"==================\"; \
                cd ${{ secrets.DEPLOY_PATH }}; \
-               echo "=== 파일 확인 ==="; \
+               echo \"=== 파일 확인 ===\"; \
                ls -la docker-compose*; \
-               echo "=================="; \
-               echo "=== 기존 컨테이너 상태 ==="; \
+               echo \"==================\"; \
+               echo \"=== 기존 컨테이너 상태 ===\"; \
                docker compose ps; \
-               echo "========================="; \
-               echo "=== 새 이미지 pull ==="; \
+               echo \"=========================\"; \
+               echo \"=== 새 이미지 pull ===\"; \
                docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}; \
-               echo "=== 이미지 pull 완료 ==="; \
-               echo "=== Docker Compose 파일 업데이트 ==="; \
-               cat > docker-compose.yml << 'EOF'
+               echo \"=== 이미지 pull 완료 ===\"; \
+               echo \"=== Docker Compose 파일 업데이트 ===\"; \
+               cat > docker-compose.yml << EOF"
                version: '3.8'
                
                services:
@@ -223,7 +223,7 @@ jobs:
                      retries: 5
                
                  site:
-                   image: ghcr.io/${{ github.repository_owner }}/mincenter-site:latest
+                   image: ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
                    container_name: mincenter-site
                    restart: unless-stopped
                    depends_on:
@@ -272,28 +272,28 @@ jobs:
                volumes:
                  postgres_data:
                  redis_data:
-               EOF
-               echo "=== Docker Compose 파일 업데이트 완료 ==="; \
-               echo "=== 기존 컨테이너 완전 제거 ==="; \
+EOF
+               echo \"=== Docker Compose 파일 업데이트 완료 ===\"; \
+               echo \"=== 기존 컨테이너 완전 제거 ===\"; \
                docker compose down site; \
                docker compose rm -f site; \
-               echo "=== 기존 컨테이너 제거 완료 ==="; \
-               echo "=== 새 컨테이너 생성 ==="; \
+               echo \"=== 기존 컨테이너 제거 완료 ===\"; \
+               echo \"=== 새 컨테이너 생성 ===\"; \
                docker compose up -d site; \
-               echo "=== 새 컨테이너 생성 완료 ==="; \
+               echo \"=== 새 컨테이너 생성 완료 ===\"; \
                sleep 5; \
-               echo "=== 배포 후 컨테이너 상태 ==="; \
+               echo \"=== 배포 후 컨테이너 상태 ===\"; \
                docker compose ps; \
-               echo "============================="; \
-               echo "=== 환경변수 확인 ==="; \
-               docker compose exec -T site env | grep -E "(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)" || echo "환경변수 확인 실패"; \
-               echo "============================="; \
-               echo "=== 컨테이너 로그 확인 ==="; \
-               docker compose logs --tail=20 site || echo "로그 확인 실패"; \
-               echo "============================="; \
-               echo "=== Docker Compose 파일 내용 확인 ==="; \
-               grep -A 10 "site:" docker-compose.yml; \
-               echo "====================================="'
+               echo \"=============================\"; \
+               echo \"=== 환경변수 확인 ===\"; \
+               docker compose exec -T site env | grep -E \"(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)\" || echo \"환경변수 확인 실패\"; \
+               echo \"=============================\"; \
+               echo \"=== 컨테이너 로그 확인 ===\"; \
+               docker compose logs --tail=20 site || echo \"로그 확인 실패\"; \
+               echo \"=============================\"; \
+               echo \"=== Docker Compose 파일 내용 확인 ===\"; \
+               grep -A 10 \"site:\" docker-compose.yml; \
+               echo \"=====================================\""
 
   # 관리자 배포
   deploy-admin:
