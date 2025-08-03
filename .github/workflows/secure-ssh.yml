@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "=== SSH 연결 테스트 ==="
           
-          # SSH 연결 테스트 (보안 강화)
+          # SSH 연결 테스트 (변수 확장 문제 해결)
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
@@ -40,13 +40,13 @@ jobs:
               -o ServerAliveCountMax=3 \
               -v \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "echo '=== 서버 정보 ==='; \
-               echo '호스트: \$(hostname)'; \
-               echo 'IP 주소: \$(hostname -I | awk \"{print \\\$1}\")'; \
-               echo '사용자: \$(whoami)'; \
-               echo '경로: \$(pwd)'; \
-               echo '시간: \$(date)'; \
-               echo '=================='"
+              'echo "=== 서버 정보 ==="; \
+               echo "호스트: $(hostname)"; \
+               echo "IP 주소: $(hostname -I | awk "{print \$1}")"; \
+               echo "사용자: $(whoami)"; \
+               echo "경로: $(pwd)"; \
+               echo "시간: $(date)"; \
+               echo "=================="'
       
       - name: Test with webfactory/ssh-agent
         uses: webfactory/ssh-agent@v0.8.0
@@ -58,4 +58,4 @@ jobs:
           echo "=== webfactory/ssh-agent 테스트 ==="
           ssh -o StrictHostKeyChecking=no \
               ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-              "echo '호스트: \$(hostname)'; echo '사용자: \$(whoami)'" 
+              'echo "호스트: $(hostname)"; echo "사용자: $(whoami)"' 
