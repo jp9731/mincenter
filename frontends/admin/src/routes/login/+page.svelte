@@ -96,13 +96,15 @@
 					</Button>
 				</form>
 
-				<div class="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
-					<p class="text-sm text-blue-700">
-						<strong>테스트 계정:</strong><br />
-						이메일: admin@example.com<br />
-						비밀번호: admin123
-					</p>
-				</div>
+				{#if import.meta.env.MODE === 'development'}
+					<div class="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
+						<p class="text-sm text-blue-700">
+							<strong>테스트 계정:</strong><br />
+							이메일: admin@example.com<br />
+							비밀번호: admin123
+						</p>
+					</div>
+				{/if}
 			</CardContent>
 		</Card>
 	</div>
