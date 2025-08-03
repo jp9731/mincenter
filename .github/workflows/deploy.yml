@@ -163,9 +163,23 @@ jobs:
             echo "=== 새 이미지 pull ==="
             docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
             echo "=== 이미지 pull 완료 ==="
+            echo "=== nginx proxy manager 네트워크 확인 ==="
+            NPM_NETWORK=$(docker network ls | grep -i nginx | awk '{print $2}' | head -n1)
+            if [ -z "$NPM_NETWORK" ]; then
+                NPM_NETWORK="nginxproxymanager_default"
+                echo "기본 네트워크 이름 사용: $NPM_NETWORK"
+            else
+                echo "발견된 nginx 네트워크: $NPM_NETWORK"
+            fi
+            echo
             echo "=== Docker Compose 파일 업데이트 (수정됨) ==="
             cat > docker-compose.yml << 'EOF'
             version: '3.8'
+            
+            networks:
+              default:
+                external: true
+                name: nginxproxymanager_default
             
             services:
               postgres:

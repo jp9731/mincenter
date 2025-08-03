@@ -1,0 +1,51 @@
+name: Fix Nginx Proxy Manager Network
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-network:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect Nginx Proxy Manager to MinCenter Network
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            
+            echo "=== 현재 Docker 네트워크 확인 ==="
+            docker network ls
+            echo
+            
+            echo "=== nginx proxy manager 컨테이너 찾기 ==="
+            NPM_CONTAINER=$(docker ps | grep -i "nginx.*proxy.*manager\|jc21.*nginx" | awk '{print $1}' | head -n1)
+            if [ -z "$NPM_CONTAINER" ]; then
+                echo "nginx proxy manager 컨테이너를 찾을 수 없습니다."
+                echo "실행 중인 모든 컨테이너:"
+                docker ps
+                exit 1
+            fi
+            echo "발견된 nginx proxy manager 컨테이너: $NPM_CONTAINER"
+            echo
+            
+            echo "=== mincenter_default 네트워크 확인 ==="
+            if ! docker network inspect mincenter_default > /dev/null 2>&1; then
+                echo "mincenter_default 네트워크가 없습니다. 생성합니다."
+                docker network create mincenter_default
+            fi
+            echo
+            
+            echo "=== nginx proxy manager를 mincenter 네트워크에 연결 ==="
+            docker network connect mincenter_default $NPM_CONTAINER || echo "이미 연결되어 있거나 연결 실패"
+            echo
+            
+            echo "=== 네트워크 연결 확인 ==="
+            docker network inspect mincenter_default | grep -A 10 "Containers"
+            echo
+            
+            echo "=== 연결 테스트 ==="
+            docker exec $NPM_CONTAINER nslookup mincenter-site || echo "mincenter-site 컨테이너를 찾을 수 없습니다"
