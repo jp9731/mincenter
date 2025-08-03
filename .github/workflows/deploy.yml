@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # 이전 커밋과 비교하기 위해
+          fetch-depth: 5  # 최근 5개 커밋과 비교하기 위해
 
       - name: Detect changes
         id: changes
@@ -32,7 +32,7 @@ jobs:
             CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
           else
             # 직접 push된 경우 (최근 3개 커밋 범위로 확장)
-            CHANGED_FILES=$(git diff --name-only HEAD~3...HEAD)
+            CHANGED_FILES=$(git diff --name-only HEAD~3...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
           fi
           
           echo "Changed files:"
