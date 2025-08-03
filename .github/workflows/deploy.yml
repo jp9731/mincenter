@@ -120,9 +120,15 @@ jobs:
       
       - name: Prepare server directory
         run: |
+          echo "=== GitHub Actions 환경 정보 ==="
+          echo "DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}"
+          echo "DEPLOY_USER: ${{ secrets.DEPLOY_USER }}"
+          echo "DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}"
+          echo "================================"
+          
           echo "=== 서버 정보 출력 ==="
           
-          # SSH 연결 테스트 (서버 정보 강제 출력)
+          # SSH 연결 테스트 (서버 정보와 GitHub Secrets 비교)
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \

@@ -69,3 +69,4 @@ npm publish
 # SSH 연결 테스트 - #오후
 # SSH 변수 확장 테스트 - #오후
 # SSH 서버 정보 디버깅 - #오후
+# GitHub Secrets vs 서버 정보 비교 테스트 - #오후
