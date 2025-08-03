@@ -179,7 +179,7 @@ jobs:
             networks:
               default:
                 external: true
-                name: nginxproxymanager_default
+                name: proxy
             
             services:
               postgres:
