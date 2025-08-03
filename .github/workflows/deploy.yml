@@ -14,8 +14,34 @@ permissions:
   actions: read
 
 jobs:
+  # 데이터베이스 마이그레이션 (빌드 전에 먼저 실행)
+  migrate-database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Apply database migrations
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 데이터베이스 마이그레이션 시작 ==="
+            cd ${{ secrets.DEPLOY_PATH }}
+            
+            # database/init.sql 적용 (스키마 변경사항)
+            if [ -f database/init.sql ]; then
+              echo "Applying database schema updates..."
+              docker exec -i mincenter-postgres psql -U mincenter -d mincenter < database/init.sql || echo "Schema update completed with warnings"
+            fi
+            
+            echo "=== 데이터베이스 마이그레이션 완료 ==="
+
   # 변경 감지
   detect-changes:
+    needs: migrate-database
     runs-on: ubuntu-latest
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}

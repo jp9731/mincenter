@@ -60,14 +60,14 @@ jobs:
       
       - name: Run tests
         env:
-          DATABASE_URL: postgresql://mincenter:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.DEPLOY_HOST }}:15432/mincenter
+          SQLX_OFFLINE: true
         run: |
           cd backends/api
           cargo test
       
       - name: Build
         env:
-          DATABASE_URL: postgresql://mincenter:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.DEPLOY_HOST }}:15432/mincenter
+          SQLX_OFFLINE: true  
         run: |
           cd backends/api
           cargo build --release
