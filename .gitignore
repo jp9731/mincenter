@@ -33,6 +33,12 @@ Cargo.lock
 !.env.example
 !.env.test
 
+# Configuration files with sensitive data
+my-config.json
+*-config.json
+secrets-config.json
+!secrets-config.example.json
+
 # OS
 .DS_Store
 .DS_Store?
