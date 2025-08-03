@@ -241,9 +241,7 @@ jobs:
                   retries: 3
             
               admin:
-                build:
-                  context: ./frontends/admin
-                  dockerfile: Dockerfile
+                image: ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
                 container_name: mincenter-admin
                 restart: unless-stopped
                 depends_on:
@@ -288,4 +286,92 @@ jobs:
             echo "============================="
             echo "=== Docker Compose 파일 내용 확인 ==="
             grep -A 10 "site:" docker-compose.yml
+            echo "===================================="
+
+  # 관리자 배포 (Docker 이미지 방식)
+  deploy-admin:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.admin-changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create environment file
+        run: |
+          cd frontends/admin
+          cat > .env.production << EOF
+          VITE_API_URL=https://api.mincenter.kr
+          PUBLIC_API_URL=https://api.mincenter.kr
+          API_BASE_URL=https://api.mincenter.kr
+          NODE_ENV=production
+          PUBLIC_DOMAIN=mincenter.kr
+          EOF
+          echo "=== Admin 환경변수 파일 생성 완료 ==="
+          cat .env.production
+      
+      - name: Build and push admin Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontends/admin
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/mincenter-admin:latest
+          build-args: |
+            VITE_API_URL=https://api.mincenter.kr
+            PUBLIC_API_URL=https://api.mincenter.kr
+            API_BASE_URL=https://api.mincenter.kr
+            NODE_ENV=production
+            PUBLIC_DOMAIN=mincenter.kr
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Deploy admin to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== Admin 서버 정보 (FIXED VERSION) ==="
+            echo "호스트: $(hostname)"
+            echo "IP 주소: $(hostname -I | awk '{print $1}')"
+            echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
+            echo "현재 시간: $(date)"
+            echo "=================="
+            cd ${{ secrets.DEPLOY_PATH }}
+            echo "=== Admin 새 이미지 pull ==="
+            docker pull ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
+            echo "=== Admin 이미지 pull 완료 ==="
+            echo "=== Admin 컨테이너 업데이트 ==="
+            
+            # 현재 docker-compose.yml에서 admin 서비스 이미지 태그 업데이트
+            sed -i "s|ghcr.io/${{ github.repository_owner }}/mincenter-admin:.*|ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}|g" docker-compose.yml
+            
+            echo "=== Admin 컨테이너 재시작 ==="
+            docker compose down admin
+            docker compose rm -f admin
+            docker compose up -d admin
+            echo "=== Admin 컨테이너 재시작 완료 ==="
+            sleep 5
+            echo "=== Admin 배포 후 컨테이너 상태 ==="
+            docker compose ps admin
+            echo "=== Admin 컨테이너 로그 확인 ==="
+            docker compose logs --tail=20 admin || echo "Admin 로그 확인 실패"
             echo "===================================="
