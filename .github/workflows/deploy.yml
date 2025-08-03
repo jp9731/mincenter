@@ -137,7 +137,17 @@ jobs:
             NODE_ENV=production
             PUBLIC_DOMAIN=mincenter.kr
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
+      
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          echo "=== Docker 정리 시작 ==="
+          docker system df
+          docker buildx prune -f --keep-storage 2gb
+          docker system prune -f
+          echo "=== Docker 정리 완료 ==="
+          docker system df
       
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -339,7 +349,17 @@ jobs:
             NODE_ENV=production
             PUBLIC_DOMAIN=mincenter.kr
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
+      
+      - name: Clean up Docker resources (Admin)
+        if: always()
+        run: |
+          echo "=== Admin Docker 정리 시작 ==="
+          docker system df
+          docker buildx prune -f --keep-storage 2gb
+          docker system prune -f
+          echo "=== Admin Docker 정리 완료 ==="
+          docker system df
       
       - name: Deploy admin to server
         uses: appleboy/ssh-action@v1.0.3
