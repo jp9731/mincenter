@@ -462,26 +462,18 @@ jobs:
               redis_data:
             EOF
             echo "=== Docker Compose 파일 업데이트 완료 ==="
-            echo "=== 기존 컨테이너 완전 제거 ==="
-            # 모든 관련 컨테이너 중지 및 제거
-            docker compose down || echo "Docker compose down 실행 완료"
-            
-            # 개별 컨테이너 강제 제거 (이름 기반)
-            docker stop ${{ secrets.PROJECT_NAME }}-site ${{ secrets.PROJECT_NAME }}-postgres ${{ secrets.PROJECT_NAME }}-redis || echo "컨테이너 중지 완료"
-            docker rm -f ${{ secrets.PROJECT_NAME }}-site ${{ secrets.PROJECT_NAME }}-postgres ${{ secrets.PROJECT_NAME }}-redis || echo "컨테이너 제거 완료"
-            
-            # 잠시 대기
-            sleep 2
-            echo "=== 기존 컨테이너 제거 완료 ==="
-            
-            echo "=== 새 컨테이너 생성 ==="
-            # dependencies 순서로 시작 (postgres, redis 먼저)
-            docker compose up -d postgres redis
-            sleep 10
-            echo "=== 데이터베이스 서비스 시작 완료 ==="
-            
-            # site 서비스 시작
-            docker compose up -d site
+                         echo "=== Site 컨테이너만 선택적 업데이트 ==="
+             # 기존 site 컨테이너만 중지 및 제거
+             docker compose stop site || echo "Site 컨테이너 중지 완료"
+             docker compose rm -f site || echo "Site 컨테이너 제거 완료"
+             
+             # 잠시 대기
+             sleep 2
+             echo "=== Site 컨테이너 제거 완료 ==="
+             
+             echo "=== Site 컨테이너만 새로 생성 ==="
+             # site 서비스만 시작 (의존성은 자동으로 확인됨)
+             docker compose up -d site
             echo "=== 새 컨테이너 생성 완료 ==="
             sleep 5
             echo "=== 배포 후 컨테이너 상태 ==="
@@ -585,14 +577,91 @@ jobs:
             # 현재 docker-compose.yml에서 admin 서비스 이미지 태그 업데이트
             sed -i "s|ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:.*|ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:${{ github.sha }}|g" docker-compose.yml
             
-            echo "=== Admin 컨테이너 재시작 ==="
-            docker compose down admin
-            docker compose rm -f admin
-            docker compose up -d admin
+                         echo "=== Admin 컨테이너만 선택적 업데이트 ==="
+             # 기존 admin 컨테이너만 중지 및 제거
+             docker compose stop admin || echo "Admin 컨테이너 중지 완료"
+             docker compose rm -f admin || echo "Admin 컨테이너 제거 완료"
+             
+             # 잠시 대기
+             sleep 2
+             echo "=== Admin 컨테이너 제거 완료 ==="
+             
+             echo "=== Admin 컨테이너만 새로 생성 ==="
+             # admin 서비스만 시작 (의존성은 자동으로 확인됨)
+             docker compose up -d admin
             echo "=== Admin 컨테이너 재시작 완료 ==="
             sleep 5
             echo "=== Admin 배포 후 컨테이너 상태 ==="
             docker compose ps admin
             echo "=== Admin 컨테이너 로그 확인 ==="
             docker compose logs --tail=20 admin || echo "Admin 로그 확인 실패"
+            echo "===================================="
+
+  # API 배포 (Rust 바이너리 방식)
+  deploy-api:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backends/api/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+       
+      - name: Build API binary
+        run: |
+          cd backends/api
+          cargo build --release --target x86_64-unknown-linux-gnu
+          echo "=== API 빌드 완료 ==="
+       
+      - name: Deploy API to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== API 서버 정보 ==="
+            echo "호스트: $(hostname)"
+            echo "IP 주소: $(hostname -I | awk '{print $1}')"
+            echo "배포 경로: ${{ secrets.DEPLOY_PATH }}"
+            echo "현재 시간: $(date)"
+            echo "=================="
+            
+            cd ${{ secrets.DEPLOY_PATH }}
+            echo "=== 기존 API 컨테이너 상태 ==="
+            docker compose ps api 2>/dev/null || echo "API 컨테이너 없음"
+            echo "============================="
+            
+            echo "=== API 컨테이너만 선택적 업데이트 ==="
+            # 기존 API 컨테이너만 중지 및 제거
+            docker compose stop api 2>/dev/null || echo "API 컨테이너 중지 완료"
+            docker compose rm -f api 2>/dev/null || echo "API 컨테이너 제거 완료"
+            
+            # 잠시 대기
+            sleep 2
+            echo "=== API 컨테이너 제거 완료 ==="
+            
+            echo "=== API 컨테이너만 새로 생성 ==="
+            # API 서비스만 시작 (의존성은 자동으로 확인됨)
+            docker compose up -d api
+            echo "=== API 컨테이너 생성 완료 ==="
+            sleep 5
+            echo "=== API 배포 후 컨테이너 상태 ==="
+            docker compose ps api
+            echo "=== API 컨테이너 로그 확인 ==="
+            docker compose logs --tail=20 api || echo "API 로그 확인 실패"
             echo "===================================="
