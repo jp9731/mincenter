@@ -14,8 +14,160 @@ permissions:
   actions: read
 
 jobs:
-  # 데이터베이스 마이그레이션 (빌드 전에 먼저 실행)
+  # 환경설정 파일 배포 (최우선 실행)
+  deploy-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy environment configuration
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            echo "=== 환경설정 파일 배포 시작 ==="
+            cd ${{ secrets.DEPLOY_PATH }}
+            
+            # .env.production 파일 생성
+            cat > .env.production << 'EOF'
+            # =============================================================================
+            # MinCenter 프로덕션 환경 설정 파일 (GitHub Actions 자동 생성)
+            # =============================================================================
+            
+            # Application Configuration
+            APP_NAME=${{ secrets.PROJECT_NAME }}
+            NODE_ENV=production
+            DOMAIN=${{ secrets.DOMAIN_NAME }}
+            
+            # Database Configuration
+            POSTGRES_DB=${{ secrets.DB_NAME }}
+            POSTGRES_USER=${{ secrets.DB_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:${{ secrets.POSTGRES_PORT }}/${{ secrets.DB_NAME }}
+            
+            # API Configuration
+            API_PORT=${{ secrets.API_PORT }}
+            API_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            REFRESH_SECRET=${{ secrets.REFRESH_SECRET }}
+            ACCESS_TOKEN_EXPIRY_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRY_MINUTES }}
+            REFRESH_TOKEN_EXPIRY_DAYS=${{ secrets.REFRESH_TOKEN_EXPIRY_DAYS }}
+            RUST_LOG_LEVEL=${{ secrets.RUST_LOG_LEVEL }}
+            
+            # CORS Configuration
+            CORS_ORIGIN=https://${{ secrets.DOMAIN_NAME }},https://admin.${{ secrets.DOMAIN_NAME }}
+            CORS_ALLOWED_ORIGINS=https://${{ secrets.DOMAIN_NAME }},https://admin.${{ secrets.DOMAIN_NAME }},https://${{ secrets.API_DOMAIN }}
+            
+            # Site Configuration
+            SITE_PORT=${{ secrets.SITE_PORT }}
+            SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+            VITE_API_PORT=${{ secrets.API_PORT }}
+            VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            VITE_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            
+            # Admin Configuration
+            ADMIN_PORT=${{ secrets.ADMIN_PORT }}
+            ADMIN_SESSION_SECRET=${{ secrets.ADMIN_SESSION_SECRET }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            
+            # Redis Configuration
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            REDIS_URL=redis://:${{ secrets.REDIS_PASSWORD }}@localhost:${{ secrets.REDIS_PORT }}
+            
+            # Nginx Configuration
+            HTTP_PORT=${{ secrets.HTTP_PORT }}
+            HTTPS_PORT=${{ secrets.HTTPS_PORT }}
+            
+            # SSL Configuration
+            SSL_EMAIL=${{ secrets.SSL_EMAIL }}
+            
+            # Backup Configuration
+            BACKUP_SCHEDULE=${{ secrets.BACKUP_SCHEDULE }}
+            BACKUP_RETENTION_DAYS=${{ secrets.BACKUP_RETENTION_DAYS }}
+            
+            # Monitoring Configuration
+            MONITORING_ENABLED=${{ secrets.MONITORING_ENABLED }}
+            LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+            EOF
+            
+            echo "✅ .env.production 파일 생성 완료"
+            
+            # 각 서비스 디렉토리에 .env 파일 복사
+            echo "=== 각 서비스에 환경설정 파일 배포 ==="
+            
+            # Site 서비스용 환경설정
+            mkdir -p frontends/site
+            cat > frontends/site/.env.production << 'EOF'
+            NODE_ENV=production
+            VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            API_BASE_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
+            PUBLIC_NODE_ENV=production
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            VITE_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            EOF
+            
+            # Admin 서비스용 환경설정
+            mkdir -p frontends/admin
+            cat > frontends/admin/.env.production << 'EOF'
+            NODE_ENV=production
+            VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            API_BASE_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
+            PUBLIC_NODE_ENV=production
+            EOF
+            
+            # API 서비스용 환경설정 (Rust는 .env 파일 사용)
+            mkdir -p backends/api
+            cat > backends/api/.env << 'EOF'
+            # API Configuration
+            API_PORT=${{ secrets.API_PORT }}
+            NODE_ENV=production
+            
+            # Database Configuration
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:${{ secrets.POSTGRES_PORT }}/${{ secrets.DB_NAME }}
+            POSTGRES_DB=${{ secrets.DB_NAME }}
+            POSTGRES_USER=${{ secrets.DB_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+            
+            # Redis Configuration
+            REDIS_URL=redis://:${{ secrets.REDIS_PASSWORD }}@localhost:${{ secrets.REDIS_PORT }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            
+            # JWT Configuration
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            REFRESH_SECRET=${{ secrets.REFRESH_SECRET }}
+            ACCESS_TOKEN_EXPIRY_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRY_MINUTES }}
+            REFRESH_TOKEN_EXPIRY_DAYS=${{ secrets.REFRESH_TOKEN_EXPIRY_DAYS }}
+            
+            # Logging and CORS
+            RUST_LOG_LEVEL=${{ secrets.RUST_LOG_LEVEL }}
+            CORS_ORIGIN=https://${{ secrets.DOMAIN_NAME }},https://admin.${{ secrets.DOMAIN_NAME }}
+            CORS_ALLOWED_ORIGINS=https://${{ secrets.DOMAIN_NAME }},https://admin.${{ secrets.DOMAIN_NAME }},https://${{ secrets.API_DOMAIN }}
+            EOF
+            
+            echo "✅ 모든 서비스 환경설정 파일 배포 완료"
+            echo "=== 배포된 파일 목록 ==="
+            ls -la .env.production
+            ls -la frontends/site/.env.production
+            ls -la frontends/admin/.env.production  
+            ls -la backends/api/.env
+            echo "=== 환경설정 파일 배포 완료 ==="
+
+  # 데이터베이스 마이그레이션 (환경설정 배포 후 실행)
   migrate-database:
+    needs: deploy-environment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -139,11 +291,13 @@ jobs:
         run: |
           cd frontends/site
           cat > .env.production << EOF
-          VITE_API_URL=https://api.mincenter.kr
-          PUBLIC_API_URL=https://api.mincenter.kr
-          API_BASE_URL=https://api.mincenter.kr
+          VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+          PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+          API_BASE_URL=https://${{ secrets.API_DOMAIN }}
           NODE_ENV=production
-          PUBLIC_DOMAIN=mincenter.kr
+          PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
+          VITE_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          VITE_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
           EOF
           echo "=== 환경변수 파일 생성 완료 ==="
           cat .env.production
@@ -154,14 +308,16 @@ jobs:
           context: ./frontends/site
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/mincenter-site:latest
+            ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-site:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-site:latest
           build-args: |
-            VITE_API_URL=https://api.mincenter.kr
-            PUBLIC_API_URL=https://api.mincenter.kr
-            API_BASE_URL=https://api.mincenter.kr
+            VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            API_BASE_URL=https://${{ secrets.API_DOMAIN }}
             NODE_ENV=production
-            PUBLIC_DOMAIN=mincenter.kr
+            PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            VITE_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
       
@@ -197,7 +353,7 @@ jobs:
             docker compose ps
             echo "========================="
             echo "=== 새 이미지 pull ==="
-            docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-site:${{ github.sha }}
             echo "=== 이미지 pull 완료 ==="
             echo "=== nginx proxy manager 네트워크 확인 ==="
             NPM_NETWORK=$(docker network ls | grep -i nginx | awk '{print $2}' | head -n1)
@@ -208,45 +364,45 @@ jobs:
                 echo "발견된 nginx 네트워크: $NPM_NETWORK"
             fi
             echo
-            echo "=== Docker Compose 파일 업데이트 (수정됨) ==="
-            cat > docker-compose.yml << 'EOF'
+            echo "=== Docker Compose 파일 업데이트 (변수화됨) ==="
+            cat > docker-compose.yml << EOF
             version: '3.8'
             
             networks:
               default:
                 external: true
-                name: proxy
+                name: ${{ secrets.DOCKER_NETWORK }}
             
             services:
               postgres:
                 image: postgres:13-alpine
-                container_name: mincenter-postgres
+                container_name: ${{ secrets.PROJECT_NAME }}-postgres
                 restart: unless-stopped
                 environment:
-                  POSTGRES_DB: mincenter
-                  POSTGRES_USER: mincenter
-                  POSTGRES_PASSWORD: "!@swjp0209^^"
+                  POSTGRES_DB: ${{ secrets.DB_NAME }}
+                  POSTGRES_USER: ${{ secrets.DB_USER }}
+                  POSTGRES_PASSWORD: "${{ secrets.POSTGRES_PASSWORD }}"
                 volumes:
                   - postgres_data:/var/lib/postgresql/data
                   - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
                   - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
                 ports:
-                  - "15432:5432"
+                  - "${{ secrets.POSTGRES_PORT }}:5432"
                 healthcheck:
-                  test: ["CMD-SHELL", "pg_isready -U mincenter"]
+                  test: ["CMD-SHELL", "pg_isready -U ${{ secrets.DB_USER }}"]
                   interval: 10s
                   timeout: 5s
                   retries: 5
             
               redis:
                 image: redis:7-alpine
-                container_name: mincenter-redis
+                container_name: ${{ secrets.PROJECT_NAME }}-redis
                 restart: unless-stopped
-                command: redis-server --requirepass tnekwoddl
+                command: redis-server --requirepass ${{ secrets.REDIS_PASSWORD }}
                 volumes:
                   - redis_data:/data
                 ports:
-                  - "16379:6379"
+                  - "${{ secrets.REDIS_PORT }}:6379"
                 healthcheck:
                   test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
                   interval: 10s
@@ -254,8 +410,8 @@ jobs:
                   retries: 5
             
               site:
-                image: ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
-                container_name: mincenter-site
+                image: ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-site:${{ github.sha }}
+                container_name: ${{ secrets.PROJECT_NAME }}-site
                 restart: unless-stopped
                 depends_on:
                   postgres:
@@ -263,12 +419,12 @@ jobs:
                   redis:
                     condition: service_healthy
                 ports:
-                  - "13000:3000"
+                  - "${{ secrets.SITE_PORT }}:3000"
                 environment:
                   - NODE_ENV=production
-                  - PUBLIC_API_URL=https://api.mincenter.kr
-                  - API_BASE_URL=https://api.mincenter.kr
-                  - PUBLIC_DOMAIN=mincenter.kr
+                  - PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+                  - API_BASE_URL=https://${{ secrets.API_DOMAIN }}
+                  - PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
                   - PUBLIC_NODE_ENV=production
                 healthcheck:
                   test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
@@ -277,8 +433,8 @@ jobs:
                   retries: 3
             
               admin:
-                image: ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
-                container_name: mincenter-admin
+                image: ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:${{ github.sha }}
+                container_name: ${{ secrets.PROJECT_NAME }}-admin
                 restart: unless-stopped
                 depends_on:
                   postgres:
@@ -286,11 +442,11 @@ jobs:
                   redis:
                     condition: service_healthy
                 ports:
-                  - "13001:3000"
+                  - "${{ secrets.ADMIN_PORT }}:3000"
                 environment:
                   - NODE_ENV=production
-                  - PUBLIC_API_URL=http://api.mincenter.kr
-                  - PUBLIC_DOMAIN=localhost
+                  - PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+                  - PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
                   - PUBLIC_NODE_ENV=production
                 healthcheck:
                   test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
@@ -351,11 +507,11 @@ jobs:
         run: |
           cd frontends/admin
           cat > .env.production << EOF
-          VITE_API_URL=https://api.mincenter.kr
-          PUBLIC_API_URL=https://api.mincenter.kr
-          API_BASE_URL=https://api.mincenter.kr
+          VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+          PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+          API_BASE_URL=https://${{ secrets.API_DOMAIN }}
           NODE_ENV=production
-          PUBLIC_DOMAIN=mincenter.kr
+          PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
           EOF
           echo "=== Admin 환경변수 파일 생성 완료 ==="
           cat .env.production
@@ -366,14 +522,14 @@ jobs:
           context: ./frontends/admin
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/mincenter-admin:latest
+            ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:latest
           build-args: |
-            VITE_API_URL=https://api.mincenter.kr
-            PUBLIC_API_URL=https://api.mincenter.kr
-            API_BASE_URL=https://api.mincenter.kr
+            VITE_API_URL=https://${{ secrets.API_DOMAIN }}
+            PUBLIC_API_URL=https://${{ secrets.API_DOMAIN }}
+            API_BASE_URL=https://${{ secrets.API_DOMAIN }}
             NODE_ENV=production
-            PUBLIC_DOMAIN=mincenter.kr
+            PUBLIC_DOMAIN=${{ secrets.DOMAIN_NAME }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
       
@@ -403,12 +559,12 @@ jobs:
             echo "=================="
             cd ${{ secrets.DEPLOY_PATH }}
             echo "=== Admin 새 이미지 pull ==="
-            docker pull ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:${{ github.sha }}
             echo "=== Admin 이미지 pull 완료 ==="
             echo "=== Admin 컨테이너 업데이트 ==="
             
             # 현재 docker-compose.yml에서 admin 서비스 이미지 태그 업데이트
-            sed -i "s|ghcr.io/${{ github.repository_owner }}/mincenter-admin:.*|ghcr.io/${{ github.repository_owner }}/mincenter-admin:${{ github.sha }}|g" docker-compose.yml
+            sed -i "s|ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:.*|ghcr.io/${{ github.repository_owner }}/${{ secrets.PROJECT_NAME }}-admin:${{ github.sha }}|g" docker-compose.yml
             
             echo "=== Admin 컨테이너 재시작 ==="
             docker compose down admin
