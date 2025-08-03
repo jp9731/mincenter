@@ -61,3 +61,4 @@ npm publish
 ## 라이센스# Test commit for site deployment
 # Test commit for improved deployment detection
 # Test commit for fixed deployment workflow
+# Test commit for rsync-based deployment
