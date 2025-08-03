@@ -127,6 +127,10 @@ jobs:
           # 빌드 결과물만 유지
           find . -name "*.log" -delete
           find . -name "*.tmp" -delete
+          
+          # 환경변수 설정 (GitHub Actions 환경용)
+          export API_BASE_URL=http://mincenter-api:8080
+          export NODE_ENV=production
       
       - name: Upload site files
         uses: appleboy/scp-action@v0.1.7
@@ -212,6 +216,10 @@ jobs:
           # 빌드 결과물만 유지
           find . -name "*.log" -delete
           find . -name "*.tmp" -delete
+          
+          # 환경변수 설정 (GitHub Actions 환경용)
+          export API_BASE_URL=http://mincenter-api:8080
+          export NODE_ENV=production
       
       - name: Upload admin files
         uses: appleboy/scp-action@v0.1.7
