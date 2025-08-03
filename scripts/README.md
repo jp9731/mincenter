@@ -18,6 +18,9 @@
 - **`cleanup-backups.sh`** - 오래된 백업 파일 정리
 - **`seed-database.sh`** - 데이터베이스에 초기 데이터 삽입
 
+### 🔐 **환경 설정 관리**
+- **`backup-env.sh`** - .env 파일 백업 및 복구
+
 ### ⚙️ **서버 설정**
 - **`setup-new-server-env.sh`** - 새로운 서버 환경 초기 설정
 
@@ -63,6 +66,21 @@
 
 # 초기 데이터 삽입
 ./scripts/seed-database.sh
+```
+
+### 환경 설정 관리
+```bash
+# .env 파일 상태 확인
+./scripts/backup-env.sh check
+
+# .env 파일 백업
+./scripts/backup-env.sh backup
+
+# .env 파일 복구
+./scripts/backup-env.sh restore
+
+# 로컬 .env를 서버에 동기화
+./scripts/backup-env.sh sync
 ```
 
 ### 서버 설정
@@ -118,6 +136,7 @@ scripts/
 ├── backup-database.sh       # DB 백업
 ├── cleanup-backups.sh       # 백업 정리
 ├── seed-database.sh         # 초기 데이터 삽입
+├── backup-env.sh            # .env 파일 백업/복구
 ├── setup-new-server-env.sh  # 서버 환경 설정
 └── README.md               # 이 파일
 ``` 
