@@ -1,0 +1,57 @@
+# 로컬 개발 환경용 Docker Compose 오버라이드
+# 이 파일은 docker-compose.yml과 함께 자동으로 로드됩니다.
+
+version: '3.8'
+
+services:
+  postgres:
+    # 로컬 개발에서는 볼륨 마운트 추가
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/korean-setup.sql:/docker-entrypoint-initdb.d/01-korean-setup.sql:ro
+      - ./database/init.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+
+  api:
+    # 로컬 개발에서는 소스 코드 마운트
+    volumes:
+      - ./backends/api:/app
+      - api_target:/app/target
+    environment:
+      # 로컬 개발 환경 설정
+      RUST_LOG: debug
+      RUST_BACKTRACE: 1
+    # 로컬 개발에서는 포트 포워딩
+    ports:
+      - "18080:18080"
+
+  site:
+    # 로컬 개발에서는 소스 코드 마운트
+    volumes:
+      - ./frontends/site:/app
+      - /app/node_modules
+    environment:
+      # 로컬 개발 환경 설정
+      NODE_ENV: development
+    # 로컬 개발에서는 포트 포워딩
+    ports:
+      - "13000:13000"
+
+  admin:
+    # 로컬 개발에서는 소스 코드 마운트
+    volumes:
+      - ./frontends/admin:/app
+      - /app/node_modules
+    environment:
+      # 로컬 개발 환경 설정
+      NODE_ENV: development
+    # 로컬 개발에서는 포트 포워딩
+    ports:
+      - "13001:13001"
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  api_target:
+    driver: local 

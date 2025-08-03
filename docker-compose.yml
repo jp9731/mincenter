@@ -1,61 +1,78 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:13
-    container_name: ${APP_NAME}_postgres
+    container_name: ${APP_NAME:-mincenter}_postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB:-mincenter}
+      POSTGRES_USER: ${POSTGRES_USER:-mincenter}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # 한국어 지원을 위한 로케일 설정
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # 초기화 스크립트 자동 실행 (순서 중요)
       - ./database/korean-setup.sql:/docker-entrypoint-initdb.d/01-korean-setup.sql:ro
       - ./database/init.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
       - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
-      # 설정 파일 마운트
       - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mincenter} -d ${POSTGRES_DB:-mincenter}"]
       interval: 30s
       timeout: 10s
       retries: 3
-    # 성능 최적화를 위한 명령어 추가
-    # command: >
-    #   postgres  -c max_connections=200 -c shared_buffers=256MB -c effective_cache_size=1GB -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=200 -c max_wal_size=1GB -c min_wal_size=80MB -c autovacuum_vacuum_scale_factor=0.2 -c autovacuum_analyze_scale_factor=0.1 -c autovacuum_freeze_max_age=150000000 -c autovacuum_freeze_min_age=5000000
 
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ${APP_NAME:-mincenter}_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Rust API
   api:
     build:
       context: ./backends/api
       dockerfile: Dockerfile
-    container_name: ${APP_NAME}_api
+    container_name: ${APP_NAME:-mincenter}_api
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mincenter}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mincenter}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      API_PORT: ${API_PORT}
-      RUST_LOG: ${RUST_LOG_LEVEL}
+      REFRESH_SECRET: ${REFRESH_SECRET}
+      API_PORT: ${API_PORT:-18080}
+      RUST_LOG: ${RUST_LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN}
+      NODE_ENV: ${NODE_ENV:-production}
     ports:
-      - "${API_PORT}:${API_PORT}"
+      - "${API_PORT:-18080}:${API_PORT:-18080}"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${API_PORT}/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT:-18080}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # SvelteKit Site
   site:
     build:
       context: ./frontends/site
@@ -63,20 +80,21 @@ services:
       args:
         - API_URL=${API_URL}
         - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME}_site
+    container_name: ${APP_NAME:-mincenter}_site
     depends_on:
       api:
         condition: service_healthy
     environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${SITE_PORT}
-      API_URL: http://api:${API_PORT}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${SITE_PORT:-13000}
+      API_URL: http://api:${API_PORT:-18080}
       PUBLIC_API_URL: ${PUBLIC_API_URL}
       SESSION_SECRET: ${SESSION_SECRET}
     ports:
-      - "${SITE_PORT}:${SITE_PORT}"
+      - "${SITE_PORT:-13000}:${SITE_PORT:-13000}"
     restart: unless-stopped
 
+  # SvelteKit Admin
   admin:
     build:
       context: ./frontends/admin
@@ -84,68 +102,28 @@ services:
       args:
         - API_URL=${API_URL}
         - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME}_admin
+    container_name: ${APP_NAME:-mincenter}_admin
     depends_on:
       api:
         condition: service_healthy
     environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${ADMIN_PORT}
-      API_URL: http://api:${API_PORT}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${ADMIN_PORT:-13001}
+      API_URL: http://api:${API_PORT:-18080}
       PUBLIC_API_URL: ${PUBLIC_API_URL}
       SESSION_SECRET: ${ADMIN_SESSION_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
-      - "${ADMIN_PORT}:${ADMIN_PORT}"
+      - "${ADMIN_PORT:-13001}:${ADMIN_PORT:-13001}"
     restart: unless-stopped
-
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: ${APP_NAME}_nginx
-  #   depends_on:
-  #     - site
-  #     - admin
-  #     - api
-  #   volumes:
-  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-  #     - ./nginx/ssl:/etc/nginx/ssl:ro
-  #     - nginx_logs:/var/log/nginx
-  #   ports:
-  #     - "${HTTP_PORT}:80"
-  #     - "${HTTPS_PORT}:443"
-  #   restart: unless-stopped
-  #   environment:
-  #     - DOMAIN=${DOMAIN}
-  #     - API_UPSTREAM=api:${API_PORT}
-  #     - SITE_UPSTREAM=site:${SITE_PORT}
-  #     - ADMIN_UPSTREAM=admin:${ADMIN_PORT}
-
-  redis:
-    image: redis:7-alpine
-    container_name: ${APP_NAME}_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "${REDIS_PORT}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-  # nginx_logs:
-  #   driver: local
 
 networks:
   default:
-    name: ${APP_NAME}_network
+    name: ${APP_NAME:-mincenter}_network
     driver: bridge
