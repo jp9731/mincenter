@@ -100,7 +100,7 @@ jobs:
           cd frontends/site
           npm run build
       
-      - name: Deploy to server
+      - name: Prepare server directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -110,10 +110,6 @@ jobs:
           script: |
             # 사이트 디렉토리 준비
             mkdir -p ${{ secrets.DEPLOY_PATH }}/site
-            
-            # 컨테이너 재시작
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart site
       
       - name: Prepare site files
         run: |
@@ -135,6 +131,18 @@ jobs:
           target: "${{ secrets.DEPLOY_PATH }}/site/"
           strip_components: 0
           overwrite: true
+      
+      - name: Restart site container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # 컨테이너 재시작
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose restart site
 
   # 관리자 배포
   deploy-admin:
@@ -161,7 +169,7 @@ jobs:
           cd frontends/admin
           npm run build
       
-      - name: Deploy to server
+      - name: Prepare server directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -171,10 +179,6 @@ jobs:
           script: |
             # 관리자 디렉토리 준비
             mkdir -p ${{ secrets.DEPLOY_PATH }}/admin
-            
-            # 컨테이너 재시작
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart admin
       
       - name: Prepare admin files
         run: |
@@ -196,6 +200,18 @@ jobs:
           target: "${{ secrets.DEPLOY_PATH }}/admin/"
           strip_components: 0
           overwrite: true
+      
+      - name: Restart admin container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # 컨테이너 재시작
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose restart admin
 
   # API 배포
   deploy-api:
@@ -220,7 +236,7 @@ jobs:
             backends/api/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Deploy to server
+      - name: Prepare server directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -230,18 +246,6 @@ jobs:
           script: |
             # API 디렉토리 준비
             mkdir -p ${{ secrets.DEPLOY_PATH }}/api
-            
-            # 서버에서 Rust 빌드
-            cd ${{ secrets.DEPLOY_PATH }}/api
-            cargo build --release
-            
-            # 바이너리 복사 및 권한 설정
-            cp target/release/mincenter-api mincenter-api
-            chmod +x mincenter-api
-            
-            # 컨테이너 재시작
-            cd ${{ secrets.DEPLOY_PATH }}
-            docker compose restart api
       
       - name: Prepare API files
         run: |
@@ -263,6 +267,26 @@ jobs:
           target: "${{ secrets.DEPLOY_PATH }}/api/"
           strip_components: 0
           overwrite: true
+      
+      - name: Build and restart API
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # 서버에서 Rust 빌드
+            cd ${{ secrets.DEPLOY_PATH }}/api
+            cargo build --release
+            
+            # 바이너리 복사 및 권한 설정
+            cp target/release/mincenter-api mincenter-api
+            chmod +x mincenter-api
+            
+            # 컨테이너 재시작
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose restart api
 
   # 환경 설정 배포
   deploy-env:
