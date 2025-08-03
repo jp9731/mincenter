@@ -31,8 +31,8 @@ jobs:
             git fetch origin ${{ github.base_ref }}
             CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
           else
-            # 직접 push된 경우
-            CHANGED_FILES=$(git diff --name-only HEAD~1...HEAD)
+            # 직접 push된 경우 (최근 3개 커밋 범위로 확장)
+            CHANGED_FILES=$(git diff --name-only HEAD~3...HEAD)
           fi
           
           echo "Changed files:"
@@ -41,14 +41,20 @@ jobs:
           # 각 컴포넌트별 변경 감지
           if echo "$CHANGED_FILES" | grep -q "^frontends/site/"; then
             echo "site=true" >> $GITHUB_OUTPUT
+            echo "Site changes detected:"
+            echo "$CHANGED_FILES" | grep "^frontends/site/"
           else
             echo "site=false" >> $GITHUB_OUTPUT
+            echo "No site changes detected"
           fi
           
           if echo "$CHANGED_FILES" | grep -q "^frontends/admin/"; then
             echo "admin=true" >> $GITHUB_OUTPUT
+            echo "Admin changes detected:"
+            echo "$CHANGED_FILES" | grep "^frontends/admin/"
           else
             echo "admin=false" >> $GITHUB_OUTPUT
+            echo "No admin changes detected"
           fi
           
           if echo "$CHANGED_FILES" | grep -q "^backends/api/"; then
