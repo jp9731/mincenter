@@ -180,6 +180,8 @@
 			</div>
 		{/if}
 
-		
+		<div class="mt-12 text-center">
+			<Button href="/community/notice" variant="outline">2더 많은 소식 보기!!!</Button>
+		</div>
 	</div>
 </section>
