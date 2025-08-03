@@ -128,6 +128,13 @@ jobs:
             
             # 사이트 디렉토리 준비
             mkdir -p ${{ secrets.DEPLOY_PATH }}/site
+            
+            # SSH 연결 확인
+            echo "=== SSH 연결 확인 ==="
+            echo "현재 사용자: $(whoami)"
+            echo "현재 경로: $(pwd)"
+            echo "서버 호스트: $(hostname)"
+            echo "====================="
       
       - name: Prepare site files
         run: |

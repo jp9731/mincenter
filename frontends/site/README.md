@@ -66,3 +66,4 @@ npm publish
 # Test commit for corrected deployment order
 # Test commit for server info and env fix - #오후
 # Test deployment after SSH connection success - #오후
+# SSH 연결 테스트 - #오후
