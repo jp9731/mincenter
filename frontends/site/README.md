@@ -65,3 +65,4 @@ npm publish
 # Test commit for scp-based deployment
 # Test commit for corrected deployment order
 # Test commit for server info and env fix - #오후
+# Test deployment after SSH connection success - #오후
