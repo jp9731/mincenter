@@ -205,7 +205,7 @@ sudo yum install redis
 sudo cp nginx/minshool-loadbalancer.conf /etc/nginx/conf.d/
 
 # 애플리케이션 서버 설정
-pm2 start ecosystem.config.js
+docker compose up -d
 ```
 
 ### 2단계: 세션 설정
@@ -224,8 +224,9 @@ redis-cli monitor
 # Nginx 상태 확인
 curl http://localhost/upstream_status
 
-# PM2 모니터링
-pm2 monit
+# Docker Compose 모니터링
+docker compose ps
+docker compose logs -f
 ```
 
 ## 📊 모니터링 지표

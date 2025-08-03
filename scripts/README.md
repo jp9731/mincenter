@@ -199,4 +199,24 @@ scripts/
 ├── docker-compose-manager.sh # Docker Compose 관리
 ├── setup-new-server-env.sh  # 서버 환경 설정
 └── README.md               # 이 파일
+```
+
+## 📦 패키지 관리
+
+### 독립적인 패키지 구조
+- ✅ **Site**: `frontends/site/package.json` (자체 의존성 관리)
+- ✅ **Admin**: `frontends/admin/package.json` (자체 의존성 관리)
+- ✅ **API**: Rust Cargo.toml 기반 (별도 패키지 관리)
+- ✅ **최상위**: package.json 제거 (불필요한 중복 제거)
+
+### 패키지 설치 및 관리
+```bash
+# Site 의존성 설치
+cd frontends/site && npm install
+
+# Admin 의존성 설치
+cd frontends/admin && npm install
+
+# API 의존성 설치
+cd backends/api && cargo build
 ``` 

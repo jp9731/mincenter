@@ -76,6 +76,7 @@ database/backup_*.sql
 # Deployment marker files
 .deploy_marker
 
-# Package manager lock files (keep package-lock.json for consistency)
+# Package manager lock files
+# package-lock.json (각 프로젝트별로 관리)
 # yarn.lock
 # pnpm-lock.yaml

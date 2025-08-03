@@ -128,20 +128,21 @@ docker service create \
 docker service scale minshool-app=5
 ```
 
-### **2. PM2 Cluster 방식**
-```javascript
-// ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'minshool-app',
-    script: './app.js',
-    instances: 'max',  // CPU 코어 수만큼
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production'
-    }
-  }]
-}
+### **2. Docker Compose 스케일링**
+```yaml
+# docker-compose.yml
+services:
+  site:
+    image: mincenter-site:latest
+    deploy:
+      replicas: 3  # 3개 인스턴스 실행
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
 ### **3. Nginx Upstream 자동 감지**
