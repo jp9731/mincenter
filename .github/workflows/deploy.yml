@@ -163,7 +163,7 @@ jobs:
             echo "=== 새 이미지 pull ==="
             docker pull ghcr.io/${{ github.repository_owner }}/mincenter-site:${{ github.sha }}
             echo "=== 이미지 pull 완료 ==="
-            echo "=== Docker Compose 파일 업데이트 ==="
+            echo "=== Docker Compose 파일 업데이트 (수정됨) ==="
             cat > docker-compose.yml << 'EOF'
             version: '3.8'
             
