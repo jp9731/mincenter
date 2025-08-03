@@ -50,6 +50,7 @@ services:
     environment:
       - NODE_ENV=production
       - PUBLIC_API_URL=https://api.mincenter.kr
+      - API_BASE_URL=https://api.mincenter.kr
       - PUBLIC_DOMAIN=mincenter.kr
       - PUBLIC_NODE_ENV=production
     healthcheck:

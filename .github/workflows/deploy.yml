@@ -109,6 +109,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Create environment file
+        run: |
+          cd frontends/site
+          cat > .env.production << EOF
+          VITE_API_URL=https://api.mincenter.kr
+          PUBLIC_API_URL=https://api.mincenter.kr
+          API_BASE_URL=https://api.mincenter.kr
+          NODE_ENV=production
+          PUBLIC_DOMAIN=mincenter.kr
+          EOF
+          echo "=== 환경변수 파일 생성 완료 ==="
+          cat .env.production
+      
       - name: Build and push site Docker image
         uses: docker/build-push-action@v5
         with:
@@ -120,7 +133,9 @@ jobs:
           build-args: |
             VITE_API_URL=https://api.mincenter.kr
             PUBLIC_API_URL=https://api.mincenter.kr
+            API_BASE_URL=https://api.mincenter.kr
             NODE_ENV=production
+            PUBLIC_DOMAIN=mincenter.kr
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
@@ -158,6 +173,9 @@ jobs:
                sleep 5; \
                echo "=== 배포 후 컨테이너 상태 ==="; \
                docker compose ps; \
+               echo "============================="; \
+               echo "=== 환경변수 확인 ==="; \
+               docker compose exec -T site env | grep -E "(API_BASE_URL|NODE_ENV|PUBLIC_API_URL)" || echo "환경변수 확인 실패"; \
                echo "============================="'
 
   # 관리자 배포
