@@ -7,6 +7,11 @@ on:
     branches: [ main ]
     types: [ closed ]
 
+# GitHub Container Registry 권한 설정
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   # 변경 감지
   detect-changes:
@@ -96,12 +101,11 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Build and push site Docker image
         uses: docker/build-push-action@v5
@@ -109,8 +113,8 @@ jobs:
           context: ./frontends/site
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/site:${{ github.sha }}
-            ghcr.io/${{ github.repository }}/site:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/mincenter-site:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/mincenter-site:latest
           build-args: |
             VITE_API_URL=https://api.mincenter.kr
             PUBLIC_API_URL=https://api.mincenter.kr
@@ -144,7 +148,7 @@ jobs:
                docker compose ps; \
                echo "========================="; \
                echo "=== 새 이미지 pull ==="; \
-               docker pull ghcr.io/${{ github.repository }}/site:${{ github.sha }}; \
+               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/mincenter-site:${{ github.sha }}; \
                echo "=== 이미지 pull 완료 ==="; \
                echo "=== 컨테이너 업데이트 ==="; \
                docker compose up -d site; \
