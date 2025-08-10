@@ -86,6 +86,11 @@
 		return '#';
 	}
 
+	// 메뉴 클릭 시 모바일 메뉴 닫기
+	function closeMobileMenu() {
+		mobileMenuOpen = false;
+	}
+
 	function isActiveMenu(menu: MenuTree): boolean {
 		const menuUrl = getMenuUrl(menu);
 		return currentPage.url.pathname.startsWith(menuUrl);
@@ -236,6 +241,7 @@
 							<div>
 								<a
 									href={getMenuUrl(menu)}
+									onclick={closeMobileMenu}
 									class="hover:text-primary-600 block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
 									class:bg-primary-50={isActiveMenu(menu)}
 									class:text-primary-600={isActiveMenu(menu)}
@@ -247,6 +253,7 @@
 										{#each menu.children as child}
 											<a
 												href={getMenuUrl(child)}
+												onclick={closeMobileMenu}
 												class="hover:text-primary-600 block px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
 												class:bg-primary-50={isActiveMenu(child)}
 												class:text-primary-600={isActiveMenu(child)}
@@ -283,7 +290,7 @@
 										<span class="font-semibold text-primary-600">{currentUser.points || 0}P</span>
 									</div>
 								</div>
-								<Button variant="ghost" href="/my" class="w-full justify-start">
+								<Button variant="ghost" href="/my" onclick={closeMobileMenu} class="w-full justify-start">
 									{#if currentUser.profile_image}
 										<img src="{currentUser.profile_image}" alt="프로필 이미지" class="w-6 h-6 rounded-full object-cover border mr-2" />
 									{:else}
@@ -301,10 +308,10 @@
 						<!-- 로그인되지 않은 상태 (모바일) -->
 						<div class="flex items-center px-5">
 							<div class="flex-shrink-0">
-								<Button variant="ghost" href="/auth/login" class="w-full">로그인</Button>
+								<Button variant="ghost" href="/auth/login" onclick={closeMobileMenu} class="w-full">로그인</Button>
 							</div>
 							<div class="ml-3">
-								<Button href="/auth/register" class="w-full">회원가입</Button>
+								<Button href="/auth/register" onclick={closeMobileMenu} class="w-full">회원가입</Button>
 							</div>
 						</div>
 					{/if}
