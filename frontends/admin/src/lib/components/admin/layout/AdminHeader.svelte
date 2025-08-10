@@ -1,21 +1,16 @@
 <script lang="ts">
-	import { adminUser, adminLogout } from '$lib/stores/admin';
-	import { Button } from '$lib/components/ui/button';
-	import {
-		BellIcon,
-		UserIcon,
-		LogOutIcon,
-		MenuIcon,
-		ChevronLeftIcon,
-		ChevronRightIcon
-	} from 'lucide-svelte';
 	import { createEventDispatcher } from 'svelte';
+	import { adminLogout } from '$lib/api/admin';
+	import { adminUser } from '$lib/stores/admin';
+	import { MenuIcon, ChevronRightIcon, ChevronLeftIcon, BellIcon, UserIcon, LogOutIcon } from 'lucide-svelte';
 
-	export let sidebarCollapsed: boolean;
-	export let handleToggleSidebar: () => void;
-	export let handleToggleCollapse: () => void;
+	const { sidebarCollapsed, handleToggleSidebar, handleToggleCollapse } = $props<{
+		sidebarCollapsed: boolean;
+		handleToggleSidebar: () => void;
+		handleToggleCollapse: () => void;
+	}>();
 
-	let showUserMenu = false;
+	let showUserMenu = $state(false);
 	const dispatch = createEventDispatcher();
 
 	async function handleLogout() {
@@ -86,7 +81,6 @@
 			{#if showUserMenu}
 				<div
 					class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border bg-white py-1 shadow-lg"
-					style="z-index: 9999;"
 				>
 					<button
 						class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"

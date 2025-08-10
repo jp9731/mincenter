@@ -15,7 +15,7 @@
 	} from '$lib/components/ui/dropdown-menu';
 
 	// Svelte 5 runes 방식으로 상태 변수 정의
-	let mobileMenuOpen = false;
+	let mobileMenuOpen = $state(false);
 	let menus = $state<MenuTree[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
@@ -229,7 +229,7 @@
 
 		<!-- 모바일 메뉴 -->
 		{#if mobileMenuOpen}
-			<div class="sm:hidden" id="mobile-menu">
+			<div class="sm:hidden absolute top-full left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg" id="mobile-menu">
 				<div class="space-y-1 pb-3 pt-2">
 					{#if !currentLoading || currentMenus.length > 0}
 						{#each currentMenus as menu}
