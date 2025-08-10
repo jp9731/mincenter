@@ -34,5 +34,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: mincenter-site
-          directory: .svelte-kit/output/client
+          directory: .svelte-kit/cloudflare
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
