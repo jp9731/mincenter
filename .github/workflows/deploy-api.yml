@@ -42,19 +42,39 @@ jobs:
           echo "📝 Note: No test build in GitHub Actions to avoid SQL connection errors"
           echo "🏗️  Building will be done on the server with proper database access"
           
-          # 프로젝트 디렉토리로 이동
-          cd /home/admin/projects/mincenter
+          # 프로젝트 디렉토리 확인 및 생성
+          echo "📁 Checking project directory..."
+          mkdir -p /home/admin/projects
+          
+          # Git 저장소 확인 및 클론/업데이트
+          if [ ! -d "/home/admin/projects/mincenter" ]; then
+            echo "📥 Cloning repository for the first time..."
+            cd /home/admin/projects
+            git clone https://github.com/jp9731/mincenter.git
+            cd mincenter
+          else
+            echo "📁 Project directory exists, updating..."
+            cd /home/admin/projects/mincenter
+            
+            # Git 저장소인지 확인
+            if [ ! -d ".git" ]; then
+              echo "⚠️  Not a git repository, re-cloning..."
+              cd /home/admin/projects
+              rm -rf mincenter
+              git clone https://github.com/jp9731/mincenter.git
+              cd mincenter
+            else
+              echo "📥 Pulling latest code from GitHub..."
+              git fetch origin
+              git reset --hard origin/main
+              git clean -fd
+            fi
+          fi
           
           # 기존 API 컨테이너 중지 및 제거
           echo "🛑 Stopping existing API container..."
           docker compose stop api 2>/dev/null || true
           docker compose rm -f api 2>/dev/null || true
-          
-          # Git에서 최신 코드 가져오기
-          echo "📥 Pulling latest code from GitHub..."
-          git fetch origin
-          git reset --hard origin/main
-          git clean -fd
           
           # API 디렉토리로 이동
           cd backends/api
