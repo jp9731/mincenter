@@ -150,7 +150,7 @@ jobs:
       timeout: 10s
       retries: 3
       start_period: 40s
-COMPOSE_EOF
+          COMPOSE_EOF
           fi
           
           # 환경변수 파일 업데이트
