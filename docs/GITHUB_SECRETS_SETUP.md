@@ -48,7 +48,7 @@ cat ~/.ssh/id_ed25519
 # 서버에서 확인
 docker compose ps
 docker compose logs api
-curl http://localhost:18080/health
+curl http://localhost:18080/api/health
 ```
 
 ## 🚨 주의사항

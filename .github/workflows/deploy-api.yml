@@ -109,7 +109,7 @@ jobs:
         
         # 헬스체크
         HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-          CMD curl -f http://localhost:18080/health || exit 1
+          CMD curl -f http://localhost:18080/api/health || exit 1
         
         # 실행 명령
         CMD ["/app/mincenter-api"]
@@ -145,12 +145,12 @@ jobs:
       - mincenter_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:18080/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-        COMPOSE_EOF
+COMPOSE_EOF
           fi
           
           # 환경변수 파일 업데이트
@@ -176,7 +176,7 @@ jobs:
           # 헬스체크
           echo "🏥 Performing health check..."
           for i in {1..10}; do
-            if docker exec mincenter-api curl -f http://localhost:18080/health; then
+            if docker exec mincenter-api curl -f http://localhost:18080/api/health; then
               echo "✅ API server is healthy!"
               break
             else
