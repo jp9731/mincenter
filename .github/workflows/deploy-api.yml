@@ -50,8 +50,15 @@ jobs:
           if [ ! -d "/home/admin/projects/mincenter" ]; then
             echo "📥 Cloning repository for the first time..."
             cd /home/admin/projects
+            
+            # 기존 디렉토리가 있다면 권한 문제 해결 후 삭제
+            if [ -d "mincenter" ]; then
+              sudo rm -rf mincenter || rm -rf mincenter
+            fi
+            
             git clone https://github.com/jp9731/mincenter.git
             cd mincenter
+            sudo chown -R admin:admin . || true
           else
             echo "📁 Project directory exists, updating..."
             cd /home/admin/projects/mincenter
@@ -60,14 +67,18 @@ jobs:
             if [ ! -d ".git" ]; then
               echo "⚠️  Not a git repository, re-cloning..."
               cd /home/admin/projects
-              rm -rf mincenter
+              sudo rm -rf mincenter || rm -rf mincenter
               git clone https://github.com/jp9731/mincenter.git
               cd mincenter
             else
               echo "📥 Pulling latest code from GitHub..."
               git fetch origin
               git reset --hard origin/main
-              git clean -fd
+              
+              # Docker 컨테이너가 생성한 파일들 정리 (권한 문제 해결)
+              echo "🧹 Cleaning Docker-generated files..."
+              sudo git clean -fd || git clean -fd
+              sudo chown -R admin:admin . || true
             fi
           fi
           
@@ -75,6 +86,11 @@ jobs:
           echo "🛑 Stopping existing API container..."
           docker compose stop api 2>/dev/null || true
           docker compose rm -f api 2>/dev/null || true
+          
+          # Docker 이미지 정리 (권한 문제가 있는 빌드 파일들 제거)
+          echo "🧹 Cleaning Docker images and build cache..."
+          docker image prune -f 2>/dev/null || true
+          docker builder prune -f 2>/dev/null || true
           
           # API 디렉토리로 이동
           cd backends/api
