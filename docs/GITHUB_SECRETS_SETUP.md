@@ -8,10 +8,10 @@ GitHub 저장소 → Settings → Secrets and variables → Actions → New repo
 
 | Secret Name | Value | 설명 |
 |-------------|-------|------|
-| `SERVER_HOST` | `mincenter.kr` | 서버 호스트명 |
-| `SERVER_USER` | `admin` | 서버 사용자명 |
-| `SERVER_SSH_KEY` | [SSH 개인키] | 서버 접속용 SSH 개인키 |
-| `DATABASE_PASSWORD` | `!@swjp0209^^` | PostgreSQL 비밀번호 |
+| `DEPLOY_HOST` | `mincenter.kr` | 서버 호스트명 |
+| `DEPLOY_USER` | `admin` | 서버 사용자명 |
+| `DEPLOY_SSH_KEY` | [SSH 개인키] | 서버 접속용 SSH 개인키 |
+| `POSTGRES_PASSWORD` | `!@swjp0209^^` | PostgreSQL 비밀번호 |
 | `REDIS_PASSWORD` | `tnekwoddl` | Redis 비밀번호 |
 | `JWT_SECRET` | `y4WiGMHXVN2BwluiRJj9TGt7Fh/B1pPZM24xzQtCnD8=` | JWT 토큰 시크릿 |
 | `REFRESH_SECRET` | `ASH2HiFHXbIHfkFxWUOcC07QUodLMJBBIPkNKQ/GKcQ=` | 리프레시 토큰 시크릿 |
@@ -34,8 +34,20 @@ cat ~/.ssh/id_ed25519
 ```
 
 ### 3. GitHub Secrets에 개인키 등록
-- SECRET_SSH_KEY에는 **개인키 전체 내용**을 붙여넣기
+- `DEPLOY_SSH_KEY`에는 **개인키 전체 내용**을 붙여넣기
 - `-----BEGIN OPENSSH PRIVATE KEY-----`부터 `-----END OPENSSH PRIVATE KEY-----`까지 전부
+
+### ⚠️ **SSH 키 오류 해결**
+다음 오류가 발생하면:
+```
+Error: The ssh-private-key argument is empty. Maybe the secret has not been configured, or you are using a wrong secret name in your workflow file.
+```
+
+**원인 및 해결:**
+1. `DEPLOY_SSH_KEY` Secret이 설정되지 않았음
+2. GitHub 저장소 → Settings → Secrets and variables → Actions
+3. `DEPLOY_SSH_KEY` 이름으로 SSH 개인키 전체 내용 추가
+4. 개인키는 텍스트 그대로 붙여넣기 (base64 인코딩 불필요)
 
 ## ✅ 설정 완료 후
 
