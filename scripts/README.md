@@ -92,12 +92,14 @@
 ./scripts/env-loader.sh switch production
 ./scripts/env-loader.sh diff local production
 
-# Docker Compose 관리
+# Docker Compose 관리 (Backend only)
 ./scripts/docker-compose-manager.sh status
 ./scripts/docker-compose-manager.sh start local
 ./scripts/docker-compose-manager.sh start production
 ./scripts/docker-compose-manager.sh logs api
 ./scripts/docker-compose-manager.sh clean
+
+# Note: Site and Admin are deployed to Cloudflare Pages
 
 ### 서버 설정
 ```bash

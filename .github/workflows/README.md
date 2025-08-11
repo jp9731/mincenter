@@ -2,23 +2,27 @@
 
 ## 🚀 현재 사용 중인 워크플로우
 
-### `deploy.yml` ✅ **메인 배포 워크플로우**
-- **트리거**: `push` to main, `pull_request` merge
-- **방식**: Docker 이미지 기반 선택적 배포
-- **네트워크**: nginx proxy manager와 통합 (`proxy` 네트워크)
+### **Frontend 배포 (Cloudflare Pages)** ✅
+- **Site**: `frontends/site/.github/workflows/deploy.yml`
+- **Admin**: `frontends/admin/.github/workflows/deploy.yml`
+- **트리거**: `push` to main/develop, `pull_request`
+- **방식**: GitHub Actions → Cloudflare Pages 자동 배포
 
 **배포 순서:**
-1. 🔄 **데이터베이스 마이그레이션** (가장 먼저 실행)
-2. 🔍 **변경 감지** (site, admin, api, env, db)
-3. 🏗️ **선택적 빌드 및 배포**
-   - Site: Docker 이미지 → GitHub Container Registry → 서버 배포
-   - Admin: Docker 이미지 → GitHub Container Registry → 서버 배포
+1. 🔍 **코드 변경 감지** (main/develop 브랜치 push)
+2. 🏗️ **빌드**: `npm run build` 
+3. 📤 **Cloudflare Pages 배포**: `.svelte-kit/cloudflare` 디렉토리
+4. 🔄 **캐시 퍼지**: Cloudflare 캐시 자동 정리
 
 **특징:**
-- 변경된 컴포넌트만 선별 배포
-- Docker 이미지 캐싱으로 빌드 시간 단축
-- 자동 Docker 리소스 정리 (용량 최적화)
-- SSH 터널을 통한 안전한 데이터베이스 연결
+- 글로벌 CDN을 통한 빠른 배포
+- 자동 HTTPS 및 도메인 관리
+- 프리뷰 배포 (PR 시 자동 생성)
+- 무제한 대역폭
+
+### **Backend 배포 (수동)** ⚠️
+- **API**: 현재 수동 배포만 가능
+- **PostgreSQL**: 수동 마이그레이션 필요
 
 ### `test.yml` 🧪 **테스트 및 빌드 검증**
 - **트리거**: `pull_request`, `push` to main/develop
@@ -35,37 +39,46 @@
 
 ## 📦 배포 아키텍처
 
-### Docker 네트워크 구조
+### 배포 아키텍처
 ```
-nginx-proxy-manager ──┐
-                      │ (proxy 네트워크)
-mincenter-site ───────┤
-mincenter-admin ──────┤
-mincenter-api ────────┤
-mincenter-postgres ───┤
-mincenter-redis ──────┘
+Frontend (Cloudflare Pages)
+├── mincenter-site ────→ Cloudflare CDN
+└── mincenter-admin ───→ Cloudflare CDN
+
+Backend (Docker Server)
+├── mincenter-api ─────→ Docker Container
+├── mincenter-postgres → Docker Container  
+└── mincenter-redis ───→ Docker Container
 ```
 
-### 빌드 및 배포 흐름
+### 배포 흐름
 ```
-개발자 Push → GitHub Actions → Docker Build → Container Registry → 서버 배포
-     ↓              ↓              ↓              ↓              ↓
-  코드 변경    변경 감지    이미지 생성    이미지 저장    컨테이너 교체
+Frontend: 개발자 Push → GitHub Actions → Cloudflare Pages
+             ↓              ↓              ↓
+          코드 변경    자동 빌드    글로벌 CDN 배포
+
+Backend:  개발자 Push → 수동 SSH → Docker 재시작
+             ↓              ↓              ↓
+          코드 변경    서버 접속    컨테이너 교체
 ```
 
 ## 📋 사용 가이드
 
-### 일반적인 배포 (자동)
+### Frontend 배포 (자동)
 ```bash
 git add .
 git commit -m "Feature: 새로운 기능 추가"
-git push origin main  # → deploy.yml 자동 실행
+git push origin main  # → Cloudflare Pages 자동 배포
 ```
 
-### 수동 배포 (긴급상황)
-1. GitHub → Actions → "Manual Deploy"
-2. "Run workflow" 클릭
-3. 배포 대상 선택 (all/site/admin/api/env)
+### Backend 배포 (수동)
+```bash
+# 서버에 SSH 접속
+ssh user@server
+cd /path/to/project
+git pull origin main
+docker-compose restart api
+```
 
 ### 코드 검증 (PR)
 ```bash
@@ -77,26 +90,31 @@ git push origin feature/new-feature
 
 ## 🔍 배포 모니터링
 
-### 실시간 로그 확인
+### Frontend 배포 모니터링
 ```bash
-# GitHub Actions 로그 (실시간)
-GitHub → Actions → 실행 중인 워크플로우
+# Cloudflare Pages 배포 로그
+GitHub → Actions → "Deploy to Cloudflare Pages"
 
-# 서버 컨테이너 로그
-docker compose logs -f site
-docker compose logs -f admin
-docker compose logs -f api
+# Cloudflare Pages 대시보드
+https://dash.cloudflare.com/pages/
+
+# 배포 상태 확인
+curl -f https://your-site-domain.pages.dev
+curl -f https://your-admin-domain.pages.dev
 ```
 
-### 배포 상태 확인
+### Backend 배포 모니터링
 ```bash
+# 서버 컨테이너 로그
+docker compose logs -f api
+docker compose logs -f postgres
+docker compose logs -f redis
+
 # 컨테이너 상태
 docker compose ps
 
-# 서비스 헬스체크
-curl -f http://localhost:13000  # Site
-curl -f http://localhost:13001  # Admin
-curl -f http://localhost:18080/health  # API
+# API 헬스체크
+curl -f http://localhost:18080/health
 ```
 
 ## ⚠️ 주의사항 및 문제 해결

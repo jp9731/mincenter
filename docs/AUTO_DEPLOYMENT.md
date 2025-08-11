@@ -293,10 +293,12 @@ your-private-key-content
 # 프로젝트 경로
 PROJECT_PATH=/path/to/your/project
 
-# 서비스 URL (헬스체크용)
-SITE_URL=http://your-domain:3000
-ADMIN_URL=http://your-domain:3001
-API_URL=http://your-domain:8000
+# API URL (헬스체크용)
+API_URL=http://your-domain:18080
+
+# Note: Site and Admin are deployed to Cloudflare Pages
+# SITE_URL=https://your-site.pages.dev
+# ADMIN_URL=https://your-admin.pages.dev
 ```
 
 ### **2. SSH 키 생성 및 설정**

@@ -78,54 +78,8 @@ services:
       timeout: 10s
       retries: 3
 
-  # SvelteKit Site
-  site:
-    build:
-      context: ./frontends/site
-      dockerfile: Dockerfile
-      args:
-        - API_URL=${API_URL}
-        - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME:-mincenter}_site
-    networks:
-      - mincenter_network
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${SITE_PORT:-13000}
-      API_URL: http://api:${API_PORT:-18080}
-      PUBLIC_API_URL: ${PUBLIC_API_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-    ports:
-      - "${SITE_PORT:-13000}:${SITE_PORT:-13000}"
-    restart: unless-stopped
-
-  # SvelteKit Admin
-  admin:
-    build:
-      context: ./frontends/admin
-      dockerfile: Dockerfile
-      args:
-        - API_URL=${API_URL}
-        - PUBLIC_API_URL=${PUBLIC_API_URL}
-    container_name: ${APP_NAME:-mincenter}_admin
-    networks:
-      - mincenter_network
-    depends_on:
-      api:
-        condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${ADMIN_PORT:-13001}
-      API_URL: http://api:${API_PORT:-18080}
-      PUBLIC_API_URL: ${PUBLIC_API_URL}
-      SESSION_SECRET: ${ADMIN_SESSION_SECRET}
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-    ports:
-      - "${ADMIN_PORT:-13001}:${ADMIN_PORT:-13001}"
-    restart: unless-stopped
+  # Note: Site and Admin are deployed to Cloudflare Pages via GitHub Actions
+  # See frontends/site/.github/workflows/deploy.yml and frontends/admin/.github/workflows/deploy.yml
 
 volumes:
   postgres_data:
