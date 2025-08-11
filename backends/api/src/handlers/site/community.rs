@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 use tracing::error;
+use std::collections::HashMap;
 use crate::utils::auth::get_current_user;
 use crate::{
     models::site::community,
@@ -17,6 +18,7 @@ use crate::{
     models::{FilePurpose, EntityType},
     errors::ApiError,
     utils::auth::Claims,
+    utils::url_id::{resolve_post_uuid, generate_post_url_id},
     services::thumbnail::ThumbnailService,
     AppState,
 };
@@ -825,8 +827,12 @@ pub async fn get_posts(
 
         let thumbnail_urls = generate_thumbnail_urls(&attached_files_option).await;
 
+        // URL ID 생성
+        let url_id = generate_post_url_id(&state.pool, &post.id).await.ok();
+
         let post_with_files = PostSummary {
             id: post.id,
+            url_id,
             title: post.title,
             board_id: post.board_id,
             user_name: post.user_name,
@@ -910,11 +916,48 @@ pub async fn get_posts(
 
 // 게시글 상세 조회 (권한 체크 적용)
 pub async fn get_post(
-    Path(post_id): Path<Uuid>,
+    Path(url_id): Path<String>,
     State(state): State<AppState>,
     Extension(claims): Extension<Option<Claims>>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
     let user_role = claims.as_ref().map(|c| c.role.as_str());
+    
+    // URL ID 또는 UUID를 UUID로 변환
+    let post_id = if url_id.contains('-') && url_id.len() < 20 {
+        // URL ID 형태 (예: 1-Nu_EJg)
+        match resolve_post_uuid(&state.pool, &url_id).await {
+            Ok(uuid) => {
+                println!("✅ URL ID 변환 성공: {} -> {}", url_id, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 게시글 URL ID: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "존재하지 않는 게시글입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    } else {
+        // 기존 UUID 형태 (하위 호환성)
+        match uuid::Uuid::parse_str(&url_id) {
+            Ok(uuid) => {
+                println!("✅ UUID 직접 사용: {}", uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 ID 형식: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "잘못된 ID 형식입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    };
     
     // 먼저 기본 게시글 정보만 조회해서 테스트 (status를 text로 캐스팅)
     let post_basic = sqlx::query!(
@@ -1043,8 +1086,12 @@ pub async fn get_post(
         false
     };
 
+    // URL ID 생성
+    let url_id = generate_post_url_id(&state.pool, &post_basic.id).await.ok();
+
     let post = PostDetail {
         id: post_basic.id,
+        url_id,
         board_id: post_basic.board_id,
         category_id: post_basic.category_id,
         user_id: post_basic.user_id,
@@ -1180,8 +1227,12 @@ pub async fn create_post(
     }
     
     // PostDetail 객체 생성
+    // URL ID 생성
+    let url_id = generate_post_url_id(&state.pool, &post_result.id).await.ok();
+
     let post = PostDetail {
         id: post_result.id,
+        url_id,
         board_id: post_result.board_id,
         category_id: post_result.category_id,
         user_id: post_result.user_id,
@@ -2154,8 +2205,12 @@ pub async fn get_posts_by_slug(
 
         let thumbnail_urls = generate_thumbnail_urls(&attached_files_option).await;
 
+        // URL ID 생성
+        let url_id = generate_post_url_id(&state.pool, &post.id).await.ok();
+
         let post_with_files = PostSummary {
             id: post.id,
+            url_id,
             title: post.title,
             board_id: post.board_id,
             user_name: post.user_name,
@@ -2474,8 +2529,12 @@ pub async fn create_reply_by_slug(
     })?;
 
     // PostDetailRaw를 PostDetail로 변환
+    // URL ID 생성
+    let url_id = generate_post_url_id(&state.pool, &reply.id).await.ok();
+
     let reply_detail = PostDetail {
         id: reply.id,
+        url_id,
         board_id: reply.board_id,
         category_id: reply.category_id,
         user_id: reply.user_id,
@@ -2983,8 +3042,12 @@ pub async fn get_recent_posts(
             generate_thumbnail_urls(&post_raw.attached_files).await
         };
         
+        // URL ID 생성
+        let url_id = generate_post_url_id(&state.pool, &post_raw.id).await.ok();
+
         let post_detail = PostDetail {
             id: post_raw.id,
+            url_id,
             title: post_raw.title,
             content: post_raw.content,
             user_id: post_raw.user_id,
@@ -3017,4 +3080,82 @@ pub async fn get_recent_posts(
     let posts = posts_with_thumbnails;
 
     Ok(Json(ApiResponse::success(posts, "최근 게시글을 성공적으로 조회했습니다.")))
+}
+
+// 모든 게시판과 카테고리 정보 조회 (관리자용)
+pub async fn get_boards_with_categories(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Option<Claims>>,
+) -> Result<Json<ApiResponse<Vec<BoardWithCategoriesResponse>>>, StatusCode> {
+    // 관리자 권한 확인
+    let user_role = claims.as_ref().map(|c| c.role.as_str());
+    if user_role != Some("admin") {
+        return Ok(Json(ApiResponse {
+            success: false,
+            message: "관리자 권한이 필요합니다.".to_string(),
+            data: None,
+            pagination: None,
+        }));
+    }
+
+    // 모든 게시판과 카테고리 조회
+    let boards_raw = sqlx::query!(
+        r#"
+        SELECT 
+            b.id as board_id,
+            b.name as board_name,
+            b.slug as board_slug,
+            c.id as "category_id?",
+            c.name as "category_name?"
+        FROM boards b
+        LEFT JOIN categories c ON b.id = c.board_id
+        ORDER BY b.display_order, c.display_order
+        "#
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("Failed to fetch boards with categories: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // 게시판별로 그룹핑
+    let mut boards_map: HashMap<uuid::Uuid, BoardWithCategoriesResponse> = HashMap::new();
+    
+    for row in boards_raw {
+        let board_entry = boards_map.entry(row.board_id).or_insert_with(|| {
+            BoardWithCategoriesResponse {
+                id: row.board_id,
+                name: row.board_name.clone(),
+                slug: row.board_slug.clone(),
+                categories: Vec::new(),
+            }
+        });
+
+        // 카테고리 정보가 있으면 추가 (LEFT JOIN이므로 null일 수 있음)
+        if let (Some(category_id), Some(category_name)) = (row.category_id, row.category_name) {
+            board_entry.categories.push(CategoryInfoResponse {
+                id: category_id,
+                name: category_name,
+            });
+        }
+    }
+
+    let boards: Vec<BoardWithCategoriesResponse> = boards_map.into_values().collect();
+
+    Ok(Json(ApiResponse::success(boards, "게시판과 카테고리 목록을 성공적으로 조회했습니다.")))
+}
+
+#[derive(Debug, Serialize)]
+pub struct BoardWithCategoriesResponse {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub slug: String,
+    pub categories: Vec<CategoryInfoResponse>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CategoryInfoResponse {
+    pub id: uuid::Uuid,
+    pub name: String,
 } 

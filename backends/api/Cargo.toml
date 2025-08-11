@@ -26,3 +26,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 image = { version = "0.24", features = ["jpeg", "png", "gif", "webp"] }
 ammonia = "3"
 urlencoding = "2.1"
+base64 = "0.21"
+futures-util = "0.3.31"

@@ -13,6 +13,7 @@ use crate::{
     models::admin::board::Board,
     models::site::community::{Post, PostDetail, CommentDetail, PostStatus, UpdatePostRequest},
     utils::auth::{generate_tokens, hash_refresh_token, get_current_user, Claims},
+    utils::url_id::generate_post_url_id,
     AppState,
     errors::ApiError,
 };
@@ -817,8 +818,12 @@ pub async fn get_posts(
             None
         };
 
+        // URL ID 생성
+        let url_id = generate_post_url_id(&state.pool, &post_raw.id).await.ok();
+
         let post = PostDetail {
             id: post_raw.id,
+            url_id,
             board_id: post_raw.board_id,
             category_id: post_raw.category_id,
             user_id: post_raw.user_id,
@@ -960,8 +965,12 @@ pub async fn get_post(
         None
     };
 
+    // URL ID 생성
+    let url_id = generate_post_url_id(&state.pool, &post_raw.id).await.ok();
+
     let post = PostDetail {
         id: post_raw.id,
+        url_id,
         board_id: post_raw.board_id,
         category_id: post_raw.category_id,
         user_id: post_raw.user_id,
@@ -1276,8 +1285,12 @@ pub async fn update_post(
         })?;
 
     // PostDetailRaw를 PostDetail로 변환
+    // URL ID 생성
+    let url_id = generate_post_url_id(&state.pool, &updated_post_raw.id).await.ok();
+
     let updated_post = PostDetail {
         id: updated_post_raw.id,
+        url_id,
         board_id: updated_post_raw.board_id,
         category_id: updated_post_raw.category_id,
         user_id: updated_post_raw.user_id,

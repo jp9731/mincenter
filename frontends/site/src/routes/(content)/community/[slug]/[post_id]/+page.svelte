@@ -1,14 +1,21 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { Heart, ThumbsUp, MessageCircle, Send, Download } from 'lucide-svelte';
-	import { user } from '$lib/stores/auth';
+	import { user, isAuthenticated } from '$lib/stores/auth';
 	import { canEditPost, canDeletePost, canCreateCommentInBoard, canCreateReplyInBoard, canDownloadFile } from '$lib/utils/permissions';
 	import { togglePostLike, toggleCommentLike, createComment, loadComments, comments as commentsStore, getPostLikeStatus, getCommentLikeStatus } from '$lib/stores/community';
 	import { checkThumbnailStatus } from '$lib/api/community';
 	import { goto } from '$app/navigation';
 	import { deletePost } from '$lib/stores/community';
+	import { getBoardsWithCategories, movePost, hidePost } from '$lib/api/community';
+	import { onMount } from 'svelte';
+	import { showAlert, showDestructiveConfirm } from '$lib/stores/alert';
+	import { dev } from '$app/environment';
 
 	// Props 인터페이스 및 선언
 	interface Props {
@@ -32,6 +39,24 @@
 	let replyContent = $state<Record<string, string>>({});
 	let editingComment = $state<Record<string, boolean>>({});
 	let editContent = $state<Record<string, string>>({});
+
+	// 게시글 관리 관련 상태
+	let boardsWithCategories = $state<any[]>([]);
+	let selectedBoardId = $state<string | null>(null);
+	let selectedCategoryId = $state<string | null>(null);
+	let moveReason = $state('');
+	let hideCategory = $state('');
+	let hideReason = $state('');
+	let hideTags = $state('');
+	let isMoving = $state(false);
+	let isHiding = $state(false);
+	let authLoading = $state(true);
+	
+	// 댓글 숨김 관련 상태
+	let commentHideCategory = $state('');
+	let commentHideReason = $state('');
+	let isHidingComment = $state(false);
+
 	function increaseFont() { fontSize = Math.min(fontSize + 0.1, 2.0); }
 	function decreaseFont() { fontSize = Math.max(fontSize - 0.1, 0.8); }
 
@@ -46,11 +71,135 @@
 	let canCreateReply = $derived(data.board ? canCreateReplyInBoard(data.board, $user) : false);
 	let canDownloadFiles = $derived(data.board ? canDownloadFile(data.board, $user) : false);
 
+	// 게시판과 카테고리 목록 로드
+	async function loadBoardsWithCategories() {
+		console.log('🔄 게시판과 카테고리 로드 시작...');
+		console.log('👤 현재 사용자:', $user);
+		console.log('🔐 사용자 역할:', $user?.role);
+		try {
+			const result = await getBoardsWithCategories();
+			console.log('✅ 게시판과 카테고리 로드 성공:', result);
+			boardsWithCategories = result;
+		} catch (error) {
+			console.error('❌ 게시판과 카테고리 로드 실패:', error);
+		}
+	}
+
+	// 게시글 이동 처리
+	async function handleMovePost() {
+		if (!selectedBoardId) return;
+
+		isMoving = true;
+		try {
+			await movePost(data.postId, {
+				moved_board_id: selectedBoardId,
+				moved_category_id: selectedCategoryId,
+				move_reason: moveReason || undefined
+			});
+
+			showAlert('성공', '게시글이 성공적으로 이동되었습니다.');
+			
+			// 페이지 새로고침
+			window.location.reload();
+		} catch (error) {
+			console.error('게시글 이동 실패:', error);
+			showAlert('오류', '게시글 이동에 실패했습니다.');
+		} finally {
+			isMoving = false;
+		}
+	}
+
+	// 게시글 숨김 처리
+	async function handleHidePost() {
+		if (!hideCategory) return;
+
+		isHiding = true;
+		try {
+			const tags = hideTags ? hideTags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined;
+			
+			await hidePost(data.postId, {
+				hide_category: hideCategory,
+				hide_reason: hideReason || undefined,
+				hide_tags: tags
+			});
+
+			showAlert('성공', '게시글이 성공적으로 숨겨졌습니다.');
+			
+			// 페이지 새로고침
+			window.location.reload();
+		} catch (error) {
+			console.error('게시글 숨김 실패:', error);
+			showAlert('오류', '게시글 숨김에 실패했습니다.');
+		} finally {
+			isHiding = false;
+		}
+	}
+
+	// 댓글 숨김 처리
+	async function handleHideComment(commentId: string) {
+		if (!commentHideCategory) return;
+
+		isHidingComment = true;
+		try {
+			const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/comments/${commentId}/hide`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('auth_token')}`
+				},
+				body: JSON.stringify({
+					hide_category: commentHideCategory,
+					hide_reason: commentHideReason || undefined
+				})
+			});
+
+			if (!response.ok) {
+				let errorMessage = '댓글 숨김에 실패했습니다.';
+				try {
+					const errorText = await response.text();
+					try {
+						const errorJson = JSON.parse(errorText);
+						if (errorJson.message) {
+							errorMessage = errorJson.message;
+						}
+					} catch (parseError) {
+						if (errorText.trim()) {
+							errorMessage = errorText;
+						}
+					}
+				} catch (textError) {
+					console.error('응답 텍스트 읽기 실패:', textError);
+				}
+				throw new Error(errorMessage);
+			}
+
+			showAlert('성공', '댓글이 성공적으로 숨겨졌습니다.');
+			
+			// 댓글 목록 새로고침
+			await loadCommentsData();
+			
+			// 상태 초기화
+			commentHideCategory = '';
+			commentHideReason = '';
+		} catch (error) {
+			console.error('댓글 숨김 실패:', error);
+			showAlert('오류', error instanceof Error ? error.message : '댓글 숨김에 실패했습니다.');
+		} finally {
+			isHidingComment = false;
+		}
+	}
+
+	// 컴포넌트 마운트 시 게시판과 카테고리 로드
+	$effect(() => {
+		if ($user?.role === 'admin') {
+			loadBoardsWithCategories();
+		}
+	});
 
 
 	async function handlePostLike() {
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 		
@@ -64,7 +213,7 @@
 
 	async function handleCommentLike(commentId: string) {
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 		
@@ -87,7 +236,7 @@
 	async function handleSubmitComment() {
 		if (!newComment.trim()) return;
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 
@@ -98,29 +247,34 @@
 			await loadCommentsData(); // 댓글 목록 새로고침
 		} catch (error) {
 			console.error('댓글 작성 실패:', error);
-			alert('댓글 작성에 실패했습니다.');
+			showAlert('오류', '댓글 작성에 실패했습니다.');
 		} finally {
 			isSubmitting = false;
 		}
 	}
 
 	async function handleDeletePost() {
-		if (!confirm('정말로 이 글을 삭제하시겠습니까?')) return;
-		try {
-			await deletePost(data.post.id);
-			alert('글이 삭제되었습니다.');
-			goto(`/community/${data.slug}`);
-		} catch (error) {
-			alert('글 삭제에 실패했습니다.');
-			console.error(error);
-		}
+		showDestructiveConfirm(
+			'게시글 삭제',
+			'정말로 이 글을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+			async () => {
+				try {
+					await deletePost(data.post.id);
+					showAlert('성공', '글이 삭제되었습니다.');
+					//goto(`/community/${data.slug}`);
+				} catch (error) {
+					showAlert('오류', '글 삭제에 실패했습니다.');
+					console.error(error);
+				}
+			}
+		);
 	}
 
 	// 대댓글 생성
 	async function handleCreateReply(parentId: string) {
 		if (!replyContent[parentId]?.trim()) return;
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 
@@ -135,7 +289,7 @@
 			await loadCommentsData(); // 댓글 목록 새로고침
 		} catch (error) {
 			console.error('답글 작성 실패:', error);
-			alert('답글 작성에 실패했습니다.');
+			showAlert('오류', '답글 작성에 실패했습니다.');
 		}
 	}
 
@@ -143,7 +297,7 @@
 	async function handleUpdateComment(commentId: string) {
 		if (!editContent[commentId]?.trim()) return;
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 
@@ -166,37 +320,48 @@
 			await loadCommentsData(); // 댓글 목록 새로고침
 		} catch (error) {
 			console.error('댓글 수정 실패:', error);
-			alert('댓글 수정에 실패했습니다.');
+			showAlert('오류', '댓글 수정에 실패했습니다.');
 		}
 	}
 
 	// 댓글 삭제
 	async function handleDeleteComment(commentId: string) {
-		if (!confirm('정말로 이 댓글을 삭제하시겠습니까?')) return;
 		if (!$user) {
-			alert('로그인이 필요합니다.');
+			showAlert('로그인 필요', '로그인이 필요합니다.');
 			return;
 		}
 
-		try {
-			// API 호출로 댓글 삭제
-			const response = await fetch(`${import.meta.env.VITE_API_URL}/api/community/comments/${commentId}`, {
-				method: 'DELETE',
-				headers: {
-					'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('auth_token')}`
+		showDestructiveConfirm(
+			'댓글 삭제',
+			'정말로 이 댓글을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+			async () => {
+				try {
+					// API 호출로 댓글 삭제
+					const response = await fetch(`${import.meta.env.VITE_API_URL}/api/community/comments/${commentId}`, {
+						method: 'DELETE',
+						headers: {
+							'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('auth_token')}`
+						}
+					});
+
+					if (!response.ok) {
+						throw new Error('댓글 삭제 실패');
+					}
+
+					await loadCommentsData(); // 댓글 목록 새로고침
+				} catch (error) {
+					console.error('댓글 삭제 실패:', error);
+					showAlert('오류', '댓글 삭제에 실패했습니다.');
 				}
-			});
-
-			if (!response.ok) {
-				throw new Error('댓글 삭제 실패');
 			}
-
-			await loadCommentsData(); // 댓글 목록 새로고침
-		} catch (error) {
-			console.error('댓글 삭제 실패:', error);
-			alert('댓글 삭제에 실패했습니다.');
-		}
+		);
 	}
+
+	// 컴포넌트 마운트 시 인증 상태 확인
+	onMount(() => {
+		// 인증 상태 로딩 완료
+		authLoading = false;
+	});
 
 	// 페이지 로드 시 댓글 가져오기 및 좋아요 상태 초기화
 	$effect(() => {
@@ -384,7 +549,7 @@
 		</article>
 
 		<!-- 게시글 액션 버튼들 -->
-		{#if canEditCurrentPost || canDeleteCurrentPost || canCreateReply}
+		{#if canEditCurrentPost || canDeleteCurrentPost || canCreateReply || $user?.role === 'admin'}
 			<div class="flex gap-2 mt-4">
 				{#if canCreateReply}
 					<Button 
@@ -400,6 +565,148 @@
 				{/if}
 				{#if canDeleteCurrentPost}
 					<Button variant="destructive" onclick={handleDeletePost} size="sm">삭제</Button>
+				{/if}
+				
+				<!-- 디버그 정보 -->
+				{#if dev && !authLoading}
+					<div class="text-xs text-gray-500 mt-2">
+						디버그: 사용자 역할 = {$user?.role || 'null'} | 인증상태 = {$isAuthenticated} | 관리자 여부 = {$user?.role === 'admin'}
+					</div>
+				{/if}
+
+			
+				
+				{#if !authLoading && $user?.role === 'admin'}
+			
+					<Dialog.Root onOpenChange={(open) => { if (open) loadBoardsWithCategories(); }}>
+						<Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}>
+							이동
+						</Dialog.Trigger>
+						<Dialog.Content class="sm:max-w-[425px]">
+							<Dialog.Header>
+								<Dialog.Title>게시글 이동</Dialog.Title>
+								<Dialog.Description>
+									게시글을 다른 게시판으로 이동합니다. 이동할 게시판과 카테고리를 선택하고 이동 이유를 입력하세요.
+								</Dialog.Description>
+							</Dialog.Header>
+							
+							<div class="grid gap-4 py-4">
+								<div class="grid grid-cols-4 items-center gap-4">
+									<Label for="board-select" class="text-right">게시판</Label>
+									<select 
+										id="board-select"
+										bind:value={selectedBoardId} 
+										class="col-span-3 w-full border border-gray-300 rounded-md px-3 py-2"
+										onchange={() => selectedCategoryId = null}
+									>
+										<option value="">게시판을 선택하세요</option>
+										{#each boardsWithCategories as board}
+											<option value={board.id}>{board.name}</option>
+										{/each}
+									</select>
+								</div>
+
+								{#if selectedBoardId && boardsWithCategories.find(b => b.id.toString() === selectedBoardId)?.categories?.length > 0}
+									<div class="grid grid-cols-4 items-center gap-4">
+										<Label for="category-select" class="text-right">카테고리</Label>
+										<select 
+											id="category-select"
+											bind:value={selectedCategoryId} 
+											class="col-span-3 w-full border border-gray-300 rounded-md px-3 py-2"
+										>
+											<option value="">카테고리를 선택하세요</option>
+											{#each boardsWithCategories.find(b => b.id === selectedBoardId)?.categories || [] as category}
+												<option value={category.id}>{category.name}</option>
+											{/each}
+										</select>
+									</div>
+								{/if}
+
+								<div class="grid grid-cols-4 items-start gap-4">
+									<Label for="move-reason" class="text-right pt-2">이동 이유</Label>
+									<Textarea 
+										id="move-reason"
+										bind:value={moveReason} 
+										rows={3}
+										placeholder="이동 이유를 입력하세요 (선택사항)"
+										class="col-span-3"
+									/>
+								</div>
+							</div>
+
+							<Dialog.Footer>
+								<Button 
+									onclick={handleMovePost}
+									disabled={!selectedBoardId || isMoving}
+								>
+									{isMoving ? '이동 중...' : '이동'}
+								</Button>
+							</Dialog.Footer>
+						</Dialog.Content>
+					</Dialog.Root>
+					
+					<Dialog.Root>
+						<Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}>
+							숨김
+						</Dialog.Trigger>
+						<Dialog.Content class="sm:max-w-[425px]">
+							<Dialog.Header>
+								<Dialog.Title>게시글 숨김</Dialog.Title>
+								<Dialog.Description>
+									부적절한 게시글을 숨깁니다. 숨김 카테고리와 상세 사유를 입력하세요.
+								</Dialog.Description>
+							</Dialog.Header>
+							
+							<div class="grid gap-4 py-4">
+								<div class="grid grid-cols-4 items-center gap-4">
+									<Label for="hide-category" class="text-right">카테고리</Label>
+									<select 
+										id="hide-category"
+										bind:value={hideCategory} 
+										class="col-span-3 w-full border border-gray-300 rounded-md px-3 py-2"
+									>
+										<option value="">카테고리를 선택하세요</option>
+										<option value="광고">광고</option>
+										<option value="음란물">음란물</option>
+										<option value="욕설비방">욕설비방</option>
+										<option value="기타 정책위반">기타 정책위반</option>
+									</select>
+								</div>
+
+								<div class="grid grid-cols-4 items-start gap-4">
+									<Label for="hide-reason" class="text-right pt-2">숨김 사유</Label>
+									<Textarea 
+										id="hide-reason"
+										bind:value={hideReason} 
+										rows={3}
+										placeholder="숨김 사유를 입력하세요"
+										class="col-span-3"
+									/>
+								</div>
+
+								<div class="grid grid-cols-4 items-center gap-4">
+									<Label for="hide-tags" class="text-right">태그</Label>
+									<Input 
+										id="hide-tags"
+										type="text" 
+										bind:value={hideTags} 
+										placeholder="예: 스팸, 부적절, 기타"
+										class="col-span-3"
+									/>
+								</div>
+							</div>
+
+							<Dialog.Footer>
+								<Button 
+									variant="destructive"
+									onclick={handleHidePost}
+									disabled={!hideCategory || isHiding}
+								>
+									{isHiding ? '숨김 중...' : '숨김'}
+								</Button>
+							</Dialog.Footer>
+						</Dialog.Content>
+					</Dialog.Root>
 				{/if}
 			</div>
 		{/if}
@@ -513,6 +820,61 @@
 										<span class="text-xs">삭제</span>
 									</Button>
 								{/if}
+								
+								<!-- 관리자 댓글 숨김 버튼 -->
+								{#if $user?.role === 'admin'}
+									<Dialog.Root>
+										<Dialog.Trigger class="flex items-center gap-1 p-1 h-auto text-orange-600 text-xs">
+											숨김
+										</Dialog.Trigger>
+										<Dialog.Content class="sm:max-w-[425px]">
+											<Dialog.Header>
+												<Dialog.Title>댓글 숨김</Dialog.Title>
+												<Dialog.Description>
+													부적절한 댓글을 숨깁니다. 숨김 카테고리와 상세 사유를 입력하세요.
+												</Dialog.Description>
+											</Dialog.Header>
+											
+											<div class="grid gap-4 py-4">
+												<div class="grid grid-cols-4 items-center gap-4">
+													<Label for="comment-hide-category" class="text-right">카테고리</Label>
+													<select 
+														id="comment-hide-category"
+														bind:value={commentHideCategory} 
+														class="col-span-3 w-full border border-gray-300 rounded-md px-3 py-2"
+													>
+														<option value="">카테고리를 선택하세요</option>
+														<option value="광고">광고</option>
+														<option value="음란물">음란물</option>
+														<option value="욕설비방">욕설비방</option>
+														<option value="기타 정책위반">기타 정책위반</option>
+													</select>
+												</div>
+
+												<div class="grid grid-cols-4 items-start gap-4">
+													<Label for="comment-hide-reason" class="text-right pt-2">숨김 사유</Label>
+													<Textarea 
+														id="comment-hide-reason"
+														bind:value={commentHideReason} 
+														rows={3}
+														placeholder="숨김 사유를 입력하세요"
+														class="col-span-3"
+													/>
+												</div>
+											</div>
+
+											<Dialog.Footer>
+												<Button 
+													variant="destructive"
+													onclick={() => handleHideComment(comment.id)}
+													disabled={!commentHideCategory || isHidingComment}
+												>
+													{isHidingComment ? '숨김 중...' : '숨김'}
+												</Button>
+											</Dialog.Footer>
+										</Dialog.Content>
+									</Dialog.Root>
+								{/if}
 							{:else}
 								<div class="flex items-center gap-1 p-1 h-auto text-gray-400">
 									<Heart class="h-3 w-3" />
@@ -597,5 +959,7 @@
 			<p>게시글을 불러올 수 없습니다.</p>
 		</div>
 	{/if}
+
+
 </div>
 

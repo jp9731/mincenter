@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { adminLogout } from '$lib/api/admin';
+	import { adminLogout } from '$lib/stores/admin';
 	import { adminUser } from '$lib/stores/admin';
 	import { MenuIcon, ChevronRightIcon, ChevronLeftIcon, BellIcon, UserIcon, LogOutIcon } from 'lucide-svelte';
 

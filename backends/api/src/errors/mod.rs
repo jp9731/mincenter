@@ -28,6 +28,21 @@ pub enum ApiError {
   
   #[error("Internal server error: {0}")]
   Internal(String),
+  
+  #[error("Forbidden: {0}")]
+  Forbidden(String),
+}
+
+impl From<StatusCode> for ApiError {
+    fn from(status: StatusCode) -> Self {
+        match status {
+            StatusCode::UNAUTHORIZED => ApiError::Authentication("Unauthorized".to_string()),
+            StatusCode::FORBIDDEN => ApiError::Forbidden("Forbidden".to_string()),
+            StatusCode::NOT_FOUND => ApiError::NotFound("Not found".to_string()),
+            StatusCode::BAD_REQUEST => ApiError::BadRequest("Bad request".to_string()),
+            _ => ApiError::Internal(format!("HTTP Error: {}", status)),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -35,6 +50,7 @@ impl IntoResponse for ApiError {
       let (status, error_message) = match self {
           ApiError::Authentication(msg) => (StatusCode::UNAUTHORIZED, msg),
           ApiError::Authorization(msg) => (StatusCode::FORBIDDEN, msg),
+          ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
           ApiError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
           ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
           ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),

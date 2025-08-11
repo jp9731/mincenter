@@ -77,6 +77,8 @@ pub struct AttachedFile {
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct PostDetail {
     pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_id: Option<String>, // URL에서 사용할 짧은 ID (예: 1234-abc123)
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
     pub user_id: Uuid,
@@ -267,6 +269,8 @@ pub struct PostSummaryDb {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostSummary {
     pub id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_id: Option<String>, // URL에서 사용할 짧은 ID (예: 1234-abc123)
     pub title: String,
     pub board_id: Option<Uuid>,
     pub user_name: Option<String>,

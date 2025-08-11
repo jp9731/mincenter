@@ -18,7 +18,9 @@
 	onMount(() => {
 		// 이미 로그인된 경우 대시보드로 리다이렉트
 		const token = localStorage.getItem('admin_token');
-		if (token) {
+		const isAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+		
+		if (token && isAuthenticated) {
 			goto('/');
 		}
 	});
@@ -32,7 +34,10 @@
 
 		const success = await adminLogin(email, password);
 		if (success) {
-			goto('/');
+			// 로그인 성공 후 잠시 대기 후 대시보드로 이동
+			setTimeout(() => {
+				goto('/');
+			}, 100);
 		}
 	}
 

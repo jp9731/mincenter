@@ -51,7 +51,7 @@ pub async fn register(
   eprintln!("✅ 사용자 생성 성공: user_id={}", user.id);
 
   eprintln!("🔵 토큰 생성 시작");
-  let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
+  let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| r.to_string().to_lowercase()).unwrap_or_else(|| "user".to_string()))
       .map_err(|e| {
           eprintln!("❌ 토큰 생성 실패: {:?}", e);
           StatusCode::INTERNAL_SERVER_ERROR
@@ -129,7 +129,7 @@ pub async fn login(
   eprintln!("비밀번호 검증 성공, 토큰 생성 시작");
   eprintln!("사용자 정보: id={}, email={:?}, role={:?}", user.id, user.email, user.role);
 
-  let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
+  let (access_token, refresh_token) = generate_tokens(&state.config, user.id, user.role.as_ref().map(|r| r.to_string().to_lowercase()).unwrap_or_else(|| "user".to_string()))
       .map_err(|e| {
           eprintln!("토큰 생성 실패: {:?}", e);
           StatusCode::INTERNAL_SERVER_ERROR
@@ -234,7 +234,7 @@ pub async fn refresh(
   .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
   .ok_or(StatusCode::UNAUTHORIZED)?;
 
-  let (access_token, new_refresh_token) = generate_tokens(&state.config, user_id, user.role.as_ref().map(|r| format!("{:?}", r)).unwrap_or_else(|| "user".to_string()))
+  let (access_token, new_refresh_token) = generate_tokens(&state.config, user_id, user.role.as_ref().map(|r| r.to_string().to_lowercase()).unwrap_or_else(|| "user".to_string()))
       .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
   let expires_in = state.config.access_token_expiry * 60; // minutes to seconds
 

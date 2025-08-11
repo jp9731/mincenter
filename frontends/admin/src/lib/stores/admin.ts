@@ -67,10 +67,15 @@ export async function initializeAdminAuth(fetchFn?: typeof fetch) {
   if (!browser) return;
 
   try {
+    // 로컬 스토리지에서 인증 상태 확인
+    const isAuthenticatedInStorage = localStorage.getItem('admin_authenticated') === 'true';
+    
     const token = getAdminToken();
     if (!token) {
       isAdminAuthenticated.set(false);
       adminUser.set(null);
+      // 로컬 스토리지의 인증 상태도 정리
+      localStorage.removeItem('admin_authenticated');
       return;
     }
 
@@ -80,16 +85,25 @@ export async function initializeAdminAuth(fetchFn?: typeof fetch) {
       if (!refreshed) {
         isAdminAuthenticated.set(false);
         adminUser.set(null);
+        // 로컬 스토리지의 인증 상태도 정리
+        localStorage.removeItem('admin_authenticated');
         return;
       }
     }
 
     // 서버에서 관리자 정보 가져오기
     await fetchAdminProfile(fetchFn);
+    
+    // 인증 성공 시 로컬 스토리지에 상태 저장
+    if (isAuthenticatedInStorage) {
+      localStorage.setItem('admin_authenticated', 'true');
+    }
   } catch (e) {
     console.error('Failed to initialize admin auth:', e);
     isAdminAuthenticated.set(false);
     adminUser.set(null);
+    // 로컬 스토리지의 인증 상태도 정리
+    localStorage.removeItem('admin_authenticated');
   }
 }
 
@@ -145,6 +159,11 @@ export async function adminLogin(email: string, password: string) {
     adminUser.set(authData.user);
     isAdminAuthenticated.set(true);
 
+    // 로컬 스토리지에 인증 상태 저장 (추가 보안)
+    if (browser) {
+      localStorage.setItem('admin_authenticated', 'true');
+    }
+
     return true;
   } catch (e) {
     error.set(e instanceof Error ? e.message : '관리자 로그인에 실패했습니다.');
@@ -170,6 +189,11 @@ export async function adminLogout() {
     adminUser.set(null);
     isAdminAuthenticated.set(false);
 
+    // 로컬 스토리지의 인증 상태도 정리
+    if (browser) {
+      localStorage.removeItem('admin_authenticated');
+    }
+
     // 로그인 페이지로 리다이렉트
     if (browser) {
       goto('/login');
@@ -188,7 +212,7 @@ export async function authenticatedAdminFetch(url: string, options: RequestInit 
   if (isTokenExpired(token)) {
     const refreshed = await refreshAdminToken();
     if (!refreshed) {
-      await adminLogout();
+      // 토큰 갱신 실패 시 즉시 로그아웃하지 않고 에러만 던짐
       throw new Error('Token refresh failed');
     }
   }

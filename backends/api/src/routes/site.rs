@@ -22,6 +22,7 @@ pub fn site_routes(state: AppState) -> Router<AppState> {
         .route("/api/community/boards/:slug", get(handlers::community::get_board_by_slug))
         .route("/api/community/boards/:slug/posts", get(handlers::community::get_posts_by_slug))
         .route("/api/community/boards/:slug/categories", get(handlers::community::get_categories_by_slug))
+        .route("/api/community/boards-with-categories", get(handlers::community::get_boards_with_categories))
         // Pages (공개)
         .route("/api/pages", get(handlers::page::get_published_pages))
         .route("/api/pages/:slug", get(handlers::page::get_page_by_slug))
@@ -60,6 +61,8 @@ pub fn site_routes(state: AppState) -> Router<AppState> {
         // 파일 삭제 API
         .route("/api/upload/files/:file_id", delete(handlers::upload::delete_file))
         .route("/api/community/posts/:post_id/attachments/:file_id", delete(handlers::upload::delete_post_attachment))
+        // 게시글 관리 (관리자 권한 필요)
+        .merge(handlers::admin::post_management::site_post_management_routes())
         .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::auth_middleware));
 
     public_routes.merge(protected_routes)

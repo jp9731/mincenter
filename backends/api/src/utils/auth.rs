@@ -86,21 +86,40 @@ pub async fn get_current_user(
     State(state): State<AppState>,
     auth_header: Option<TypedHeader<Authorization<Bearer>>>,
 ) -> Result<User, StatusCode> {
+    println!("🔍 get_current_user 시작");
+    
     let auth_header = auth_header
-        .ok_or(StatusCode::UNAUTHORIZED)?
+        .ok_or_else(|| {
+            println!("❌ Authorization 헤더 없음");
+            StatusCode::UNAUTHORIZED
+        })?
         .0;
 
+    println!("✅ Authorization 헤더 확인됨");
+
     let token_data = verify_token(auth_header.token(), &state.config)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .map_err(|e| {
+            println!("❌ 토큰 검증 실패: {:?}", e);
+            StatusCode::UNAUTHORIZED
+        })?;
+
+    println!("✅ 토큰 검증 성공, 사용자 ID: {}", token_data.sub);
 
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, email, name, role::text, password_hash, created_at, updated_at FROM users WHERE id = $1"
+        "SELECT id, email, name, phone, profile_image, points, role, status, password_hash, email_verified, email_verified_at, last_login_at, created_at, updated_at FROM users WHERE id = $1"
     )
     .bind(token_data.sub)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::UNAUTHORIZED)?;
+    .map_err(|e| {
+        println!("❌ 데이터베이스 쿼리 실패: {:?}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or_else(|| {
+        println!("❌ 사용자를 찾을 수 없음: {}", token_data.sub);
+        StatusCode::UNAUTHORIZED
+    })?;
 
+    println!("✅ 사용자 조회 성공: {:?}", user.email);
     Ok(user)
 } 

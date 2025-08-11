@@ -14,6 +14,9 @@
 
 	onMount(async () => {
 		if (browser) {
+			// 로컬 스토리지에서 인증 상태 확인
+			const isAuthenticatedInStorage = localStorage.getItem('admin_authenticated') === 'true';
+			
 			await initializeAdminAuth();
 
 			const mediaQueryMobile = window.matchMedia('(max-width: 767px)');

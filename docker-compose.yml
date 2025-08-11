@@ -3,8 +3,10 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:13
+    image: postgres:17
     container_name: ${APP_NAME:-mincenter}_postgres
+    networks:
+      - mincenter_network
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mincenter}
       POSTGRES_USER: ${POSTGRES_USER:-mincenter}
@@ -29,6 +31,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ${APP_NAME:-mincenter}_redis
+    networks:
+      - mincenter_network
     command: redis-server --requirepass ${REDIS_PASSWORD}
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -49,6 +53,8 @@ services:
       context: ./backends/api
       dockerfile: Dockerfile
     container_name: ${APP_NAME:-mincenter}_api
+    networks:
+      - mincenter_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +87,8 @@ services:
         - API_URL=${API_URL}
         - PUBLIC_API_URL=${PUBLIC_API_URL}
     container_name: ${APP_NAME:-mincenter}_site
+    networks:
+      - mincenter_network
     depends_on:
       api:
         condition: service_healthy
@@ -103,6 +111,8 @@ services:
         - API_URL=${API_URL}
         - PUBLIC_API_URL=${PUBLIC_API_URL}
     container_name: ${APP_NAME:-mincenter}_admin
+    networks:
+      - mincenter_network
     depends_on:
       api:
         condition: service_healthy
@@ -124,6 +134,5 @@ volumes:
     driver: local
 
 networks:
-  default:
-    name: ${APP_NAME:-mincenter}_network
+  mincenter_network:
     driver: bridge

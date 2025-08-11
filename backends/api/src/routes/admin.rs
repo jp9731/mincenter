@@ -59,6 +59,8 @@ pub fn admin_routes(state: AppState) -> Router<AppState> {
         // 사이트 설정
         .route("/api/admin/site/settings", get(handlers::admin::settings::get_site_settings))
         .route("/api/admin/site/settings", put(handlers::admin::settings::save_site_settings))
+        // 게시글 관리 (이동, 숨김 등)
+        .nest("/api/admin", handlers::admin::post_management::post_management_routes())
         .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::admin_middleware));
 
     admin_auth_routes.merge(admin_protected_routes)

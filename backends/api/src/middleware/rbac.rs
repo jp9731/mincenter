@@ -4,7 +4,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use crate::{AppState, utils::auth::Claims};
+use crate::{AppState, utils::auth::Claims, models::User, errors::ApiError};
 
 // 권한 체크 미들웨어
 pub async fn check_permission_middleware(
@@ -145,5 +145,13 @@ pub fn require_permission(resource: &'static str, action: &'static str) -> impl 
 
             Ok(next.run(request).await)
         })
+    }
+}
+
+/// 간단한 역할 기반 권한 체크 함수
+pub fn require_role(user: &User, required_role: &str) -> Result<(), ApiError> {
+    match &user.role {
+        Some(role) if role.to_string().to_lowercase() == required_role.to_lowercase() => Ok(()),
+        _ => Err(ApiError::Forbidden("관리자 권한이 필요합니다.".to_string()))
     }
 } 

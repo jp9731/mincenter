@@ -18,7 +18,7 @@ interface UploadResponse {
   thumbnail_url?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18080';
 
 // 인증 토큰 가져오기
 function getAuthHeaders(): HeadersInit {
@@ -137,15 +137,47 @@ export async function deletePost(post_id: string): Promise<void> {
   console.log('📡 응답 상태:', res.status, res.statusText);
   
   if (!res.ok) {
-    const errorText = await res.text();
-    console.error('❌ 삭제 실패:', errorText);
-    throw new Error(`삭제 실패: ${res.status} ${res.statusText}`);
+    let errorMessage = `삭제 실패: ${res.status} ${res.statusText}`;
+    
+    try {
+      const errorText = await res.text();
+      console.error('❌ 삭제 실패 응답:', errorText);
+      
+      // JSON 응답인지 확인
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) {
+          errorMessage = errorJson.message;
+        }
+      } catch (parseError) {
+        // JSON이 아닌 경우 그대로 텍스트 사용
+        if (errorText.trim()) {
+          errorMessage = errorText;
+        }
+      }
+    } catch (textError) {
+      console.error('응답 텍스트 읽기 실패:', textError);
+    }
+    
+    throw new Error(errorMessage);
   }
   
-  const json: ApiResponse<null> = await res.json();
-  if (!json.success) throw new Error(json.message);
-  
-  console.log('✅ 게시글 삭제 성공');
+  try {
+    const json: ApiResponse<null> = await res.json();
+    if (!json.success) {
+      console.log('❌ API 응답:', json.message);
+      throw new Error(json.message || '삭제 처리 중 오류가 발생했습니다.');
+    }
+    console.log('✅ 게시글 삭제 성공');
+  } catch (jsonError) {
+    console.error('JSON 파싱 실패:', jsonError);
+    // 204 No Content 등의 경우 JSON이 없을 수 있으므로 성공으로 처리
+    if (res.status === 204 || res.status === 200) {
+      console.log('✅ 게시글 삭제 성공 (JSON 없음)');
+      return;
+    }
+    throw new Error('응답 처리 중 오류가 발생했습니다.');
+  }
 }
 
 export async function fetchComments(post_id: string): Promise<CommentDetail[]> {
@@ -524,29 +556,99 @@ export async function getRecentPosts(params?: {
   slugs?: string; // 콤마로 구분된 slug 목록
   limit?: number; // 조회할 게시글 수
 }): Promise<PostDetail[]> {
-  const searchParams = new URLSearchParams();
-  
-  if (params?.slugs) {
-    searchParams.append('slugs', params.slugs);
-  }
-  
-  if (params?.limit) {
-    searchParams.append('limit', params.limit.toString());
-  }
-  
-  const url = `${API_BASE}/api/community/posts/recent${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-  
-  console.log('getRecentPosts URL:', url);
-  
-  const res = await fetch(url);
-  console.log('getRecentPosts response status:', res.status);
-  
+  const url = new URL(`${API_BASE}/api/community/posts/recent`, window.location.origin);
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, String(v));
+  });
+  const res = await fetch(url.toString().replace(window.location.origin, ''));
   const json: ApiResponse<PostDetail[]> = await res.json();
-  console.log('getRecentPosts response data:', json);
+  if (!json.success) throw new Error(json.message);
+  return json.data;
+}
+
+// 게시글 이동과 숨김 관련 API 함수들
+
+// 게시판과 카테고리 목록 조회
+export async function getBoardsWithCategories(): Promise<any[]> {
+  console.log('🌐 API 호출: /api/community/boards-with-categories');
+  const res = await fetch(`${API_BASE}/api/community/boards-with-categories`, {
+    headers: getAuthHeaders()
+  });
+  console.log('📡 응답 상태:', res.status, res.statusText);
+  const json: ApiResponse<any[]> = await res.json();
+  console.log('📄 응답 데이터:', json);
+  if (!json.success) throw new Error(json.message);
+  return json.data;
+}
+
+// 게시글 이동
+export async function movePost(postId: string, data: {
+  moved_board_id: string;
+  moved_category_id?: string;
+  move_reason?: string;
+}): Promise<any> {
+  console.log('🔄 게시글 이동 API 호출:', { postId, data });
   
-  if (!json.success || !json.data) {
-    throw new Error(json.message || '최근 게시글을 불러오는데 실패했습니다.');
+  // 백엔드 API 형식에 맞게 데이터 변환 (UUID 문자열 사용)
+  const requestData = {
+    target_board_id: data.moved_board_id, // UUID 문자열 그대로 사용
+    target_category_id: data.moved_category_id || null,
+    move_reason: data.move_reason || null,
+    move_location: "site"
+    // post_id는 URL 경로에서 가져오므로 요청 본문에서 제거
+  };
+  
+  console.log('📤 변환된 요청 데이터:', requestData);
+  
+  const res = await fetch(`${API_BASE}/api/site/posts/${postId}/move`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(requestData)
+  });
+  
+  console.log('📡 응답 상태:', res.status, res.statusText);
+  
+  if (!res.ok) {
+    let errorMessage = '게시글 이동에 실패했습니다.';
+    try {
+      const error = await res.json();
+      console.error('❌ 이동 실패 응답:', error);
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      const errorText = await res.text();
+      console.error('❌ 이동 실패 (텍스트 응답):', errorText);
+      errorMessage = `서버 오류 (${res.status}): ${errorText}`;
+    }
+    throw new Error(errorMessage);
   }
   
-  return json.data;
+  const json = await res.json();
+  console.log('✅ 이동 성공 응답:', json);
+  return json;
+}
+
+// 게시글 숨김
+export async function hidePost(postId: string, data: {
+  hide_category: string;
+  hide_reason?: string;
+  hide_tags?: string[];
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/site/posts/${postId}/hide`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify(data)
+  });
+  
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message || '게시글 숨김에 실패했습니다.');
+  }
+  
+  return await res.json();
 } 

@@ -72,6 +72,80 @@ async fn main() {
     // 데이터베이스 연결
     let pool = crate::database::get_database().await.expect("Failed to connect to database");
     
+    // URL ID 테이블 생성 (존재하지 않는 경우)
+    info!("URL ID 테이블 생성 확인 중...");
+    
+    // 각 테이블을 개별적으로 생성
+    let tables = [
+        ("posts_url_ids", r#"
+            CREATE TABLE IF NOT EXISTS posts_url_ids (
+                id SERIAL PRIMARY KEY,
+                uuid UUID NOT NULL UNIQUE,
+                sequence_num INTEGER NOT NULL UNIQUE,
+                hash VARCHAR(10) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                CONSTRAINT posts_url_ids_uuid_fkey FOREIGN KEY (uuid) REFERENCES posts(id) ON DELETE CASCADE
+            )
+        "#),
+        ("comments_url_ids", r#"
+            CREATE TABLE IF NOT EXISTS comments_url_ids (
+                id SERIAL PRIMARY KEY,
+                uuid UUID NOT NULL UNIQUE,
+                sequence_num INTEGER NOT NULL UNIQUE,
+                hash VARCHAR(10) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                CONSTRAINT comments_url_ids_uuid_fkey FOREIGN KEY (uuid) REFERENCES comments(id) ON DELETE CASCADE
+            )
+        "#),
+        ("users_url_ids", r#"
+            CREATE TABLE IF NOT EXISTS users_url_ids (
+                id SERIAL PRIMARY KEY,
+                uuid UUID NOT NULL UNIQUE,
+                sequence_num INTEGER NOT NULL UNIQUE,
+                hash VARCHAR(10) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                CONSTRAINT users_url_ids_uuid_fkey FOREIGN KEY (uuid) REFERENCES users(id) ON DELETE CASCADE
+            )
+        "#),
+    ];
+
+    for (table_name, sql) in tables.iter() {
+        match sqlx::query(sql).execute(&pool).await {
+            Ok(_) => info!("✅ {} 테이블이 성공적으로 생성되었습니다.", table_name),
+            Err(e) => {
+                if e.to_string().contains("already exists") {
+                    info!("ℹ️  {} 테이블이 이미 존재합니다.", table_name);
+                } else {
+                    error!("❌ {} 테이블 생성 실패: {}", table_name, e);
+                    // 테이블 생성 실패해도 서버는 계속 실행
+                }
+            }
+        }
+    }
+
+    // 인덱스 생성
+    let indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_posts_url_ids_sequence_hash ON posts_url_ids(sequence_num, hash)",
+        "CREATE INDEX IF NOT EXISTS idx_posts_url_ids_uuid ON posts_url_ids(uuid)",
+        "CREATE INDEX IF NOT EXISTS idx_comments_url_ids_sequence_hash ON comments_url_ids(sequence_num, hash)",
+        "CREATE INDEX IF NOT EXISTS idx_comments_url_ids_uuid ON comments_url_ids(uuid)",
+        "CREATE INDEX IF NOT EXISTS idx_users_url_ids_sequence_hash ON users_url_ids(sequence_num, hash)",
+        "CREATE INDEX IF NOT EXISTS idx_users_url_ids_uuid ON users_url_ids(uuid)",
+    ];
+
+    for index_sql in indexes.iter() {
+        match sqlx::query(index_sql).execute(&pool).await {
+            Ok(_) => info!("✅ 인덱스가 성공적으로 생성되었습니다."),
+            Err(e) => {
+                if e.to_string().contains("already exists") {
+                    info!("ℹ️  인덱스가 이미 존재합니다.");
+                } else {
+                    error!("❌ 인덱스 생성 실패: {}", e);
+                }
+            }
+        }
+    }
+    
     // Redis 연결
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let redis = RedisClient::open(redis_url).expect("Failed to connect to Redis");

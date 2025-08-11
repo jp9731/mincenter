@@ -1,12 +1,16 @@
 // 사용자 타입
 export interface User {
   id: string;
-  email: string;
-  name: string;
-  role: string;
+  email?: string;
+  name?: string;
+  role?: string; // Option<UserRole>에서 직렬화되므로 optional
+  phone?: string;
+  profile_image?: string;
+  points?: number;
+  status?: string;
   permissions?: string[];
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // 사용자 역할

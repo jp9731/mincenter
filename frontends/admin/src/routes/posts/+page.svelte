@@ -28,8 +28,24 @@
 	let statusFilter = '';
 	let currentPage = 1;
 
+	// 관리 메뉴 관련 상태
+	let showManagementMenu = $state<Record<string, boolean>>({});
+	let showMoveModal = $state(false);
+	let showHideModal = $state(false);
+	let selectedPostId = $state<string | null>(null);
+	let boardsWithCategories = $state<any[]>([]);
+	let selectedBoardId = $state<number | null>(null);
+	let selectedCategoryId = $state<number | null>(null);
+	let moveReason = $state('');
+	let hideCategory = $state('');
+	let hideReason = $state('');
+	let hideTags = $state('');
+	let isMoving = $state(false);
+	let isHiding = $state(false);
+	let isLoading = $state(false);
+
 	// API URL 가져오기
-	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+	const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:18080';
 
 	// 완전한 파일 URL 생성 (site와 동일한 방식)
 	function getFullFileUrl(fileUrl: string): string {
@@ -64,8 +80,230 @@
 		return null;
 	}
 
+	// 관리 메뉴 토글
+	function toggleManagementMenu(postId: string) {
+		showManagementMenu[postId] = !showManagementMenu[postId];
+		showManagementMenu = { ...showManagementMenu };
+	}
+
+	// 게시판과 카테고리 목록 로드
+	async function loadBoardsWithCategories() {
+		try {
+			const res = await fetch(`${API_BASE}/api/community/boards-with-categories`, {
+				headers: {
+					'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+				}
+			});
+			const result = await res.json();
+			if (result.success) {
+				boardsWithCategories = result.data;
+			}
+		} catch (error) {
+			console.error('게시판과 카테고리 로드 실패:', error);
+		}
+	}
+
+	// 게시글 이동 처리
+	async function handleMovePost() {
+		if (!selectedPostId || !selectedBoardId) return;
+
+		isMoving = true;
+		try {
+			const res = await fetch(`${API_BASE}/api/admin/posts/move`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+				},
+				body: JSON.stringify({
+					post_id: selectedPostId,
+					moved_board_id: selectedBoardId,
+					moved_category_id: selectedCategoryId,
+					move_reason: moveReason || undefined
+				})
+			});
+
+			if (res.ok) {
+				showMoveModal = false;
+				alert('게시글이 성공적으로 이동되었습니다.');
+				loadPosts({ page: currentPage, limit: 20, search: searchQuery, board_id: boardFilter, status: statusFilter });
+			} else {
+				throw new Error('게시글 이동에 실패했습니다.');
+			}
+		} catch (error) {
+			console.error('게시글 이동 실패:', error);
+			alert('게시글 이동에 실패했습니다.');
+		} finally {
+			isMoving = false;
+		}
+	}
+
+	// 게시글 숨김 처리
+	async function handleHidePost(postId: string) {
+		if (confirm('정말로 이 게시글을 숨기시겠습니까?')) {
+			try {
+				const res = await fetch(`${API_BASE}/api/admin/posts/hide`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+					},
+					body: JSON.stringify({
+						post_id: postId,
+						hide_category: 'quick_hide',
+						hide_reason: '관리자에 의한 빠른 숨김'
+					})
+				});
+
+				if (res.ok) {
+					alert('게시글이 성공적으로 숨겨졌습니다.');
+					// 현재 페이지의 게시글 목록만 새로고침
+					loadPosts({ page: currentPage, limit: 20, search: searchQuery, board_id: boardFilter, status: statusFilter });
+				} else {
+					throw new Error('게시글 숨김에 실패했습니다.');
+				}
+			} catch (error) {
+				console.error('게시글 숨김 실패:', error);
+				alert('게시글 숨김에 실패했습니다.');
+			}
+		}
+	}
+
+	// 게시글 숨김 처리 (모달)
+	async function handleHidePostModal() {
+		if (!selectedPostId || !hideCategory) return;
+
+		isHiding = true;
+		try {
+			const tags = hideTags ? hideTags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined;
+			
+			const res = await fetch(`${API_BASE}/api/admin/posts/hide`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+				},
+				body: JSON.stringify({
+					post_id: selectedPostId,
+					hide_category: hideCategory,
+					hide_reason: hideReason || undefined,
+					hide_tags: tags
+				})
+			});
+
+			if (res.ok) {
+				showHideModal = false;
+				alert('게시글이 성공적으로 숨겨졌습니다.');
+				loadPosts({ page: currentPage, limit: 20, search: searchQuery, board_id: boardFilter, status: statusFilter });
+			} else {
+				throw new Error('게시글 숨김에 실패했습니다.');
+			}
+		} catch (error) {
+			console.error('게시글 숨김 실패:', error);
+			alert('게시글 숨김에 실패했습니다.');
+		} finally {
+			isHiding = false;
+		}
+	}
+
+	// 게시글 숨김 해제 처리
+	async function handleUnhidePost(postId: string) {
+		if (confirm('정말로 이 게시글을 공개하시겠습니까?')) {
+			try {
+				const res = await fetch(`${API_BASE}/api/admin/posts/unhide`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+					},
+					body: JSON.stringify({
+						post_id: postId
+					})
+				});
+
+				if (res.ok) {
+					alert('게시글이 성공적으로 공개되었습니다.');
+					loadPosts({ page: currentPage, limit: 20, search: searchQuery, board_id: boardFilter, status: statusFilter });
+				} else {
+					throw new Error('게시글 공개에 실패했습니다.');
+				}
+			} catch (error) {
+				console.error('게시글 공개 실패:', error);
+				alert('게시글 공개에 실패했습니다.');
+			}
+		}
+	}
+
+	// 게시글 삭제 처리
+	async function handleDeletePost(postId: string) {
+		if (confirm('정말로 이 게시글을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) {
+			try {
+				const res = await fetch(`${API_BASE}/api/admin/posts/${postId}/delete`, {
+					method: 'DELETE',
+					headers: {
+						'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+					}
+				});
+
+				if (res.ok) {
+					alert('게시글이 성공적으로 삭제되었습니다.');
+					loadPosts({ page: currentPage, limit: 20, search: searchQuery, board_id: boardFilter, status: statusFilter });
+				} else {
+					throw new Error('게시글 삭제에 실패했습니다.');
+				}
+			} catch (error) {
+				console.error('게시글 삭제 실패:', error);
+				alert('게시글 삭제에 실패했습니다.');
+			}
+		}
+	}
+
+	// 이동 모달 열기
+	function openMoveModal(postId: string) {
+		selectedPostId = postId;
+		showMoveModal = true;
+		showManagementMenu[postId] = false;
+		showManagementMenu = { ...showManagementMenu };
+	}
+
+	// 숨김 모달 열기
+	function openHideModal(postId: string) {
+		selectedPostId = postId;
+		showHideModal = true;
+		showManagementMenu[postId] = false;
+		showManagementMenu = { ...showManagementMenu };
+	}
+
+	// 모달 상태 초기화
+	function resetModalStates() {
+		showMoveModal = false;
+		showHideModal = false;
+		selectedPostId = null;
+		selectedBoardId = null;
+		selectedCategoryId = null;
+		moveReason = '';
+		hideCategory = '';
+		hideReason = '';
+		hideTags = '';
+	}
+
+	// 모달 외부 클릭 시 닫기
+	function handleModalBackdropClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) {
+			resetModalStates();
+		}
+	}
+
+	// ESC 키로 모달 닫기
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			resetModalStates();
+		}
+	}
+
 	onMount(() => {
 		loadPosts({ page: 1, limit: 20 });
+		loadBoardsWithCategories();
 	});
 
 	function handleSearch() {
@@ -88,12 +326,6 @@
 			board_id: boardFilter,
 			status: statusFilter
 		});
-	}
-
-	function handleHidePost(postId: string) {
-		if (confirm('정말로 이 게시글을 숨기시겠습니까?')) {
-			hidePost(postId, '관리자에 의한 숨김');
-		}
 	}
 
 	function getStatusBadge(status: string) {
@@ -203,6 +435,19 @@
 					</TableRow>
 				</TableHeader>
 				<TableBody>
+					{#if isLoading}
+						<TableRow>
+							<TableCell colspan="9" class="text-center py-8">
+								게시글 목록을 불러오는 중입니다...
+							</TableCell>
+						</TableRow>
+					{:else if $posts.length === 0}
+						<TableRow>
+							<TableCell colspan="9" class="text-center py-8">
+								검색 결과나 필터링 결과에 해당하는 게시글이 없습니다.
+							</TableCell>
+						</TableRow>
+					{/if}
 					{#each $posts as post}
 						<TableRow>
 							<TableCell>
@@ -262,7 +507,9 @@
 											숨기기
 										</Button>
 									{:else if post.status === 'hidden'}
-										<Button variant="outline" size="sm">공개</Button>
+										<Button variant="outline" size="sm" onclick={() => handleUnhidePost(post.id)}>
+											공개
+										</Button>
 									{/if}
 									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}`)}>
 										상세보기
@@ -270,6 +517,42 @@
 									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}/edit`)}>
 										수정
 									</Button>
+									<Button variant="outline" size="sm" onclick={() => handleDeletePost(post.id)}>
+										삭제
+									</Button>
+									<div class="relative">
+										<Button variant="outline" size="sm" onclick={() => toggleManagementMenu(post.id)}>
+											관리
+										</Button>
+										{#if showManagementMenu[post.id]}
+											<div class="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+												<div class="py-1">
+													<button
+														class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+														onclick={() => openMoveModal(post.id)}
+													>
+														게시글 이동
+													</button>
+													<button
+														class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+														onclick={() => openHideModal(post.id)}
+													>
+														게시글 숨김
+													</button>
+													<button
+														class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+														onclick={() => {
+															if (confirm('정말로 이 게시글을 삭제하시겠습니까?')) {
+																handleDeletePost(post.id);
+															}
+														}}
+													>
+														게시글 삭제
+													</button>
+												</div>
+											</div>
+										{/if}
+									</div>
 								</div>
 							</TableCell>
 						</TableRow>
@@ -307,4 +590,142 @@
 			{/if}
 		</CardContent>
 	</Card>
+
+	<!-- 게시글 이동 모달 -->
+	{#if showMoveModal}
+		<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick={handleModalBackdropClick}>
+			<div class="bg-white rounded-lg p-6 w-full max-w-md" onkeydown={handleKeydown}>
+				<h3 class="text-lg font-semibold mb-4">게시글 이동</h3>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">이동할 게시판</label>
+						<Select
+							type="single"
+							value={selectedBoardId?.toString() || ''}
+							onValueChange={(value: any) => {
+								if (value) {
+									const boardId = parseInt(value);
+									selectedBoardId = isNaN(boardId) ? null : boardId;
+								} else {
+									selectedBoardId = null;
+								}
+								selectedCategoryId = null;
+							}}
+						>
+							<SelectTrigger>
+								{selectedBoardId ? boardsWithCategories.find(b => b.id === selectedBoardId)?.name || '게시판 선택' : '게시판 선택'}
+							</SelectTrigger>
+							<SelectContent>
+								{#each boardsWithCategories as board}
+									<SelectItem value={board.id.toString()}>{board.name}</SelectItem>
+								{/each}
+							</SelectContent>
+						</Select>
+					</div>
+					
+					{#if selectedBoardId && boardsWithCategories.find(b => b.id === selectedBoardId)?.categories?.length > 0}
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-2">이동할 카테고리 (선택사항)</label>
+							<Select
+								type="single"
+								value={selectedCategoryId?.toString() || ''}
+								onValueChange={(value: any) => {
+									if (value) {
+										const categoryId = parseInt(value);
+										selectedCategoryId = isNaN(categoryId) ? null : categoryId;
+									} else {
+										selectedCategoryId = null;
+									}
+								}}
+							>
+								<SelectTrigger>
+									{selectedCategoryId ? boardsWithCategories.find(b => b.id === selectedBoardId)?.categories?.find((c: any) => c.id === selectedCategoryId)?.name || '카테고리 선택' : '카테고리 선택'}
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="">카테고리 없음</SelectItem>
+									{#each boardsWithCategories.find(b => b.id === selectedBoardId)?.categories || [] as category}
+										<SelectItem value={category.id.toString()}>{category.name}</SelectItem>
+									{/each}
+								</SelectContent>
+							</Select>
+						</div>
+					{/if}
+					
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">이동 사유 (선택사항)</label>
+						<Input
+							type="text"
+							placeholder="이동 사유를 입력하세요"
+							bind:value={moveReason}
+						/>
+					</div>
+				</div>
+				
+				<div class="flex justify-end space-x-3 mt-6">
+					<Button variant="outline" onclick={resetModalStates}>취소</Button>
+					<Button onclick={handleMovePost} disabled={isMoving || !selectedBoardId}>
+						{isMoving ? '이동 중...' : '이동'}
+					</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- 게시글 숨김 모달 -->
+	{#if showHideModal}
+		<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick={handleModalBackdropClick}>
+			<div class="bg-white rounded-lg p-6 w-full max-w-md" onkeydown={handleKeydown}>
+				<h3 class="text-lg font-semibold mb-4">게시글 숨김</h3>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">숨김 카테고리 *</label>
+						<Select
+							type="single"
+							value={hideCategory}
+							onValueChange={(value: any) => {
+								hideCategory = value;
+							}}
+						>
+							<SelectTrigger>
+								{hideCategory || '숨김 카테고리 선택'}
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="inappropriate">부적절한 내용</SelectItem>
+								<SelectItem value="spam">스팸/광고</SelectItem>
+								<SelectItem value="duplicate">중복 게시글</SelectItem>
+								<SelectItem value="violation">이용약관 위반</SelectItem>
+								<SelectItem value="other">기타</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">숨김 사유 (선택사항)</label>
+						<Input
+							type="text"
+							placeholder="숨김 사유를 입력하세요"
+							bind:value={hideReason}
+						/>
+					</div>
+					
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">태그 (선택사항)</label>
+						<Input
+							type="text"
+							placeholder="쉼표로 구분하여 입력 (예: 부적절, 광고)"
+							bind:value={hideTags}
+						/>
+						<p class="text-xs text-gray-500 mt-1">쉼표로 구분하여 여러 태그를 입력할 수 있습니다.</p>
+					</div>
+				</div>
+				
+				<div class="flex justify-end space-x-3 mt-6">
+					<Button variant="outline" onclick={resetModalStates}>취소</Button>
+					<Button onclick={handleHidePostModal} disabled={isHiding || !hideCategory}>
+						{isHiding ? '숨김 중...' : '숨기기'}
+					</Button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

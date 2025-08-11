@@ -21,15 +21,26 @@ pub struct User {
     pub updated_at: Option<DateTime<Utc>>,  // Option으로 변경
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum UserRole {
     User,
     Admin,
 }
 
+impl std::fmt::Display for UserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserRole::User => write!(f, "user"),
+            UserRole::Admin => write!(f, "admin"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::Type)]
 #[sqlx(type_name = "user_status", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum UserStatus {
     Active,
     Inactive,
