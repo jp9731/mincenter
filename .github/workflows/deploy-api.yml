@@ -1,0 +1,190 @@
+name: Deploy API to Server
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backends/api/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy to server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        REFRESH_SECRET: ${{ secrets.REFRESH_SECRET }}
+      run: |
+        ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+          set -e
+          
+          echo "🚀 Starting API deployment..."
+          
+          # 프로젝트 디렉토리로 이동
+          cd /home/admin/projects/mincenter
+          
+          # 기존 API 컨테이너 중지 및 제거
+          echo "🛑 Stopping existing API container..."
+          docker compose stop api 2>/dev/null || true
+          docker compose rm -f api 2>/dev/null || true
+          
+          # Git에서 최신 코드 가져오기
+          echo "📥 Pulling latest code from GitHub..."
+          git fetch origin
+          git reset --hard origin/main
+          git clean -fd
+          
+          # API 디렉토리로 이동
+          cd backends/api
+          
+          # Dockerfile 생성
+          echo "🐳 Creating Dockerfile..."
+          cat > Dockerfile << 'DOCKERFILE_EOF'
+        FROM rust:1.75 as builder
+        
+        WORKDIR /app
+        COPY . .
+        
+        # SQLx CLI 설치
+        RUN cargo install sqlx-cli --no-default-features --features postgres
+        
+        # 의존성 캐싱을 위한 더미 빌드
+        RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+        COPY Cargo.toml Cargo.lock ./
+        RUN cargo build --release && rm -rf src
+        
+        # 실제 소스 코드 복사 및 빌드
+        COPY src ./src
+        COPY .sqlx ./.sqlx
+        
+        # 환경변수 설정 후 빌드
+        ENV SQLX_OFFLINE=true
+        RUN cargo build --release --bin mincenter-api
+        
+        # 런타임 이미지
+        FROM debian:bookworm-slim
+        
+        # 런타임 의존성 설치
+        RUN apt-get update && apt-get install -y \
+            ca-certificates \
+            libssl3 \
+            && rm -rf /var/lib/apt/lists/*
+        
+        WORKDIR /app
+        
+        # 빌드된 바이너리 복사
+        COPY --from=builder /app/target/release/mincenter-api /app/mincenter-api
+        
+        # 실행 권한 부여
+        RUN chmod +x /app/mincenter-api
+        
+        # 포트 노출
+        EXPOSE 18080
+        
+        # 환경변수 설정
+        ENV API_PORT=18080
+        ENV RUST_LOG=info
+        
+        # 헬스체크
+        HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+          CMD curl -f http://localhost:18080/health || exit 1
+        
+        # 실행 명령
+        CMD ["/app/mincenter-api"]
+        DOCKERFILE_EOF
+          
+          # docker-compose.yml 업데이트
+          echo "📝 Updating docker-compose.yml..."
+          cd /home/admin/projects/mincenter
+          
+          # API 서비스가 있는지 확인하고 없으면 추가
+          if ! grep -q "api:" docker-compose.yml; then
+            cat >> docker-compose.yml << 'COMPOSE_EOF'
+
+  api:
+    build: 
+      context: ./backends/api
+      dockerfile: Dockerfile
+    container_name: mincenter-api
+    ports:
+      - "18080:18080"
+    environment:
+      - DATABASE_URL=postgresql://mincenter:${DATABASE_PASSWORD}@postgres:5432/mincenter
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - API_PORT=18080
+      - RUST_LOG=info
+      - CORS_ORIGIN=https://mincenter.kr,https://admin.mincenter.kr
+      - JWT_SECRET=${JWT_SECRET}
+      - REFRESH_SECRET=${REFRESH_SECRET}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mincenter_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+        COMPOSE_EOF
+          fi
+          
+          # 환경변수 파일 업데이트
+          echo "🔧 Updating environment variables..."
+          sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${DATABASE_PASSWORD}/" .env
+          sed -i "s/REDIS_PASSWORD=.*/REDIS_PASSWORD=${REDIS_PASSWORD}/" .env
+          
+          # JWT 시크릿이 없으면 추가
+          if ! grep -q "JWT_SECRET" .env; then
+            echo "JWT_SECRET=${JWT_SECRET}" >> .env
+            echo "REFRESH_SECRET=${REFRESH_SECRET}" >> .env
+          fi
+          
+          # Docker 이미지 빌드 및 컨테이너 시작
+          echo "🏗️  Building and starting API container..."
+          docker compose build api
+          docker compose up -d api
+          
+          # 컨테이너 시작 대기
+          echo "⏳ Waiting for API container to start..."
+          sleep 30
+          
+          # 헬스체크
+          echo "🏥 Performing health check..."
+          for i in {1..10}; do
+            if docker exec mincenter-api curl -f http://localhost:18080/health; then
+              echo "✅ API server is healthy!"
+              break
+            else
+              echo "⏳ Waiting for API server... ($i/10)"
+              sleep 10
+            fi
+          done
+          
+          # 컨테이너 상태 확인
+          echo "📊 Container status:"
+          docker compose ps api
+          
+          echo "🎉 API deployment completed successfully!"
+        EOF
