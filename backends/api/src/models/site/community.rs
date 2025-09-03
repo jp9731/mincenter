@@ -77,8 +77,6 @@ pub struct AttachedFile {
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct PostDetail {
     pub id: Uuid,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url_id: Option<String>, // URL에서 사용할 짧은 ID (예: 1234-abc123)
     pub board_id: Uuid,
     pub category_id: Option<Uuid>,
     pub user_id: Uuid,
@@ -269,8 +267,6 @@ pub struct PostSummaryDb {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostSummary {
     pub id: Uuid,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url_id: Option<String>, // URL에서 사용할 짧은 ID (예: 1234-abc123)
     pub title: String,
     pub board_id: Option<Uuid>,
     pub user_name: Option<String>,
@@ -298,4 +294,147 @@ pub struct ThumbnailUrls {
     pub thumb: Option<String>,   // 목록용 (150x150)
     pub card: Option<String>,    // 카드용 (300x200)  
     pub large: Option<String>,   // 본문용 (800x600)
-} 
+}
+
+// API 응답용 구조체들 (short_id 포함)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostDetailResponse {
+    pub id: Uuid,
+    pub short_id: String, // Base62 압축된 ID
+    pub board_id: Uuid,
+    pub category_id: Option<Uuid>,
+    pub user_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub title: String,
+    pub content: String,
+    pub views: Option<i32>,
+    pub likes: Option<i32>,
+    pub dislikes: Option<i32>,
+    pub is_notice: Option<bool>,
+    pub status: Option<PostStatus>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub depth: Option<i32>,
+    pub reply_count: Option<i32>,
+    pub user_name: Option<String>,
+    pub user_email: Option<String>,
+    pub board_name: Option<String>,
+    pub board_slug: Option<String>,
+    pub category_name: Option<String>,
+    pub comment_count: Option<i64>,
+    pub attached_files: Option<Vec<AttachedFile>>,
+    pub thumbnail_urls: Option<ThumbnailUrls>,
+    pub is_liked: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostSummaryResponse {
+    pub id: Uuid,
+    pub short_id: String, // Base62 압축된 ID
+    pub title: String,
+    pub board_id: Option<Uuid>,
+    pub user_name: Option<String>,
+    pub board_name: Option<String>,
+    pub board_slug: Option<String>,
+    pub category_name: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub comment_count: Option<i64>,
+    pub content: String,
+    pub views: Option<i32>,
+    pub likes: Option<i32>,
+    pub is_notice: Option<bool>,
+    pub attached_files: Option<Vec<String>>,
+    pub thumbnail_urls: Option<ThumbnailUrls>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CategoryResponse {
+    pub id: Uuid,
+    pub short_id: String, // Base62 압축된 ID
+    pub board_id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub display_order: Option<i32>,
+    pub is_active: Option<bool>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+// 변환 함수들
+impl PostSummary {
+    pub fn to_response(self) -> PostSummaryResponse {
+        use crate::utils::uuid_compression::compress_uuid_to_base62;
+        
+        PostSummaryResponse {
+            id: self.id,
+            short_id: compress_uuid_to_base62(&self.id),
+            title: self.title,
+            board_id: self.board_id,
+            user_name: self.user_name,
+            board_name: self.board_name,
+            board_slug: self.board_slug,
+            category_name: self.category_name,
+            created_at: self.created_at,
+            comment_count: self.comment_count,
+            content: self.content,
+            views: self.views,
+            likes: self.likes,
+            is_notice: self.is_notice,
+            attached_files: self.attached_files,
+            thumbnail_urls: self.thumbnail_urls,
+        }
+    }
+}
+
+impl PostDetail {
+    pub fn to_response(self) -> PostDetailResponse {
+        use crate::utils::uuid_compression::compress_uuid_to_base62;
+        
+        PostDetailResponse {
+            id: self.id,
+            short_id: compress_uuid_to_base62(&self.id),
+            board_id: self.board_id,
+            category_id: self.category_id,
+            user_id: self.user_id,
+            parent_id: self.parent_id,
+            title: self.title,
+            content: self.content,
+            views: self.views,
+            likes: self.likes,
+            dislikes: self.dislikes,
+            is_notice: self.is_notice,
+            status: self.status,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            depth: self.depth,
+            reply_count: self.reply_count,
+            user_name: self.user_name,
+            user_email: self.user_email,
+            board_name: self.board_name,
+            board_slug: self.board_slug,
+            category_name: self.category_name,
+            comment_count: self.comment_count,
+            attached_files: self.attached_files,
+            thumbnail_urls: self.thumbnail_urls,
+            is_liked: self.is_liked,
+        }
+    }
+}
+
+impl Category {
+    pub fn to_response(self) -> CategoryResponse {
+        use crate::utils::uuid_compression::compress_uuid_to_base62;
+        
+        CategoryResponse {
+            id: self.id,
+            short_id: compress_uuid_to_base62(&self.id),
+            board_id: self.board_id,
+            name: self.name,
+            description: self.description,
+            display_order: self.display_order,
+            is_active: self.is_active,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
+}

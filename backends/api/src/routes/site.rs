@@ -27,7 +27,9 @@ pub fn site_routes(state: AppState) -> Router<AppState> {
         .route("/api/pages", get(handlers::page::get_published_pages))
         .route("/api/pages/:slug", get(handlers::page::get_page_by_slug))
         // 사이트 메뉴 (공개)
-        .route("/api/site/menus", get(handlers::menu::get_site_menus))
+        .route("/api/site/menus", get(handlers::site_menu::get_site_menus))
+        // 사이트 정보 (공개)
+        .route("/api/site/info", get(handlers::site_info::get_site_info))
         // 공개 일정 (사이트용)
         .route("/api/calendar/events", get(handlers::calendar::get_public_events))
         // 파일 업로드

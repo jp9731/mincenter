@@ -1,7 +1,8 @@
 use crate::{
     errors::ApiError,
-    models::admin::board::{Board, Category, CreateBoardRequest, UpdateBoardRequest, CreateCategoryRequest, UpdateCategoryRequest},
+    models::admin::board::{Board, Category, CreateBoardRequest, UpdateBoardRequest, CreateCategoryRequest, UpdateCategoryRequest, BoardResponse, CategoryResponse},
     models::response::ApiResponse,
+    utils::uuid_compression::compress_uuid_to_base62,
 };
 use axum::{
     extract::{Path, Query, State},
@@ -68,8 +69,11 @@ fn parse_csv_option(s: &Option<String>) -> Option<Vec<String>> {
 }
 
 fn convert_board_raw_to_board(raw: BoardRaw) -> Board {
+    use crate::utils::uuid_compression::compress_uuid_to_base62;
+    
     Board {
         id: raw.id,
+
         name: raw.name,
         slug: raw.slug,
         description: raw.description,
@@ -417,13 +421,28 @@ pub async fn delete_board(
 pub async fn list_categories(
     State(state): State<AppState>,
     Path(board_id): Path<Uuid>,
-) -> Result<Json<ApiResponse<Vec<Category>>>, ApiError> {
-    let categories = sqlx::query_as::<_, Category>(
+) -> Result<Json<ApiResponse<Vec<CategoryResponse>>>, ApiError> {
+    let categories_raw = sqlx::query_as::<_, Category>(
         "SELECT * FROM categories WHERE board_id = $1 ORDER BY display_order ASC, created_at ASC"
     )
     .bind(board_id)
     .fetch_all(&state.pool)
     .await?;
+
+    // CategoryResponse로 변환 (short_id 포함)
+    let categories: Vec<CategoryResponse> = categories_raw.into_iter().map(|category| {
+        CategoryResponse {
+            id: category.id,
+            short_id: compress_uuid_to_base62(&category.id),
+            board_id: category.board_id,
+            name: category.name,
+            description: category.description,
+            display_order: category.display_order,
+            is_active: category.is_active,
+            created_at: category.created_at,
+            updated_at: category.updated_at,
+        }
+    }).collect();
 
     Ok(Json(ApiResponse::success(categories, "카테고리 목록을 성공적으로 조회했습니다.")))
 }
@@ -433,11 +452,11 @@ pub async fn create_category(
     State(state): State<AppState>,
     Path(board_id): Path<Uuid>,
     Json(category_data): Json<CreateCategoryRequest>,
-) -> Result<Json<ApiResponse<Category>>, ApiError> {
+) -> Result<Json<ApiResponse<CategoryResponse>>, ApiError> {
     let category = sqlx::query_as::<_, Category>(
         r#"
-        INSERT INTO categories (board_id, name, description, display_order, is_active)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO categories (id, board_id, name, description, display_order, is_active)
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
         RETURNING *
         "#,
     )
@@ -449,7 +468,20 @@ pub async fn create_category(
     .fetch_one(&state.pool)
     .await?;
 
-    Ok(Json(ApiResponse::success(category, "카테고리가 성공적으로 생성되었습니다.")))
+    // CategoryResponse로 변환 (short_id 포함)
+    let category_response = CategoryResponse {
+        id: category.id,
+        short_id: compress_uuid_to_base62(&category.id),
+        board_id: category.board_id,
+        name: category.name,
+        description: category.description,
+        display_order: category.display_order,
+        is_active: category.is_active,
+        created_at: category.created_at,
+        updated_at: category.updated_at,
+    };
+
+    Ok(Json(ApiResponse::success(category_response, "카테고리가 성공적으로 생성되었습니다.")))
 }
 
 // 카테고리 수정
@@ -457,7 +489,7 @@ pub async fn update_category(
     State(state): State<AppState>,
     Path((board_id, category_id)): Path<(Uuid, Uuid)>,
     Json(category_data): Json<UpdateCategoryRequest>,
-) -> Result<Json<ApiResponse<Category>>, ApiError> {
+) -> Result<Json<ApiResponse<CategoryResponse>>, ApiError> {
     let mut query = "UPDATE categories SET ".to_string();
     let mut params: Vec<String> = Vec::new();
     let mut param_count = 1;
@@ -522,7 +554,20 @@ pub async fn update_category(
         .fetch_one(&state.pool)
         .await?;
 
-    Ok(Json(ApiResponse::success(category, "카테고리가 성공적으로 수정되었습니다.")))
+    // CategoryResponse로 변환 (short_id 포함)
+    let category_response = CategoryResponse {
+        id: category.id,
+        short_id: compress_uuid_to_base62(&category.id),
+        board_id: category.board_id,
+        name: category.name,
+        description: category.description,
+        display_order: category.display_order,
+        is_active: category.is_active,
+        created_at: category.created_at,
+        updated_at: category.updated_at,
+    };
+
+    Ok(Json(ApiResponse::success(category_response, "카테고리가 성공적으로 수정되었습니다.")))
 }
 
 // 카테고리 삭제

@@ -267,13 +267,18 @@ export async function getPosts(params?: {
   if (params?.page) searchParams.set('page', params.page.toString());
   if (params?.limit) searchParams.set('limit', params.limit.toString());
   const res = await authenticatedAdminFetch(`/api/admin/posts?${searchParams}`, {}, fetchFn);
-  const json: ApiResponse<any[]> & { pagination: any } = await res.json();
+  const json: ApiResponse<any> = await res.json();
   if (!json.success || !json.data) throw new Error(json.message);
   
-  // API 응답 구조: { success: true, data: [...posts], pagination: {...} }
+  // API 응답 구조: { success: true, data: { posts: [...], total_count: 6, page: 1, limit: 20, total_pages: 1 } }
   return {
-    posts: json.data,
-    pagination: json.pagination
+    posts: json.data.posts || [],
+    pagination: {
+      page: json.data.page || 1,
+      limit: json.data.limit || 20,
+      total: json.data.total_count || 0,
+      totalPages: json.data.total_pages || 0
+    }
   };
 }
 
@@ -630,15 +635,36 @@ export const adminApi = {
   updateCalendarEvent,
   deleteCalendarEvent,
   createPost,
-  updatePost
+  updatePost,
+  uploadFile,
+  uploadSiteFile
 }; 
+
+// 파일 업로드 (일반 파일)
+export async function uploadFile(file: File, entityType: string = 'posts', filePurpose?: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('entity_type', entityType);
+  if (filePurpose) {
+    formData.append('file_purpose', filePurpose);
+  }
+  
+  const res = await authenticatedAdminFetch('/api/upload/posts', {
+    method: 'POST',
+    body: formData,
+    headers: {} // FormData를 사용할 때는 Content-Type을 설정하지 않음
+  });
+  const json: ApiResponse<any> = await res.json();
+  if (!json.success || !json.data) throw new Error(json.message);
+  return json.data.url;
+}
 
 // 파일 업로드 (사이트 파일)
 export async function uploadSiteFile(file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
   
-  const res = await authenticatedAdminFetch('/api/upload/site', {
+  const res = await authenticatedAdminFetch('/api/admin/upload/site', {
     method: 'POST',
     body: formData,
     headers: {} // FormData를 사용할 때는 Content-Type을 설정하지 않음

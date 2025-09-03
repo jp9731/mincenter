@@ -361,6 +361,8 @@
 	onMount(() => {
 		// 인증 상태 로딩 완료
 		authLoading = false;
+
+		dev && console.log('data:', data);
 	});
 
 	// 페이지 로드 시 댓글 가져오기 및 좋아요 상태 초기화

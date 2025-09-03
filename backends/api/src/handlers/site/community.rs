@@ -19,11 +19,12 @@ use crate::{
     errors::ApiError,
     utils::auth::Claims,
     utils::url_id::{resolve_post_uuid, generate_post_url_id},
+    utils::uuid_compression::compress_uuid_to_base62,
     services::thumbnail::ThumbnailService,
     AppState,
 };
 use chrono::{DateTime, Utc};
-use community::{Post, PostDetail, Comment, CommentDetail, CreatePostRequest, CreateReplyRequest, UpdatePostRequest, CreateCommentRequest, UpdateCommentRequest, PostFilter, PostListResponse, CommentListResponse, RecentPostsResponse, BoardStats, PostQuery, PostSummary, ThumbnailUrls, PostStatus, PostSummaryDb, AttachedFile};
+use community::{Post, PostDetail, Comment, CommentDetail, CreatePostRequest, CreateReplyRequest, UpdatePostRequest, CreateCommentRequest, UpdateCommentRequest, PostFilter, PostListResponse, CommentListResponse, RecentPostsResponse, BoardStats, PostQuery, PostSummary, ThumbnailUrls, PostStatus, PostSummaryDb, AttachedFile, PostDetailResponse, PostSummaryResponse, CategoryResponse};
 use ammonia::clean;
 use std::str::FromStr;
 
@@ -187,8 +188,11 @@ fn parse_csv_option(s: &Option<String>) -> Option<Vec<String>> {
 }
 
 fn convert_board_raw_to_board(raw: BoardRaw) -> Board {
+    use crate::utils::uuid_compression::compress_uuid_to_base62;
+    
     Board {
         id: raw.id,
+
         slug: raw.slug,
         name: raw.name,
         description: raw.description,
@@ -391,13 +395,19 @@ pub async fn get_categories(
     Path(board_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<Vec<Category>>>, StatusCode> {
-    let categories = sqlx::query_as::<_, Category>(
+    let categories_raw = sqlx::query_as::<_, Category>(
         "SELECT id, board_id, name, description, display_order, is_active, created_at, updated_at FROM categories WHERE board_id = $1 AND is_active = true ORDER BY display_order, name"
     )
     .bind(board_id)
     .fetch_all(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // 압축된 ID 추가
+    let categories: Vec<Category> = categories_raw.into_iter().map(|mut category| {
+
+        category
+    }).collect();
 
     Ok(Json(ApiResponse {
         success: true,
@@ -468,7 +478,7 @@ pub async fn get_categories_by_slug(
     let board = convert_board_raw_to_board(board_raw);
 
     // 게시판 ID로 카테고리 조회
-    let categories = sqlx::query_as::<_, Category>(
+    let categories_raw = sqlx::query_as::<_, Category>(
         "SELECT id, board_id, name, description, display_order, is_active, created_at, updated_at FROM categories WHERE board_id = $1 AND is_active = true ORDER BY display_order, name"
     )
     .bind(board.id)
@@ -478,6 +488,12 @@ pub async fn get_categories_by_slug(
         eprintln!("Error fetching categories: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    // 압축된 ID 추가
+    let categories: Vec<Category> = categories_raw.into_iter().map(|mut category| {
+
+        category
+    }).collect();
 
     Ok(Json(ApiResponse {
         success: true,
@@ -492,7 +508,7 @@ pub async fn get_posts(
     Query(query): Query<PostQuery>,
     State(state): State<AppState>,
     Extension(claims): Extension<Option<Claims>>,
-) -> Result<Json<ApiResponse<Vec<PostSummary>>>, StatusCode> {
+) -> Result<Json<ApiResponse<Vec<PostSummaryResponse>>>, StatusCode> {
     let user_role = claims.as_ref().map(|c| c.role.as_str());
     
     // 게시판 권한 체크 (board_id가 있는 경우)
@@ -832,7 +848,8 @@ pub async fn get_posts(
 
         let post_with_files = PostSummary {
             id: post.id,
-            url_id,
+
+
             title: post.title,
             board_id: post.board_id,
             user_name: post.user_name,
@@ -906,10 +923,13 @@ pub async fn get_posts(
         total_pages: total_pages as u32,
     });
 
+    // PostSummary를 PostSummaryResponse로 변환
+    let posts_response: Vec<PostSummaryResponse> = posts.into_iter().map(|post| post.to_response()).collect();
+
     Ok(Json(ApiResponse {
         success: true,
         message: "게시글 목록을 성공적으로 조회했습니다.".to_string(),
-        data: Some(posts),
+        data: Some(posts_response),
         pagination,
     }))
 }
@@ -922,7 +942,7 @@ pub async fn get_post(
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
     let user_role = claims.as_ref().map(|c| c.role.as_str());
     
-    // URL ID 또는 UUID를 UUID로 변환
+    // URL ID, 압축된 ID, 또는 UUID를 UUID로 변환
     let post_id = if url_id.contains('-') && url_id.len() < 20 {
         // URL ID 형태 (예: 1-Nu_EJg)
         match resolve_post_uuid(&state.pool, &url_id).await {
@@ -935,6 +955,24 @@ pub async fn get_post(
                 return Ok(Json(ApiResponse {
                     success: false,
                     message: "존재하지 않는 게시글입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    } else if url_id.len() == 22 && url_id.chars().all(|c| c.is_alphanumeric()) {
+        // Base62 압축된 ID 형태 (22자리)
+        use crate::utils::uuid_compression::decompress_base62_to_uuid;
+        match decompress_base62_to_uuid(&url_id) {
+            Ok(uuid) => {
+                println!("✅ 압축된 ID 변환 성공: {} -> {}", url_id, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 압축된 ID: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "잘못된 ID 형식입니다.".to_string(),
                     data: None,
                     pagination: None,
                 }));
@@ -1091,7 +1129,8 @@ pub async fn get_post(
 
     let post = PostDetail {
         id: post_basic.id,
-        url_id,
+
+
         board_id: post_basic.board_id,
         category_id: post_basic.category_id,
         user_id: post_basic.user_id,
@@ -1232,7 +1271,8 @@ pub async fn create_post(
 
     let post = PostDetail {
         id: post_result.id,
-        url_id,
+
+
         board_id: post_result.board_id,
         category_id: post_result.category_id,
         user_id: post_result.user_id,
@@ -1348,13 +1388,42 @@ pub async fn create_post(
 
 // 게시글 수정
 pub async fn update_post(
-    Path(post_id): Path<Uuid>,
+    Path(post_id_str): Path<String>,
     State(state): State<AppState>,
     Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
     Json(payload): Json<UpdatePostRequest>,
 ) -> Result<Json<ApiResponse<PostDetail>>, StatusCode> {
     // 인증 확인
     let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
+    
+    // 압축된 ID 또는 UUID를 UUID로 변환
+    let post_id = if post_id_str.len() == 22 && post_id_str.chars().all(|c| c.is_alphanumeric()) {
+        // Base62 압축된 ID 형태 (22자리)
+        use crate::utils::uuid_compression::decompress_base62_to_uuid;
+        match decompress_base62_to_uuid(&post_id_str) {
+            Ok(uuid) => {
+                println!("✅ 압축된 ID 변환 성공: {} -> {}", post_id_str, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 압축된 ID: {}", post_id_str);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+    } else {
+        // 기존 UUID 형태 (하위 호환성)
+        match uuid::Uuid::parse_str(&post_id_str) {
+            Ok(uuid) => {
+                println!("✅ UUID 직접 사용: {}", uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 ID 형식: {}", post_id_str);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+    };
+    
     // 권한 확인
     let post = sqlx::query_as::<_, Post>(
         "SELECT * FROM posts WHERE id = $1 AND status = 'published'"
@@ -1464,13 +1533,16 @@ pub async fn update_post(
     
     query_builder = query_builder.bind(post_id);
 
-    let updated_post = query_builder
+    let mut updated_post = query_builder
         .fetch_one(&state.pool)
         .await
         .map_err(|e| {
             error!("Failed to update post: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+    
+    // 압축된 ID 추가
+
 
     // 첨부파일 처리 (기존 파일 연결 제거 후 새로 연결)
     if let Some(attached_files) = payload.attached_files {
@@ -1549,12 +1621,40 @@ pub async fn update_post(
 
 // 게시글 삭제
 pub async fn delete_post(
-    Path(post_id): Path<Uuid>,
+    Path(post_id_str): Path<String>,
     State(state): State<AppState>,
     Extension(claims): Extension<Option<crate::utils::auth::Claims>>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
     // 인증 확인
     let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
+    
+    // 압축된 ID 또는 UUID를 UUID로 변환
+    let post_id = if post_id_str.len() == 22 && post_id_str.chars().all(|c| c.is_alphanumeric()) {
+        // Base62 압축된 ID 형태 (22자리)
+        use crate::utils::uuid_compression::decompress_base62_to_uuid;
+        match decompress_base62_to_uuid(&post_id_str) {
+            Ok(uuid) => {
+                println!("✅ 압축된 ID 변환 성공: {} -> {}", post_id_str, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 압축된 ID: {}", post_id_str);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+    } else {
+        // 기존 UUID 형태 (하위 호환성)
+        match uuid::Uuid::parse_str(&post_id_str) {
+            Ok(uuid) => {
+                println!("✅ UUID 직접 사용: {}", uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 ID 형식: {}", post_id_str);
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+    };
     
     // 권한 확인
     let post = sqlx::query_as::<_, Post>(
@@ -2051,7 +2151,7 @@ pub async fn get_posts_by_slug(
     Extension(claims): Extension<Option<Claims>>,
     Path(slug): Path<String>,
     Query(query): Query<PostQuery>,
-) -> Result<Json<ApiResponse<Vec<PostSummary>>>, StatusCode> {
+) -> Result<Json<ApiResponse<Vec<PostSummaryResponse>>>, StatusCode> {
     let user_role = claims.as_ref().map(|c| c.role.as_str());
     
     // slug로 board_id 조회
@@ -2210,7 +2310,8 @@ pub async fn get_posts_by_slug(
 
         let post_with_files = PostSummary {
             id: post.id,
-            url_id,
+
+
             title: post.title,
             board_id: post.board_id,
             user_name: post.user_name,
@@ -2284,9 +2385,12 @@ pub async fn get_posts_by_slug(
         total_pages: total_pages as u32,
     };
 
+    // PostSummary를 PostSummaryResponse로 변환
+    let posts_response: Vec<PostSummaryResponse> = posts.into_iter().map(|post| post.to_response()).collect();
+
     Ok(Json(ApiResponse {
         success: true,
-        data: Some(posts),
+        data: Some(posts_response),
         message: "게시글 목록을 성공적으로 조회했습니다.".to_string(),
         pagination: Some(pagination),
     }))
@@ -2534,7 +2638,8 @@ pub async fn create_reply_by_slug(
 
     let reply_detail = PostDetail {
         id: reply.id,
-        url_id,
+
+
         board_id: reply.board_id,
         category_id: reply.category_id,
         user_id: reply.user_id,
@@ -3047,7 +3152,8 @@ pub async fn get_recent_posts(
 
         let post_detail = PostDetail {
             id: post_raw.id,
-            url_id,
+
+
             title: post_raw.title,
             content: post_raw.content,
             user_id: post_raw.user_id,

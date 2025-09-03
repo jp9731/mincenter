@@ -5,7 +5,7 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"deploy": "vite build",
+
 		"prepare": "npx svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "echo 'TypeScript check temporarily disabled'",

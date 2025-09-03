@@ -174,4 +174,65 @@ pub struct UpdateCategoryRequest {
     pub description: Option<String>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
+}
+
+// API 응답용 구조체들 (short_id 포함)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BoardResponse {
+    pub id: Uuid,
+    pub short_id: String, // Base62 압축된 ID
+    pub name: String,
+    pub slug: String,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub display_order: i32,
+    pub is_public: bool,
+    pub allow_anonymous: bool,
+    pub allow_file_upload: bool,
+    pub max_files: i32,
+    pub max_file_size: i64,
+    pub allowed_file_types: Option<Vec<String>>,
+    pub allow_rich_text: bool,
+    pub require_category: bool,
+    pub allow_comments: bool,
+    pub allow_likes: bool,
+    pub write_permission: String,
+    pub list_permission: String,
+    pub read_permission: String,
+    pub reply_permission: String,
+    pub comment_permission: String,
+    pub download_permission: String,
+    pub hide_list: bool,
+    pub editor_type: String,
+    pub allow_search: bool,
+    pub allow_recommend: bool,
+    pub allow_disrecommend: bool,
+    pub show_author_name: bool,
+    pub show_ip: bool,
+    pub edit_comment_limit: i32,
+    pub delete_comment_limit: i32,
+    pub use_sns: bool,
+    pub use_captcha: bool,
+    pub title_length: i32,
+    pub posts_per_page: i32,
+    pub read_point: i32,
+    pub write_point: i32,
+    pub comment_point: i32,
+    pub download_point: i32,
+    pub allowed_iframe_domains: Option<Vec<String>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CategoryResponse {
+    pub id: Uuid,
+    pub short_id: String, // Base62 압축된 ID
+    pub board_id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub display_order: i32,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 } 

@@ -30,15 +30,21 @@
 
 	interface SiteInfo {
 		siteName: string;
-		catchphrase: string;
-		address: string;
-		phone: string;
-		email: string;
-		homepage: string;
-		fax: string;
-		representativeName: string;
+		siteDescription: string;
+		siteKeywords: string;
+		siteAuthor: string;
+		siteUrl: string;
+		siteLogo: string;
+		siteFavicon: string;
+		contactEmail: string;
+		contactPhone: string;
+		contactFax: string;
+		contactAddress: string;
 		businessNumber: string;
-		logoImageUrl: string;
+		socialFacebook: string;
+		socialTwitter: string;
+		socialInstagram: string;
+		socialYoutube: string;
 	}
 
 	interface SnsLink {
@@ -52,15 +58,21 @@
 
 	let siteInfo: SiteInfo = {
 		siteName: '',
-		catchphrase: '',
-		address: '',
-		phone: '',
-		email: '',
-		homepage: '',
-		fax: '',
-		representativeName: '',
+		siteDescription: '',
+		siteKeywords: '',
+		siteAuthor: '',
+		siteUrl: '',
+		siteLogo: '',
+		siteFavicon: '',
+		contactEmail: '',
+		contactPhone: '',
+		contactFax: '',
+		contactAddress: '',
 		businessNumber: '',
-		logoImageUrl: ''
+		socialFacebook: '',
+		socialTwitter: '',
+		socialInstagram: '',
+		socialYoutube: ''
 	};
 
 	let snsLinks: SnsLink[] = [];
@@ -96,15 +108,21 @@
 				// 백엔드 snake_case를 프론트엔드 camelCase로 변환
 				siteInfo = {
 					siteName: data.site_info.site_name || '',
-					catchphrase: data.site_info.catchphrase || '',
-					address: data.site_info.address || '',
-					phone: data.site_info.phone || '',
-					email: data.site_info.email || '',
-					homepage: data.site_info.homepage || '',
-					fax: data.site_info.fax || '',
-					representativeName: data.site_info.representative_name || '',
+					siteDescription: data.site_info.site_description || '',
+					siteKeywords: data.site_info.site_keywords || '',
+					siteAuthor: data.site_info.site_author || '',
+					siteUrl: data.site_info.site_url || '',
+					siteLogo: data.site_info.site_logo || '',
+					siteFavicon: data.site_info.site_favicon || '',
+					contactEmail: data.site_info.contact_email || '',
+					contactPhone: data.site_info.contact_phone || '',
+					contactFax: data.site_info.contact_fax || '',
+					contactAddress: data.site_info.contact_address || '',
 					businessNumber: data.site_info.business_number || '',
-					logoImageUrl: data.site_info.logo_image_url || ''
+					socialFacebook: data.site_info.social_facebook || '',
+					socialTwitter: data.site_info.social_twitter || '',
+					socialInstagram: data.site_info.social_instagram || '',
+					socialYoutube: data.site_info.social_youtube || ''
 				};
 			}
 			if (data.sns_links) {
@@ -124,16 +142,22 @@
 
 			// 에러 시 기본값 설정
 			siteInfo = {
-				siteName: '민센터 봉사단체',
-				catchphrase: '함께 만들어가는 따뜻한 세상',
-				address: '서울특별시 강남구 테헤란로 123',
-				phone: '02-1234-5678',
-				email: 'info@mincenter.org',
-				homepage: 'https://example.com',
-				fax: '',
-				representativeName: '',
-				businessNumber: '',
-				logoImageUrl: ''
+				siteName: '민들레장애인자립생활센터',
+				siteDescription: '함께 만들어가는 따뜻한 세상',
+				siteKeywords: '장애인자립생활센터, 민들레, 봉사, 복지',
+				siteAuthor: '박길연',
+				siteUrl: 'https://mincenter.org',
+				siteLogo: '',
+				siteFavicon: '',
+				contactEmail: 'mincenter08@daum.net',
+				contactPhone: '032-542-9294',
+				contactFax: '032-232-0739',
+				contactAddress: '인천광역시 계양구 계산새로71 A동 201~202호 (계산동, 하이베라스)',
+				businessNumber: '131-80-12554',
+				socialFacebook: '',
+				socialTwitter: '',
+				socialInstagram: 'https://www.instagram.com/mincenter08?igsh=bTZyM2Qxa2t4ajJv',
+				socialYoutube: ''
 			};
 			snsLinks = [];
 		} finally {
@@ -151,15 +175,21 @@
 			const settingsData = {
 				siteInfo: {
 					site_name: siteInfo.siteName,
-					catchphrase: siteInfo.catchphrase,
-					address: siteInfo.address,
-					phone: siteInfo.phone,
-					email: siteInfo.email,
-					homepage: siteInfo.homepage,
-					fax: siteInfo.fax,
-					representative_name: siteInfo.representativeName,
+					site_description: siteInfo.siteDescription,
+					site_keywords: siteInfo.siteKeywords,
+					site_author: siteInfo.siteAuthor,
+					site_url: siteInfo.siteUrl,
+					site_logo: siteInfo.siteLogo,
+					site_favicon: siteInfo.siteFavicon,
+					contact_email: siteInfo.contactEmail,
+					contact_phone: siteInfo.contactPhone,
+					contact_fax: siteInfo.contactFax,
+					contact_address: siteInfo.contactAddress,
 					business_number: siteInfo.businessNumber,
-					logo_image_url: siteInfo.logoImageUrl
+					social_facebook: siteInfo.socialFacebook,
+					social_twitter: siteInfo.socialTwitter,
+					social_instagram: siteInfo.socialInstagram,
+					social_youtube: siteInfo.socialYoutube
 				},
 				snsLinks: snsLinks.map(link => ({
 					name: link.name,
@@ -250,7 +280,7 @@
 
 		try {
 			const result = await uploadSiteFile(file);
-			siteInfo.logoImageUrl = result.url;
+			siteInfo.siteLogo = result.url;
 			alert('로고 이미지가 업로드되었습니다.');
 		} catch (error) {
 			console.error('로고 업로드 실패:', error);
@@ -263,7 +293,7 @@
 	}
 
 	function removeLogo() {
-		siteInfo.logoImageUrl = '';
+		siteInfo.siteLogo = '';
 		logoFile = null;
 	}
 </script>
@@ -311,57 +341,82 @@
 							/>
 						</div>
 						<div>
-							<label for="catchphrase" class="mb-1 block text-sm font-medium text-gray-700">
-								캐치프라이즈
+							<label for="siteAuthor" class="mb-1 block text-sm font-medium text-gray-700">
+								대표자명
 							</label>
-							<Input
-								id="catchphrase"
-								bind:value={siteInfo.catchphrase}
-								placeholder="캐치프라이즈를 입력하세요"
-							/>
+							<div class="flex items-center gap-2">
+								<UserIcon class="h-4 w-4 text-gray-400" />
+								<Input
+									id="siteAuthor"
+									bind:value={siteInfo.siteAuthor}
+									placeholder="대표자명을 입력하세요"
+								/>
+							</div>
 						</div>
 					</div>
 
 					<div>
-						<label for="homepage" class="mb-1 block text-sm font-medium text-gray-700">
+						<label for="siteDescription" class="mb-1 block text-sm font-medium text-gray-700">
+							사이트 설명
+						</label>
+						<Input
+							id="siteDescription"
+							bind:value={siteInfo.siteDescription}
+							placeholder="사이트 설명을 입력하세요"
+						/>
+					</div>
+
+					<div>
+						<label for="siteKeywords" class="mb-1 block text-sm font-medium text-gray-700">
+							사이트 키워드
+						</label>
+						<Input
+							id="siteKeywords"
+							bind:value={siteInfo.siteKeywords}
+							placeholder="키워드를 쉼표로 구분하여 입력하세요"
+						/>
+					</div>
+
+					<div>
+						<label for="siteUrl" class="mb-1 block text-sm font-medium text-gray-700">
 							홈페이지 주소
 						</label>
 						<Input
-							id="homepage"
-							bind:value={siteInfo.homepage}
+							id="siteUrl"
+							bind:value={siteInfo.siteUrl}
 							placeholder="https://example.com"
 							type="url"
 						/>
 					</div>
 
 					<div>
-						<label for="address" class="mb-1 block text-sm font-medium text-gray-700"> 주소 </label>
+						<label for="contactAddress" class="mb-1 block text-sm font-medium text-gray-700"> 주소 </label>
 						<div class="flex items-center gap-2">
 							<MapPinIcon class="h-4 w-4 text-gray-400" />
-							<Input id="address" bind:value={siteInfo.address} placeholder="주소를 입력하세요" />
+							<Input id="contactAddress" bind:value={siteInfo.contactAddress} placeholder="주소를 입력하세요" />
 						</div>
 					</div>
 
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div>
-							<label for="phone" class="mb-1 block text-sm font-medium text-gray-700">
+							<label for="contactPhone" class="mb-1 block text-sm font-medium text-gray-700">
 								연락처
 							</label>
 							<div class="flex items-center gap-2">
 								<PhoneIcon class="h-4 w-4 text-gray-400" />
-								<Input id="phone" bind:value={siteInfo.phone} placeholder="연락처를 입력하세요" />
+								<Input id="contactPhone" bind:value={siteInfo.contactPhone} placeholder="연락처를 입력하세요" />
 							</div>
 						</div>
 						<div>
-							<label for="email" class="mb-1 block text-sm font-medium text-gray-700">
+							<label for="contactEmail" class="mb-1 block text-sm font-medium text-gray-700">
 								이메일
 							</label>
 							<div class="flex items-center gap-2">
 								<MailIcon class="h-4 w-4 text-gray-400" />
 								<Input
-									id="email"
+									id="contactEmail"
 									type="email"
-									bind:value={siteInfo.email}
+									bind:value={siteInfo.contactEmail}
 									placeholder="이메일을 입력하세요"
 								/>
 							</div>
@@ -370,52 +425,38 @@
 
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div>
-							<label for="fax" class="mb-1 block text-sm font-medium text-gray-700">
+							<label for="contactFax" class="mb-1 block text-sm font-medium text-gray-700">
 								팩스
 							</label>
 							<div class="flex items-center gap-2">
 								<FanIcon class="h-4 w-4 text-gray-400" />
-								<Input id="fax" bind:value={siteInfo.fax} placeholder="팩스번호를 입력하세요" />
+								<Input id="contactFax" bind:value={siteInfo.contactFax} placeholder="팩스번호를 입력하세요" />
 							</div>
 						</div>
 						<div>
-							<label for="representativeName" class="mb-1 block text-sm font-medium text-gray-700">
-								대표자명
+							<label for="businessNumber" class="mb-1 block text-sm font-medium text-gray-700">
+								사업자번호
 							</label>
 							<div class="flex items-center gap-2">
-								<UserIcon class="h-4 w-4 text-gray-400" />
+								<BuildingIcon class="h-4 w-4 text-gray-400" />
 								<Input
-									id="representativeName"
-									bind:value={siteInfo.representativeName}
-									placeholder="대표자명을 입력하세요"
+									id="businessNumber"
+									bind:value={siteInfo.businessNumber}
+									placeholder="사업자등록번호를 입력하세요 (예: 123-45-67890)"
 								/>
 							</div>
 						</div>
 					</div>
 
 					<div>
-						<label for="businessNumber" class="mb-1 block text-sm font-medium text-gray-700">
-							사업자번호
-						</label>
-						<div class="flex items-center gap-2">
-							<BuildingIcon class="h-4 w-4 text-gray-400" />
-							<Input
-								id="businessNumber"
-								bind:value={siteInfo.businessNumber}
-								placeholder="사업자등록번호를 입력하세요 (예: 123-45-67890)"
-							/>
-						</div>
-					</div>
-
-					<div>
-						<label for="logoImageUrl" class="mb-1 block text-sm font-medium text-gray-700">
+						<label for="siteLogo" class="mb-1 block text-sm font-medium text-gray-700">
 							로고 이미지
 						</label>
 						<div class="space-y-3">
-							{#if siteInfo.logoImageUrl}
+							{#if siteInfo.siteLogo}
 								<div class="flex items-center gap-3">
 									<img
-										src={siteInfo.logoImageUrl}
+										src={siteInfo.siteLogo}
 										alt="로고 미리보기"
 										class="h-16 w-auto rounded border"
 										onerror={(e) => {
@@ -435,22 +476,71 @@
 								</div>
 							{/if}
 							
-							<div class="flex items-center gap-2">
-								<ImageIcon class="h-4 w-4 text-gray-400" />
-								<Input
-									id="logoImageUrl"
-									type="file"
-									accept="image/*"
-									onchange={handleLogoUpload}
-									disabled={logoUploading}
-								/>
-								{#if logoUploading}
-									<div class="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
-								{/if}
-							</div>
-							<p class="text-xs text-gray-500">
-								이미지 파일만 업로드 가능합니다. (최대 5MB)
-							</p>
+							
+							
+							
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
+			<!-- 소셜 미디어 -->
+			<Card>
+				<CardHeader>
+					<CardTitle class="flex items-center gap-2">
+						<Share2Icon class="h-5 w-5" />
+						소셜 미디어
+					</CardTitle>
+					<CardDescription>소셜 미디어 계정 정보를 설정합니다</CardDescription>
+				</CardHeader>
+				<CardContent class="space-y-4">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div>
+							<label for="socialFacebook" class="mb-1 block text-sm font-medium text-gray-700">
+								Facebook
+							</label>
+							<Input
+								id="socialFacebook"
+								bind:value={siteInfo.socialFacebook}
+								placeholder="https://facebook.com/yourpage"
+								type="url"
+							/>
+						</div>
+						<div>
+							<label for="socialTwitter" class="mb-1 block text-sm font-medium text-gray-700">
+								Twitter
+							</label>
+							<Input
+								id="socialTwitter"
+								bind:value={siteInfo.socialTwitter}
+								placeholder="https://twitter.com/yourpage"
+								type="url"
+							/>
+						</div>
+					</div>
+
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div>
+							<label for="socialInstagram" class="mb-1 block text-sm font-medium text-gray-700">
+								Instagram
+							</label>
+							<Input
+								id="socialInstagram"
+								bind:value={siteInfo.socialInstagram}
+								placeholder="https://instagram.com/yourpage"
+								type="url"
+							/>
+						</div>
+						<div>
+							<label for="socialYoutube" class="mb-1 block text-sm font-medium text-gray-700">
+								YouTube
+							</label>
+							<Input
+								id="socialYoutube"
+								bind:value={siteInfo.socialYoutube}
+								placeholder="https://youtube.com/channel/yourchannel"
+								type="url"
+							/>
 						</div>
 					</div>
 				</CardContent>

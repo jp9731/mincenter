@@ -38,6 +38,7 @@
 		shouldShowDisrecommend
 	} from '$lib/utils/permissions';
 	import type { Post, PostFilter, Board } from '$lib/types/community';
+	import { dev } from '$app/environment';
 
 	// Props 인터페이스 및 선언
 	interface Props {
@@ -430,7 +431,7 @@
 	
 	// posts 배열 변경 시에도 observer 재설정
 	$effect(() => {
-		console.log('posts 변경됨:', $posts.length);
+	dev && console.log('posts 변경됨:', $posts.length);
 		
 		// 새 게시글이 추가되었는지 확인
 		if ($posts.length > previousPostsLength) {
@@ -591,7 +592,7 @@
 						<!-- 섬네일 이미지 -->
 						{#if thumbnailUrl}
 							<div class="flex-shrink-0">
-								<a href="/community/{data.slug}/{post.id}">
+								<a href="/community/{data.slug}/{post.short_id}">
 									<img
 										src={thumbnailUrl}
 										alt={post.title}
@@ -605,7 +606,7 @@
 							{#if post.is_notice}
 								<Badge variant="secondary" class={`${fontSizeBadgeClass} ${leadingBadgeClass}`}>공지</Badge>
 							{/if}
-							<a href="/community/{data.slug}/{post.id}" class={`text-gray-900 hover:text-blue-600 transition-colors font-medium truncate ${fontSizeClass} ${leadingClass}`}>
+							<a href="/community/{data.slug}/{post.short_id}" class={`text-gray-900 hover:text-blue-600 transition-colors font-medium truncate ${fontSizeClass} ${leadingClass}`}>
 								{post.category_name ? `[${post.category_name}] ` : ''}{post.title}
 							</a>
 							{#if isNewPost(post)}
@@ -650,7 +651,7 @@
 					<!-- 카드 헤더 이미지 -->
 					{#if thumbnailUrl}
 						<div class="overflow-hidden">
-							<a href="/community/{data.slug}/{post.id}">
+							<a href="/community/{data.slug}/{post.short_id}">
 								<img
 									src={thumbnailUrl}
 									alt={post.title}
@@ -663,7 +664,7 @@
 						<div class="flex items-start justify-between">
 							<div class="flex-1 min-w-0">
 								<CardTitle class={`leading-tight break-words whitespace-pre-line pr-10 sm:pr-24 ${fontSizeClass} ${leadingClass}`}> <!-- 우측 패딩 추가 -->
-									<a href="/community/{data.slug}/{post.id}" class="hover:text-blue-600 transition-colors">
+									<a href="/community/{data.slug}/{post.short_id}" class="hover:text-blue-600 transition-colors">
 										{#if post.depth && post.depth > 0}
 											<span class="text-gray-400 mr-1">{'└'.repeat(post.depth)} ↳</span>
 										{/if}

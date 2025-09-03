@@ -122,6 +122,28 @@ export async function getSiteMenus(): Promise<ApiResponse<SiteMenuResponse>> {
   }
 }
 
+export interface SiteInfo {
+	id: string;
+	site_name: string;
+	site_description?: string;
+	site_keywords?: string;
+	site_author?: string;
+	site_url?: string;
+	site_logo?: string;
+	site_favicon?: string;
+	contact_email?: string;
+	contact_phone?: string;
+	contact_fax?: string;
+	contact_address?: string;
+	business_number?: string;
+	social_facebook?: string;
+	social_twitter?: string;
+	social_instagram?: string;
+	social_youtube?: string;
+	created_at: string;
+	updated_at: string;
+}
+
 export interface Page {
   id: string;
   slug: string;
@@ -139,6 +161,23 @@ export interface Page {
   updated_by?: string;
   view_count: number;
   sort_order: number;
+}
+
+export async function getSiteInfo(): Promise<SiteInfo> {
+	const baseUrl = API_BASE || 'http://localhost:18080';
+	const response = await fetch(`${baseUrl}/api/site/info`);
+	
+	if (!response.ok) {
+		throw new Error(`HTTP error! status: ${response.status}`);
+	}
+	
+	const result: ApiResponse<SiteInfo> = await response.json();
+	
+	if (!result.success) {
+		throw new Error(result.message || '사이트 정보를 가져오는데 실패했습니다.');
+	}
+	
+	return result.data;
 }
 
 export async function getPageBySlug(slug: string): Promise<ApiResponse<Page>> {

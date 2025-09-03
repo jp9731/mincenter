@@ -238,7 +238,7 @@
 	async function handleDeletePost(postId: string) {
 		if (confirm('정말로 이 게시글을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) {
 			try {
-				const res = await fetch(`${API_BASE}/api/admin/posts/${postId}/delete`, {
+				const res = await fetch(`${API_BASE}/api/admin/posts/${postId}`, {
 					method: 'DELETE',
 					headers: {
 						'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
@@ -514,12 +514,10 @@
 									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}`)}>
 										상세보기
 									</Button>
-									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}/edit`)}>
+									<Button variant="outline" size="sm" onclick={() => goto(`/posts/${post.id}/form`)}>
 										수정
 									</Button>
-									<Button variant="outline" size="sm" onclick={() => handleDeletePost(post.id)}>
-										삭제
-									</Button>
+								
 									<div class="relative">
 										<Button variant="outline" size="sm" onclick={() => toggleManagementMenu(post.id)}>
 											관리
@@ -542,9 +540,8 @@
 													<button
 														class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
 														onclick={() => {
-															if (confirm('정말로 이 게시글을 삭제하시겠습니까?')) {
-																handleDeletePost(post.id);
-															}
+															showManagementMenu[post.id] = false;
+															handleDeletePost(post.id);
 														}}
 													>
 														게시글 삭제

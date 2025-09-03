@@ -14,7 +14,7 @@ import {
 } from '$lib/utils/auth';
 import { getUsers, getPosts, togglePostVisibility, updateUserStatus } from '$lib/api/admin';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.mincenter.kr';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const adminUser = writable<AdminUser | null>(null);
 export const isAdminAuthenticated = writable(false);
@@ -217,8 +217,8 @@ export async function authenticatedAdminFetch(url: string, options: RequestInit 
     }
   }
 
-  // URL이 상대 경로인 경우 API_URL과 결합
-  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+  // URL이 상대 경로인 경우 API_URL과 결합 (API_URL이 있는 경우에만)
+  const fullUrl = url.startsWith('http') ? url : (API_URL ? `${API_URL}${url}` : url);
 
   const fetcher = fetchFn || fetch;
   const response = await fetcher(fullUrl, {

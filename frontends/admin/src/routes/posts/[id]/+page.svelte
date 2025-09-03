@@ -13,6 +13,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
 	import { getPost, getComments } from '$lib/api/admin';
+	import { cleanHtmlContent } from '$lib/utils/html';
 	import type { Post } from '$lib/types/admin';
 
 	let post: Post | null = null;
@@ -30,6 +31,8 @@
 		}
 		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
 	}
+
+
 
 	onMount(async () => {
 		const postId = $page.params.id;
@@ -132,8 +135,8 @@
 			</CardHeader>
 			<CardContent>
 				<div class="prose max-w-none">
-					<div class="whitespace-pre-wrap text-gray-700 leading-relaxed">
-						{post.content}
+					<div class="text-gray-700 leading-relaxed">
+						{@html cleanHtmlContent(post.content)}
 					</div>
 				</div>
 			</CardContent>

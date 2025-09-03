@@ -24,7 +24,10 @@ pub async fn get_site_settings(
     )
     .fetch_optional(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        tracing::error!("사이트 정보 조회 실패: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // 기본 사이트 정보가 없으면 생성
     let site_info = if let Some(info) = site_info {
@@ -32,24 +35,18 @@ pub async fn get_site_settings(
     } else {
         let default_info = sqlx::query_as::<_, SiteInfo>(
             r#"
-            INSERT INTO site_info (site_name, catchphrase, address, phone, email, homepage, fax, representative_name, business_number, logo_image_url)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO site_info (site_name)
+            VALUES ($1)
             RETURNING *
             "#
         )
         .bind("민센터 봉사단체")
-        .bind("함께 만들어가는 따뜻한 세상")
-        .bind("서울특별시 강남구 테헤란로 123")
-        .bind("02-1234-5678")
-        .bind("info@mincenter.org")
-        .bind("https://example.com")
-        .bind("")
-        .bind("")
-        .bind("")
-        .bind("")
         .fetch_one(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("기본 사이트 정보 생성 실패: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
         
         default_info
     };
@@ -60,7 +57,10 @@ pub async fn get_site_settings(
     )
     .fetch_all(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|e| {
+        tracing::error!("SNS 링크 조회 실패: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let settings = SiteSettings {
         site_info,
@@ -83,30 +83,42 @@ pub async fn save_site_settings(
         r#"
         UPDATE site_info SET
             site_name = COALESCE($1, site_name),
-            catchphrase = $2,
-            address = $3,
-            phone = $4,
-            email = $5,
-            homepage = $6,
-            fax = $7,
-            representative_name = $8,
-            business_number = $9,
-            logo_image_url = $10,
+            site_description = COALESCE($2, site_description),
+            site_keywords = COALESCE($3, site_keywords),
+            site_author = COALESCE($4, site_author),
+            site_url = COALESCE($5, site_url),
+            site_logo = COALESCE($6, site_logo),
+            site_favicon = COALESCE($7, site_favicon),
+            contact_email = COALESCE($8, contact_email),
+            contact_phone = COALESCE($9, contact_phone),
+            contact_fax = COALESCE($10, contact_fax),
+            contact_address = COALESCE($11, contact_address),
+            business_number = COALESCE($12, business_number),
+            social_facebook = COALESCE($13, social_facebook),
+            social_twitter = COALESCE($14, social_twitter),
+            social_instagram = COALESCE($15, social_instagram),
+            social_youtube = COALESCE($16, social_youtube),
             updated_at = NOW()
         WHERE id = (SELECT id FROM site_info ORDER BY created_at DESC LIMIT 1)
         RETURNING *
         "#
     )
     .bind(&payload.siteInfo.site_name)
-    .bind(&payload.siteInfo.catchphrase)
-    .bind(&payload.siteInfo.address)
-    .bind(&payload.siteInfo.phone)
-    .bind(&payload.siteInfo.email)
-    .bind(&payload.siteInfo.homepage)
-    .bind(&payload.siteInfo.fax)
-    .bind(&payload.siteInfo.representative_name)
+    .bind(&payload.siteInfo.site_description)
+    .bind(&payload.siteInfo.site_keywords)
+    .bind(&payload.siteInfo.site_author)
+    .bind(&payload.siteInfo.site_url)
+    .bind(&payload.siteInfo.site_logo)
+    .bind(&payload.siteInfo.site_favicon)
+    .bind(&payload.siteInfo.contact_email)
+    .bind(&payload.siteInfo.contact_phone)
+    .bind(&payload.siteInfo.contact_fax)
+    .bind(&payload.siteInfo.contact_address)
     .bind(&payload.siteInfo.business_number)
-    .bind(&payload.siteInfo.logo_image_url)
+    .bind(&payload.siteInfo.social_facebook)
+    .bind(&payload.siteInfo.social_twitter)
+    .bind(&payload.siteInfo.social_instagram)
+    .bind(&payload.siteInfo.social_youtube)
     .fetch_one(&mut *tx)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

@@ -26,8 +26,10 @@ pub fn admin_routes(state: AppState) -> Router<AppState> {
         .route("/api/admin/users/:id", put(handlers::admin::update_user))
         // 게시글 관리
         .route("/api/admin/posts", get(handlers::admin::get_posts))
+        .route("/api/admin/posts", post(handlers::admin::create_post))
         .route("/api/admin/posts/:id", get(handlers::admin::get_post))
         .route("/api/admin/posts/:id", put(handlers::admin::update_post))
+        .route("/api/admin/posts/:id", delete(handlers::admin::delete_post))
         // 게시판 관리
         .route("/api/admin/boards", get(handlers::board::list_boards))
         .route("/api/admin/boards", post(handlers::board::create_board))
@@ -41,9 +43,9 @@ pub fn admin_routes(state: AppState) -> Router<AppState> {
         // 댓글 관리
         .route("/api/admin/comments", get(handlers::admin::get_comments))
         // 메뉴 관리
-        .route("/api/admin/menus", get(handlers::menu::get_menus))
-        .route("/api/admin/menus", post(handlers::menu::create_menu))
-        .route("/api/admin/menus", put(handlers::menu::update_menus))
+        .route("/api/admin/menus", get(handlers::admin_menu::get_menus))
+        .route("/api/admin/menus", post(handlers::admin_menu::create_menu))
+        .route("/api/admin/menus", put(handlers::admin_menu::update_menus))
         // 페이지 관리
         .route("/api/admin/pages", get(handlers::page::get_pages))
         .route("/api/admin/pages", post(handlers::page::create_page))
@@ -59,6 +61,8 @@ pub fn admin_routes(state: AppState) -> Router<AppState> {
         // 사이트 설정
         .route("/api/admin/site/settings", get(handlers::admin::settings::get_site_settings))
         .route("/api/admin/site/settings", put(handlers::admin::settings::save_site_settings))
+        // 파일 업로드 (관리자용)
+        .route("/api/admin/upload/site", post(handlers::admin_upload::upload_site_file))
         // 게시글 관리 (이동, 숨김 등)
         .nest("/api/admin", handlers::admin::post_management::post_management_routes())
         .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::admin_middleware));

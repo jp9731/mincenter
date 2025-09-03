@@ -3,6 +3,7 @@
 	import { Card } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { getRecentPosts } from '$lib/api/community';
+	import { stripHtml } from '$lib/utils/html';
 	import type { PostDetail } from '$lib/types/community';
 
 	// Props - 슬러그와 글 수를 설정할 수 있도록 개선
@@ -63,11 +64,7 @@
 		return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
 	}
 
-	// 텍스트에서 HTML 태그 제거
-	function stripHtml(html: string | null | undefined): string {
-		if (!html) return '';
-		return html.replace(/<[^>]*>/g, '').trim();
-	}
+
 
 	// 날짜 포맷팅
 	function formatDate(dateString: string): string {

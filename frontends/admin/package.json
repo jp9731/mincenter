@@ -5,7 +5,7 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"deploy": "vite build",
+
 		"prepare": "npx svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -84,6 +84,15 @@
 		"@fullcalendar/timegrid": "^6.1.17",
 		"@sveltejs/adapter-cloudflare": "^7.1.3",
 		"@tadashi/svelte-editor-quill": "^4.0.0",
+		"@tiptap/core": "^3.3.1",
+		"@tiptap/extension-color": "^3.3.1",
+		"@tiptap/extension-highlight": "^3.3.1",
+		"@tiptap/extension-image": "^3.3.1",
+		"@tiptap/extension-link": "^3.3.1",
+		"@tiptap/extension-placeholder": "^3.3.1",
+		"@tiptap/extension-text-align": "^3.3.1",
+		"@tiptap/extension-underline": "^3.3.1",
+		"@tiptap/starter-kit": "^3.3.1",
 		"lucide-svelte": "^0.518.0",
 		"svelte-dnd-action": "^0.9.64"
 	}

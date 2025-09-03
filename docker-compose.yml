@@ -1,68 +1,16 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:17
-    container_name: ${APP_NAME:-mincenter}_postgres
-    networks:
-      - mincenter_network
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-mincenter}
-      POSTGRES_USER: ${POSTGRES_USER:-mincenter}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/korean-setup.sql:/docker-entrypoint-initdb.d/01-korean-setup.sql:ro
-      - ./database/init.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
-      - ./database/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-    ports:
-      - "${POSTGRES_PORT:-15432}:5432"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mincenter} -d ${POSTGRES_DB:-mincenter}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: ${APP_NAME:-mincenter}_redis
-    networks:
-      - mincenter_network
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Rust API
+  # Rust API (PostgreSQL과 Redis는 서버에서 직접 사용)
   api:
     build:
       context: ./backends/api
       dockerfile: Dockerfile
     container_name: ${APP_NAME:-mincenter}_api
-    networks:
-      - mincenter_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-mincenter}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mincenter}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # 서버의 PostgreSQL과 Redis 사용
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
       JWT_SECRET: ${JWT_SECRET}
       REFRESH_SECRET: ${REFRESH_SECRET}
       API_PORT: ${API_PORT:-18080}
@@ -78,15 +26,5 @@ services:
       timeout: 10s
       retries: 3
 
-  # Note: Site and Admin are deployed to Cloudflare Pages via GitHub Actions
-  # See frontends/site/.github/workflows/deploy.yml and frontends/admin/.github/workflows/deploy.yml
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-
-networks:
-  mincenter_network:
-    driver: bridge
+  # Note: Site and Admin are deployed to Cloudflare Pages automatically
+  # PostgreSQL and Redis are running directly on the server

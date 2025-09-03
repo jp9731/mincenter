@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { getSiteInfo, type SiteInfo } from '$lib/api/site';
 
 	let currentYear = new Date().getFullYear();
+	let siteInfo = $state<SiteInfo | null>(null);
+	let isLoading = $state(true);
+	let error = $state<string | null>(null);
 	
 	// Svelte 5 스타일 터치 및 모바일 감지
 	let isTouching = $state(false);
@@ -18,7 +22,9 @@
 
 	// 전화 걸기 함수
 	function makeCall() {
-		window.location.href = 'tel:032-542-9294';
+		if (siteInfo?.contact_phone) {
+			window.location.href = `tel:${siteInfo.contact_phone}`;
+		}
 	}
 	
 	// 터치 이벤트 핸들러
@@ -35,7 +41,7 @@
 		innerWidth = window.innerWidth;
 	}
 	
-	onMount(() => {
+	onMount(async () => {
 		// 터치 이벤트 리스너 추가
 		document.addEventListener('touchstart', handleTouchStart);
 		document.addEventListener('touchend', handleTouchEnd);
@@ -43,6 +49,16 @@
 		
 		// 윈도우 크기 변경 리스너
 		window.addEventListener('resize', handleResize);
+		
+		// 사이트 정보 가져오기
+		try {
+			siteInfo = await getSiteInfo();
+		} catch (err) {
+			error = err instanceof Error ? err.message : '사이트 정보를 가져오는데 실패했습니다.';
+			console.error('사이트 정보 로드 실패:', err);
+		} finally {
+			isLoading = false;
+		}
 		
 		return () => {
 			document.removeEventListener('touchstart', handleTouchStart);
@@ -63,28 +79,59 @@
 				<img src="/images/min_logo.png" alt="민들레장애인자립생활센터 로고" class="w-32 h-32 object-contain">
 			</div>
 			
-			<!-- 기존 정보 -->
+			<!-- 사이트 정보 -->
 			<div class="min-w-[340px] md:min-w-[420px] flex-1">
-				<h2 class="mb-2 text-lg font-bold">민들레장애인자립생활센터</h2>
-				<ul class="space-y-1 text-base">
-					<li><span class="font-semibold">대표</span>: 박길연</li>
-					<li>
-						<span class="font-semibold">주소</span>: 인천광역시 계양구 계산새로71 A동 201~202호
-						<span class="text-sm text-gray-200">(계산동, 하이베라스)</span>
-					</li>
-					<li><span class="font-semibold">사업자등록번호</span>: 131-80-12554</li>
-					<li>
-						<span class="font-semibold">전화</span>: <a href="tel:032-542-9294" class="underline text-green-200 font-medium">032-542-9294</a>
-					</li>
-					<li>
-						<span class="font-semibold">이메일</span>: <a href="mailto:mincenter08@daum.net" class="underline text-green-200 font-medium">mincenter08@daum.net</a>
-					</li>
-					<li><span class="font-semibold">전자팩스</span>: 032-232-0739</li>
-				</ul>
+				{#if isLoading}
+					<div class="animate-pulse">
+						<div class="h-6 bg-gray-300 rounded mb-2 w-48"></div>
+						<div class="space-y-2">
+							<div class="h-4 bg-gray-300 rounded w-32"></div>
+							<div class="h-4 bg-gray-300 rounded w-40"></div>
+							<div class="h-4 bg-gray-300 rounded w-36"></div>
+						</div>
+					</div>
+				{:else if error}
+					<div class="text-red-200">
+						<p class="text-sm">사이트 정보를 불러올 수 없습니다.</p>
+						<p class="text-xs mt-1">{error}</p>
+					</div>
+				{:else if siteInfo}
+					<h2 class="mb-2 text-lg font-bold">{siteInfo.site_name}</h2>
+					<ul class="space-y-1 text-base">
+						{#if siteInfo.site_author}
+							<li><span class="font-semibold">대표</span>: {siteInfo.site_author}</li>
+						{/if}
+						{#if siteInfo.contact_address}
+							<li>
+								<span class="font-semibold">주소</span>: {siteInfo.contact_address}
+							</li>
+						{/if}
+						{#if siteInfo.contact_phone}
+							<li>
+								<span class="font-semibold">전화</span>: <a href="tel:{siteInfo.contact_phone}" class="underline text-green-200 font-medium">{siteInfo.contact_phone}</a>
+							</li>
+						{/if}
+						{#if siteInfo.contact_email}
+							<li>
+								<span class="font-semibold">이메일</span>: <a href="mailto:{siteInfo.contact_email}" class="underline text-green-200 font-medium">{siteInfo.contact_email}</a>
+							</li>
+						{/if}
+						{#if siteInfo.business_number}
+							<li><span class="font-semibold">사업자등록번호</span>: {siteInfo.business_number}</li>
+						{/if}
+						{#if siteInfo.contact_fax}
+							<li><span class="font-semibold">전자팩스</span>: {siteInfo.contact_fax}</li>
+						{/if}
+					</ul>
+				{:else}
+					<div class="text-gray-300">
+						<p class="text-sm">사이트 정보가 없습니다.</p>
+					</div>
+				{/if}
 			</div>
 		</div>
 		<div class="text-center md:text-right mt-6 md:mt-0 w-full">
-			<p class="text-md">© 2025 민들레장애인자립생활센터. All rights reserved.</p>
+			<p class="text-md">© {currentYear} {siteInfo?.site_name || '민들레장애인자립생활센터'}. All rights reserved.</p>
 		</div>
 	</div>
 </footer>
@@ -116,7 +163,9 @@
 		<!-- 유튜브 버튼 -->
 		<li class="flex justify-end">
 			<a
-				href="#"
+				href={siteInfo?.social_youtube || "#"}
+				target="_blank"
+				rel="noopener noreferrer"
 				class="fab-btn group ml-auto"
 				aria-label="유튜브"
 			>
@@ -132,7 +181,7 @@
 		<!-- 인스타그램 버튼 -->
 		<li class="flex justify-end">
 			<a
-				href="https://www.instagram.com/mincenter08?igsh=bTZyM2Qxa2t4ajJv"
+				href={siteInfo?.social_instagram || "https://www.instagram.com/mincenter08?igsh=bTZyM2Qxa2t4ajJv"}
 				target="_blank"
 				rel="noopener noreferrer"
 				class="fab-btn group ml-auto"
