@@ -1878,15 +1878,15 @@ pub async fn create_comment(
     // post_id를 압축된 ID에서 UUID로 변환
     let post_id = if payload.post_id.contains('-') && payload.post_id.len() < 20 {
         // URL ID 형태: "post-123-title-slug"
-        resolve_post_uuid(&payload.post_id, &state.pool)
+        resolve_post_uuid(&state.pool, &payload.post_id)
             .await
-            .ok_or_else(|| {
+            .map_err(|_| {
                 eprintln!("Invalid URL ID for post: {}", payload.post_id);
                 StatusCode::BAD_REQUEST
             })?
     } else if payload.post_id.len() == 22 && payload.post_id.chars().all(|c| c.is_alphanumeric()) {
         // Base62 압축된 ID
-        crate::utils::uuid_compression::decompress_uuid_from_base62(&payload.post_id)
+        crate::utils::uuid_compression::decompress_base62_to_uuid(&payload.post_id)
             .map_err(|e| {
                 eprintln!("Invalid compressed ID: {} - Error: {}", payload.post_id, e);
                 StatusCode::BAD_REQUEST
