@@ -261,7 +261,7 @@
 				try {
 					await deletePost(data.post.id);
 					showAlert('성공', '글이 삭제되었습니다.');
-					//goto(`/community/${data.slug}`);
+					goto(`/community/${data.slug}`);
 				} catch (error) {
 					showAlert('오류', '글 삭제에 실패했습니다.');
 					console.error(error);

@@ -10,7 +10,6 @@ pub struct Config {
     pub api_port: u16,
     pub api_base_url: String,
     pub redis_url: String,
-    pub cors_origin: String,
     pub rust_log: String,
 }
 
@@ -18,39 +17,30 @@ impl Config {
     pub fn from_env() -> Self {
         let node_env = env::var("NODE_ENV").unwrap_or_else(|_| "development".to_string());
         
-        // 환경별 기본값 설정
-        let (default_db_url, default_api_port, default_api_base_url) = match node_env.as_str() {
+        // 환경별 기본값 설정 (민감한 정보는 환경변수에서만 읽음)
+        let (default_api_port, default_api_base_url) = match node_env.as_str() {
             "production" => (
-                "postgresql://mincenter:!@swjp0209^^@postgres:5432/mincenter",
                 "8080",
                 "http://mincenter-api:8080"
             ),
             _ => (
-                "postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter",
                 "18080",
                 "http://localhost:18080"
             )
         };
 
-        let (default_redis_url, default_cors_origin, default_rust_log) = match node_env.as_str() {
-            "production" => (
-                "redis://:tnekwoddl@redis:6379",
-                "https://mincenter.kr,https://admin.mincenter.kr",
-                "info"
-            ),
-            _ => (
-                "redis://:tnekwoddl@localhost:6379",
-                "http://localhost:13000,http://localhost:13001",
-                "debug"
-            )
+        let default_rust_log = match node_env.as_str() {
+            "production" => "info",
+            _ => "debug"
         };
 
         Self {
-            database_url: env::var("DATABASE_URL").unwrap_or_else(|_| default_db_url.to_string()),
+            database_url: env::var("DATABASE_URL")
+                .expect("DATABASE_URL environment variable is required"),
             jwt_secret: env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "your-secret-key".to_string()),
+                .expect("JWT_SECRET environment variable is required"),
             refresh_secret: env::var("REFRESH_SECRET")
-                .unwrap_or_else(|_| "your-refresh-secret-key".to_string()),
+                .expect("REFRESH_SECRET environment variable is required"),
             access_token_expiry: env::var("ACCESS_TOKEN_EXPIRY_MINUTES")
                 .unwrap_or_else(|_| "15".to_string())
                 .parse()
@@ -65,9 +55,10 @@ impl Config {
                 .expect("API_PORT must be a number"),
             api_base_url: env::var("API_BASE_URL")
                 .unwrap_or_else(|_| default_api_base_url.to_string()),
-            redis_url: env::var("REDIS_URL").unwrap_or_else(|_| default_redis_url.to_string()),
-            cors_origin: env::var("CORS_ORIGIN").unwrap_or_else(|_| default_cors_origin.to_string()),
-            rust_log: env::var("RUST_LOG").unwrap_or_else(|_| default_rust_log.to_string()),
+            redis_url: env::var("REDIS_URL")
+                .expect("REDIS_URL environment variable is required"),
+            rust_log: env::var("RUST_LOG_LEVEL")
+                .unwrap_or_else(|_| default_rust_log.to_string()),
         }
     }
 

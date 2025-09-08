@@ -1352,8 +1352,8 @@ pub async fn create_post(
 
                         // file_entities 테이블에 연결 정보 저장
                         sqlx::query!(
-                            "INSERT INTO file_entities (file_id, entity_type, entity_id, file_purpose, display_order)
-                             VALUES ($1, $2, $3, $4, $5)",
+                            "INSERT INTO file_entities (id, file_id, entity_type, entity_id, file_purpose, display_order)
+                             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)",
                             file_id,
                             EntityType::Post as EntityType,  // entity_type을 Post로 설정
                             post.id,
@@ -1689,11 +1689,66 @@ pub async fn delete_post(
 
 // 댓글 목록 조회 (권한 체크 적용)
 pub async fn get_comments(
-    Path(post_id): Path<Uuid>,
+    Path(url_id): Path<String>,
     State(state): State<AppState>,
     Extension(claims): Extension<Option<Claims>>,
 ) -> Result<Json<ApiResponse<Vec<CommentDetail>>>, StatusCode> {
     let user_role = claims.as_ref().map(|c| c.role.as_str());
+    
+    // URL ID, 압축된 ID, 또는 UUID를 UUID로 변환
+    let post_id = if url_id.contains('-') && url_id.len() < 20 {
+        // URL ID 형태 (예: 1-Nu_EJg)
+        match resolve_post_uuid(&state.pool, &url_id).await {
+            Ok(uuid) => {
+                println!("✅ URL ID 변환 성공: {} -> {}", url_id, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 게시글 URL ID: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "존재하지 않는 게시글입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    } else if url_id.len() == 22 && url_id.chars().all(|c| c.is_alphanumeric()) {
+        // Base62 압축된 ID 형태 (22자리)
+        use crate::utils::uuid_compression::decompress_base62_to_uuid;
+        match decompress_base62_to_uuid(&url_id) {
+            Ok(uuid) => {
+                println!("✅ 압축된 ID 변환 성공: {} -> {}", url_id, uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 압축된 ID: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "잘못된 ID 형식입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    } else {
+        // 기존 UUID 형태 (하위 호환성)
+        match uuid::Uuid::parse_str(&url_id) {
+            Ok(uuid) => {
+                println!("✅ UUID 직접 사용: {}", uuid);
+                uuid
+            },
+            Err(_) => {
+                println!("❌ 잘못된 UUID: {}", url_id);
+                return Ok(Json(ApiResponse {
+                    success: false,
+                    message: "잘못된 ID 형식입니다.".to_string(),
+                    data: None,
+                    pagination: None,
+                }));
+            }
+        }
+    };
     
     // 게시글 정보 조회 (게시판 ID 확인용)
     let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", post_id)
@@ -1819,8 +1874,33 @@ pub async fn create_comment(
 ) -> Result<Json<ApiResponse<CommentDetail>>, StatusCode> {
     // 인증 확인
     let claims = claims.ok_or(StatusCode::UNAUTHORIZED)?;
+    
+    // post_id를 압축된 ID에서 UUID로 변환
+    let post_id = if payload.post_id.contains('-') && payload.post_id.len() < 20 {
+        // URL ID 형태: "post-123-title-slug"
+        resolve_post_uuid(&payload.post_id, &state.pool)
+            .await
+            .ok_or_else(|| {
+                eprintln!("Invalid URL ID for post: {}", payload.post_id);
+                StatusCode::BAD_REQUEST
+            })?
+    } else if payload.post_id.len() == 22 && payload.post_id.chars().all(|c| c.is_alphanumeric()) {
+        // Base62 압축된 ID
+        crate::utils::uuid_compression::decompress_uuid_from_base62(&payload.post_id)
+            .map_err(|e| {
+                eprintln!("Invalid compressed ID: {} - Error: {}", payload.post_id, e);
+                StatusCode::BAD_REQUEST
+            })?
+    } else {
+        // 일반 UUID 형태
+        Uuid::from_str(&payload.post_id).map_err(|e| {
+            eprintln!("Invalid UUID: {} - Error: {}", payload.post_id, e);
+            StatusCode::BAD_REQUEST
+        })?
+    };
+    
     // 게시글 정보 조회 (게시판 ID 확인용)
-    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", payload.post_id)
+    let post = sqlx::query!("SELECT board_id FROM posts WHERE id = $1 AND status IN ('active', 'published')", post_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| {
@@ -1876,7 +1956,7 @@ pub async fn create_comment(
          VALUES ($1, $2, $3, $4, $5, false)
          RETURNING id, post_id, user_id, parent_id, content, likes, status, created_at, updated_at, depth, is_deleted"
     )
-    .bind(payload.post_id)
+    .bind(post_id)
     .bind(claims.sub)
     .bind(payload.parent_id)
     .bind(payload.content)

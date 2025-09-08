@@ -24,10 +24,11 @@ echo "현재 작업 디렉토리: $(pwd)"
 echo "압축할 파일들:"
 ls -la
 
-# target과 Cargo.lock 제외하고 압축
+# target, Cargo.lock, static/uploads 제외하고 압축
 tar -czf ../../api-deploy.tar.gz \
     --exclude='./target' \
     --exclude='./Cargo.lock' \
+    --exclude='./static/uploads' \
     .
 
 # 압축 파일 확인
@@ -48,10 +49,27 @@ echo "서버에서 배포 작업 시작..."
 # 작업 디렉토리로 이동
 cd /home/admin/projects/mincenter
 
-# 기존 API 폴더 백업 (있는 경우)
+# 기존 백업 파일 정리 (최근 3개만 유지)
+echo "기존 백업 파일 정리 중..."
+ls -t api.backup.*.tar.gz 2>/dev/null | tail -n +4 | xargs rm -f 2>/dev/null || true
+
+# 기존 API 폴더 백업 (있는 경우, static/uploads 제외)
 if [ -d "api" ]; then
-    echo "기존 API 폴더 백업 중..."
-    mv api "api.backup.$(date +%Y%m%d_%H%M%S)"
+    echo "기존 API 폴더 백업 중 (static/uploads 제외)..."
+    
+    # 업로드 폴더만 별도 백업 (용량 절약을 위해)
+    if [ -d "api/static/uploads" ]; then
+        echo "업로드 폴더만 별도 백업 중..."
+        cp -r api/static/uploads /tmp/uploads_backup
+    fi
+    
+    # static/uploads 제외하고 백업
+    tar -czf "api.backup.$(date +%Y%m%d_%H%M%S).tar.gz" \
+        --exclude='api/static/uploads' \
+        api/
+    
+    # 기존 폴더 삭제
+    rm -rf api
 fi
 
 # 새 API 폴더 생성
@@ -62,6 +80,26 @@ mkdir -p api
 echo "파일 압축 해제 중..."
 cd api
 tar -xzf /tmp/api-deploy.tar.gz
+
+# 업로드 폴더 복원 (백업이 있는 경우)
+if [ -d "/tmp/uploads_backup" ]; then
+    echo "업로드 폴더 복원 중..."
+    mkdir -p static
+    cp -r /tmp/uploads_backup
+    rm -rf /tmp/uploads_backup
+    echo "업로드 폴더 복원 완료"
+fi
+
+# 백업 폴더에서 업로드 폴더 복원 (더 안전한 방법)
+# 압축된 백업 파일에서 복원 (static/uploads는 별도 백업됨)
+LATEST_BACKUP_TAR=$(ls -t /home/admin/projects/mincenter/api.backup.*.tar.gz 2>/dev/null | head -1)
+if [ -n "$LATEST_BACKUP_TAR" ]; then
+    echo "백업 파일에서 업로드 폴더 복원 중..."
+    mkdir -p static
+    # 압축 파일에서 static/uploads만 추출
+    tar -xzf "$LATEST_BACKUP_TAR" --wildcards "api/static/uploads/*" --strip-components=3 -C static/ 2>/dev/null || true
+    echo "백업 파일에서 업로드 폴더 복원 완료"
+fi
 
 # Rust 환경 설정
 echo "Rust 환경 설정 중..."
@@ -89,6 +127,10 @@ chmod +x target/release/mincenter-api
 echo "기존 서비스 중지 중..."
 systemctl --user stop mincenter-api || true
 
+# 기존 Docker 컨테이너 중지 (있는 경우)
+echo "기존 Docker 컨테이너 중지 중..."
+docker stop mincenter-api || true
+
 # 사용자 레벨 systemd 서비스 설정
 echo "사용자 레벨 systemd 서비스 설정 중..."
 mkdir -p ~/.config/systemd/user
@@ -107,8 +149,8 @@ RestartSec=10
 Environment=RUST_LOG=info
 Environment=RUST_BACKTRACE=1
 
-# 환경 변수 파일 로드
-EnvironmentFile=/home/admin/projects/mincenter/api/.env
+# 환경 변수 파일 로드 (실제 파일 경로 사용)
+EnvironmentFile=/home/admin/projects/mincenter/.env
 
 [Install]
 WantedBy=default.target

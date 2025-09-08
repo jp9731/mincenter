@@ -9,15 +9,13 @@ mod services;
 mod utils;
 
 use axum::{
-    extract::{Path, Query, State, Extension},
-    http::{StatusCode, Method, header},
-    response::IntoResponse,
-    routing::{get, post, put, delete},
-    Json, Router,
+    extract::Request,
+    http::{Method, HeaderValue},
+    response::Response,
+    routing::get,
+    Router,
+    middleware::Next,
 };
-use axum::routing::options;
-use std::collections::HashMap;
-use tower_http::cors::CorsLayer;
 use tower_http::services::fs::ServeDir;
 use tracing::{info, error, warn};
 use crate::config::Config;
@@ -33,33 +31,67 @@ pub struct AppState {
     pub redis: RedisClient,
 }
 
+// CORS 미들웨어
+async fn cors_middleware(request: Request, next: Next) -> Response {
+    let origin = request
+        .headers()
+        .get("origin")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let method = request.method().clone();
+    
+    // 허용된 Origin 목록 (환경변수에서만 읽어옴)
+    let allowed_origins: Vec<String> = std::env::var("CORS_ORIGIN")
+        .expect("CORS_ORIGIN environment variable is required")
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // OPTIONS preflight 처리
+    if method == Method::OPTIONS {
+        let mut response = Response::new(axum::body::Body::empty());
+        let headers = response.headers_mut();
+        
+        let allowed_origin = if allowed_origins.contains(&origin) {
+            origin
+        } else {
+            "*".to_string()
+        };
+        
+        headers.insert("Access-Control-Allow-Origin", HeaderValue::from_str(&allowed_origin).unwrap_or_else(|_| HeaderValue::from_static("*")));
+        headers.insert("Access-Control-Allow-Methods", HeaderValue::from_static("GET, POST, PUT, DELETE, OPTIONS"));
+        headers.insert("Access-Control-Allow-Headers", HeaderValue::from_static("authorization, content-type, x-requested-with"));
+        headers.insert("Access-Control-Max-Age", HeaderValue::from_static("86400"));
+        
+        return response;
+    }
+
+    // 일반 요청 처리
+    let mut response = next.run(request).await;
+    
+    let allowed_origin = if allowed_origins.contains(&origin) {
+        origin
+    } else {
+        "*".to_string()
+    };
+
+    response.headers_mut().insert(
+        "Access-Control-Allow-Origin",
+        HeaderValue::from_str(&allowed_origin).unwrap_or_else(|_| HeaderValue::from_static("*"))
+    );
+
+    response
+}
+
 #[tokio::main]
 async fn main() {
     // 환경 변수 로드
     dotenv::dotenv().ok();
     
-    // 환경 변수가 없으면 기본값 설정
-    if std::env::var("DATABASE_URL").is_err() {
-        std::env::set_var("DATABASE_URL", "postgresql://mincenter:!@swjp0209^^@localhost:15432/mincenter");
-    }
-    if std::env::var("REDIS_URL").is_err() {
-        std::env::set_var("REDIS_URL", "redis://:tnekwoddl@localhost:16379");
-    }
-    if std::env::var("JWT_SECRET").is_err() {
-        std::env::set_var("JWT_SECRET", "y4WiGMHXVN2BwluiRJj9TGt7Fh/B1pPZM24xzQtCnD8=");
-    }
-    if std::env::var("REFRESH_SECRET").is_err() {
-        std::env::set_var("REFRESH_SECRET", "ASH2HiFHXbIHfkFxWUOcC07QUodLMJBBIPkNKQ/GKcQ=");
-    }
-    if std::env::var("API_PORT").is_err() {
-        std::env::set_var("API_PORT", "18080");
-    }
-    if std::env::var("RUST_LOG_LEVEL").is_err() {
-        std::env::set_var("RUST_LOG_LEVEL", "info");
-    }
-    if std::env::var("CORS_ORIGIN").is_err() {
-        std::env::set_var("CORS_ORIGIN", "https://mincenter.kr,https://admin.mincenter.kr");
-    }
+    // 환경 변수는 .env 파일에서 로드됨
     
     // 로깅 초기화
     tracing_subscriber::fmt::init();
@@ -91,6 +123,7 @@ async fn main() {
     // 헬스 체크
     let health_routes = Router::new()
         .route("/health", get(handlers::health_check));
+    
 
     // 라우터 결합
     let app = Router::new()
@@ -99,13 +132,8 @@ async fn main() {
         .merge(admin_router)
         // 정적 파일 서빙
         .nest_service("/uploads", ServeDir::new("static/uploads"))
-        .layer(axum::middleware::from_fn(middleware::custom_cors_middleware))
         .with_state(state)
-        // OPTIONS 요청을 위한 catch-all 핸들러
-        .route("/*path", options(|| async { 
-            info!("OPTIONS preflight 요청 처리");
-            StatusCode::OK 
-        }));
+        .layer(axum::middleware::from_fn(cors_middleware));
 
     info!("Server starting on port {}", port);
     

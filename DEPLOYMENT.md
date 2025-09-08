@@ -37,6 +37,11 @@ npm run dev
 # API 서버 배포 (전체 배포)
 ./scripts/deploy-api.sh
 
+# 중요: static/uploads 폴더는 자동으로 보존됩니다
+# - 업로드 파일들은 용량 절약을 위해 백업에서 제외됩니다
+# - 기존 업로드 파일들이 임시 백업에서 자동으로 복원됩니다
+# - 배포 시 업로드된 파일들이 삭제되지 않습니다
+
 # API 서버 중지
 ./scripts/stop-api.sh
 
@@ -133,6 +138,12 @@ ssh mincenter-auto 'systemctl --user status mincenter-api'
 1. 서버 상태 확인: `./scripts/status-api.sh`
 2. 로그 확인: `./scripts/logs-api.sh 50`
 3. 서버 직접 확인: `ssh mincenter-auto 'systemctl --user status mincenter-api'`
+
+### 포트 충돌 오류 (Address already in use)
+1. 기존 Docker 컨테이너 확인: `ssh mincenter-auto 'docker ps | grep mincenter'`
+2. Docker 컨테이너 중지: `ssh mincenter-auto 'docker stop mincenter-api'`
+3. 포트 사용 확인: `ssh mincenter-auto 'netstat -tlnp | grep :18080'`
+4. 서비스 재시작: `./scripts/restart-api.sh`
 
 ### 배포 실패 시
 1. SSH 연결 확인: `ssh mincenter-auto 'echo "연결 성공"'`

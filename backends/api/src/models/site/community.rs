@@ -175,7 +175,7 @@ pub struct UpdatePostRequest {
 // 댓글 생성 요청
 #[derive(Debug, Deserialize)]
 pub struct CreateCommentRequest {
-    pub post_id: Uuid,
+    pub post_id: String, // 압축된 ID 지원을 위해 String으로 변경
     pub parent_id: Option<Uuid>,
     pub content: String,
 }
