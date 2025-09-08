@@ -130,7 +130,7 @@
 			<div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
 				{#each posts as post}
 					{@const imageUrl = getFirstImageUrl(post)}
-					<Card class="overflow-hidden transition-shadow hover:shadow-lg !py-0">
+					<Card class="overflow-hidden transition-shadow hover:shadow-lg !py-0 cursor-pointer" onclick={() => window.location.href = `/community/${post.board_slug}/${post.id}`}>
 						{#if imageUrl}
 							<div class="aspect-w-16 aspect-h-9">
 								<img 
@@ -145,14 +145,20 @@
 								<img src="/images/min_logo.png" alt="기본 이미지" class=" object-contain opacity-40" />
 							</div>
 						{/if}
-						<div class="px-6 pb-6">
-							<div class="mb-2 flex items-center gap-2">
-								<span class="text-primary-600 text-sm font-medium">
-									{post.category_name || post.board_name}
-								</span>
-								<span class="text-sm text-gray-500">
-									{formatDate(post.created_at)}
-								</span>
+						<div class="px-6 pb-2">
+							<div class="mb-2 flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<span class="text-primary-600 text-sm font-medium">
+										{post.category_name || post.board_name}
+									</span>
+									<span class="text-sm text-gray-500">
+										{formatDate(post.created_at)}
+									</span>
+								</div>
+								<div class="flex items-center gap-4 text-xs text-gray-500">
+									<span>조회 {post.views || 0}</span>
+									<span>댓글 {post.comment_count || 0}</span>
+								</div>
 							</div>
 							<h3 class="mb-2 text-xl font-semibold text-gray-900 line-clamp-2">
 								{post.title}
@@ -162,15 +168,6 @@
 									{stripHtml(post.content)}
 								</p>
 							{/if}
-							<div class="flex items-center justify-between">
-								<Button variant="ghost" asChild>
-									<a href="/community/{post.board_slug}/{post.id}">자세히 보기</a>
-								</Button>
-								<div class="flex items-center gap-4 text-xs text-gray-500">
-									<span>조회 {post.views || 0}</span>
-									<span>댓글 {post.comment_count || 0}</span>
-								</div>
-							</div>
 						</div>
 					</Card>
 				{/each}
