@@ -5,6 +5,29 @@
 
 set -e
 
+# 배포 실패 시 임시 파일 정리 함수
+cleanup_on_error() {
+    echo "❌ 배포 중 오류가 발생했습니다. 임시 파일을 정리합니다..."
+    
+    # 로컬 임시 파일 정리
+    if [ -f "api-deploy.tar.gz" ]; then
+        rm -f api-deploy.tar.gz
+        echo "✅ 로컬의 api-deploy.tar.gz 파일 삭제 완료"
+    fi
+    
+    # 서버 임시 파일 정리 (가능한 경우)
+    if ssh "$SERVER_HOST" "test -f /tmp/api-deploy.tar.gz" 2>/dev/null; then
+        ssh "$SERVER_HOST" "rm -f /tmp/api-deploy.tar.gz"
+        echo "✅ 서버의 /tmp/api-deploy.tar.gz 파일 삭제 완료"
+    fi
+    
+    echo "🧹 임시 파일 정리 완료"
+    exit 1
+}
+
+# 오류 발생 시 정리 함수 실행
+trap cleanup_on_error ERR
+
 echo "🚀 MinCenter API 배포 시작..."
 
 # 서버 정보
@@ -81,14 +104,14 @@ echo "파일 압축 해제 중..."
 cd api
 tar -xzf /tmp/api-deploy.tar.gz
 
-# 업로드 폴더 복원 (백업이 있는 경우)
-if [ -d "/tmp/uploads_backup" ]; then
-    echo "업로드 폴더 복원 중..."
-    mkdir -p static
-    cp -r /tmp/uploads_backup
-    rm -rf /tmp/uploads_backup
-    echo "업로드 폴더 복원 완료"
-fi
+    # 업로드 폴더 복원 (백업이 있는 경우)
+    if [ -d "/tmp/uploads_backup" ]; then
+        echo "업로드 폴더 복원 중..."
+        mkdir -p static
+        cp -r /tmp/uploads_backup static/uploads
+        rm -rf /tmp/uploads_backup
+        echo "업로드 폴더 복원 완료"
+    fi
 
 # 백업 폴더에서 업로드 폴더 복원 (더 안전한 방법)
 # 압축된 백업 파일에서 복원 (static/uploads는 별도 백업됨)
@@ -168,8 +191,9 @@ echo "서비스 상태 확인 중..."
 systemctl --user status mincenter-api
 
 # 배포 성공 후 임시 파일 정리
-echo "🧹 임시 파일 정리 중..."
+echo "🧹 서버 임시 파일 정리 중..."
 rm -f /tmp/api-deploy.tar.gz
+echo "✅ 서버의 /tmp/api-deploy.tar.gz 파일 삭제 완료"
 
 echo "✅ API 배포 완료!"
 echo "참고: 사용자 레벨 systemd 서비스로 실행 중입니다."
@@ -182,9 +206,21 @@ EOF
 
 # 로컬 정리
 echo "🧹 로컬 임시 파일 정리 중..."
-rm -f api-deploy.tar.gz
+if [ -f "api-deploy.tar.gz" ]; then
+    rm -f api-deploy.tar.gz
+    echo "✅ 로컬의 api-deploy.tar.gz 파일 삭제 완료"
+else
+    echo "ℹ️  로컬에 api-deploy.tar.gz 파일이 없습니다"
+fi
 
 echo "🎉 API 배포가 완료되었습니다!"
-echo "서버에서 다음 명령어로 상태를 확인할 수 있습니다:"
+echo ""
+echo "📋 배포 완료 요약:"
+echo "  ✅ 서버 배포: 완료"
+echo "  ✅ 서비스 시작: 완료"
+echo "  ✅ 임시 파일 정리: 완료"
+echo ""
+echo "🔧 서버 관리 명령어:"
 echo "  ssh $SERVER_HOST 'systemctl --user status mincenter-api'"
 echo "  ssh $SERVER_HOST 'systemctl --user logs mincenter-api -f'"
+echo "  ssh $SERVER_HOST 'systemctl --user restart mincenter-api'"
